@@ -1,0 +1,231 @@
+You are a senior full-stack engineer responsible for preparing this project for **production deployment**.
+
+Your job is to **refactor and optimize the codebase** without changing the current UI appearance, features, or user workflows.
+
+Important rules:
+
+1. Do NOT change UI design or layout
+2. Do NOT remove existing features
+3. Do NOT rewrite logic unless required for optimization or deployment
+4. Focus on **performance, stability, and deployment readiness**
+
+---
+
+# Target Architecture
+
+Frontend → Vercel
+Backend API → Render
+Database → Supabase
+Authentication → Google OAuth
+
+The final project must run **without errors and be ready for client deployment**.
+
+---
+
+# 1. Project Structure
+
+Refactor the repository into a clean production structure:
+
+/frontend
+/backend
+
+Frontend contains only:
+
+* UI
+* pages
+* components
+* API calls
+
+Backend contains:
+
+* API routes
+* authentication
+* Supabase integration
+* business logic
+
+Remove unnecessary coupling between frontend and backend.
+
+---
+
+# 2. Frontend Optimization (Vercel Ready)
+
+Ensure the frontend can run with:
+
+npm install
+npm run build
+
+The build should output a `/dist` or `/build` folder.
+
+Requirements:
+
+* remove unused dependencies
+* remove heavy dev scripts
+* fix large imports
+* optimize bundle size
+
+Use environment variables properly.
+
+Example:
+
+VITE_API_URL=https://backend-domain.onrender.com
+VITE_GOOGLE_CLIENT_ID=
+
+Ensure all API requests point to the backend API.
+
+The frontend must contain **no backend logic or secrets**.
+
+---
+
+# 3. Backend Optimization (Render Ready)
+
+Ensure backend runs as a **single lightweight server process**.
+
+Server must listen using:
+
+const port = process.env.PORT || 5000
+
+app.listen(port, "0.0.0.0")
+
+Remove development scripts such as:
+
+* concurrently
+* frontend dev servers
+* unused dev tooling
+
+Backend must start with:
+
+npm install
+npm start
+
+---
+
+# 4. Supabase Database Integration
+
+Ensure the backend uses **Supabase as the primary database**.
+
+Requirements:
+
+* use Supabase client properly
+* avoid multiple database connections
+* ensure queries are efficient
+* handle errors correctly
+
+Use environment variables:
+
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+Ensure all database logic runs from the backend API.
+
+---
+
+# 5. Google Authentication Stability
+
+Fix Google OAuth implementation to ensure:
+
+* correct OAuth redirect handling
+* proper token validation
+* no infinite redirect loops
+* no console errors
+* no authentication failures
+
+Authentication flow should be:
+
+Frontend → request login
+Backend → verify Google token
+Backend → create or fetch user in Supabase
+Backend → return session / JWT
+
+Ensure login works reliably.
+
+---
+
+# 6. Performance Optimization
+
+Reduce memory usage and improve startup performance.
+
+Tasks:
+
+* remove unused dependencies
+* remove duplicate packages
+* lazy load heavy modules
+* ensure backend startup is lightweight
+* avoid memory leaks
+
+The project must run on **low-memory hosting environments**.
+
+---
+
+# 7. Environment Variables Setup
+
+Create `.env.example` files.
+
+Frontend example:
+
+VITE_API_URL=
+VITE_GOOGLE_CLIENT_ID=
+
+Backend example:
+
+PORT=
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+JWT_SECRET=
+
+Ensure the project works correctly when environment variables are provided.
+
+---
+
+# 8. Deployment Preparation
+
+Prepare the project so clients only need to deploy.
+
+Frontend deployment:
+
+1. upload `/frontend` to Vercel
+2. configure environment variables
+3. deploy
+
+Backend deployment:
+
+1. upload `/backend` to Render
+2. configure environment variables
+3. run `npm install`
+4. run `npm start`
+
+Deployment must work without additional configuration.
+
+---
+
+# 9. Documentation
+
+Create a file:
+
+DEPLOYMENT.md
+
+Explain clearly:
+
+* Supabase setup
+* Google OAuth setup
+* Frontend deployment to Vercel
+* Backend deployment to Render
+* environment variable configuration
+
+The instructions must be simple enough for non-technical users.
+
+---
+
+# Final Goal
+
+Deliver a **clean, optimized, production-ready project** that:
+
+* keeps the existing UI unchanged
+* uses Supabase as the database
+* supports Google login reliably
+* runs efficiently
+* deploys easily for clients
+* contains no runtime errors.
