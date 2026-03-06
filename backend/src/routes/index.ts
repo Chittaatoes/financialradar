@@ -25,15 +25,14 @@
  * - checkFocusCompletion(): Auto-checks if a daily focus mission is done
  */
 import type { Express } from "express";
-import { createServer, type Server } from "http";
 import { storage } from "../storage";
 import { setupAuth, isAuthenticated, isAdmin } from "../auth";
 import { format, subDays, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, subMonths, parseISO } from "date-fns";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../db";
-import { users } from "../../../shared/models/auth";
-import { userProfiles } from "../../../shared/schema";
+import { users } from "../../shared/models/auth";
+import { userProfiles } from "../../shared/schema";
 import { eq, sql, count } from "drizzle-orm";
 
 // === REQUEST VALIDATION SCHEMAS ===
@@ -105,9 +104,8 @@ const BADGE_SEED_DATA = [
 ];
 
 export async function registerRoutes(
-  httpServer: Server,
   app: Express
-): Promise<Server> {
+): Promise<void> {
   await setupAuth(app);
 // registerAuthRoutes sudah tidak dipakai
 
@@ -1894,5 +1892,4 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
     }
   });
 
-  return httpServer;
 }

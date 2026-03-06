@@ -2,12 +2,10 @@ import "dotenv/config";
 import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import { registerRoutes } from "./routes";
-import { createServer } from "http";
 import { log, requestLogger } from "./middleware/logger";
 
 const app = express();
 app.set("trust proxy", 1);
-const httpServer = createServer(app);
 
 declare module "http" {
   interface IncomingMessage {
@@ -46,7 +44,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(requestLogger);
 
 (async () => {
-  await registerRoutes(httpServer, app);
+  await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -61,9 +59,9 @@ app.use(requestLogger);
     return res.status(status).json({ message });
   });
 
-  const port = parseInt(process.env.PORT || "10000", 10);
+  const port = parseInt(process.env.PORT || "5000", 10);
 
-  httpServer.listen(port, "0.0.0.0", () => {
+  app.listen(port, "0.0.0.0", () => {
     log(`API server running on port ${port}`);
   });
 })();

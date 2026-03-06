@@ -29,8 +29,8 @@ import {
   type BudgetPlan, type InsertBudgetPlan,
   accounts, transactions, goals, liabilities, userProfiles, xpLogs, streakLogs,
   customCategories, dailyFocus, badges, userBadges, budgetAllocations, budgetPlans,
-} from "../../shared/schema";
-import { users } from "../../shared/models/auth";
+} from "../shared/schema";
+import { users } from "../shared/models/auth";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, lte, count } from "drizzle-orm";
 

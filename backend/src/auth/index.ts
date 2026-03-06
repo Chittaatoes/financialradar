@@ -2,7 +2,7 @@ import type { Express, RequestHandler } from "express";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool, db } from "../db";
-import { users } from "../../../shared/models/auth";
+import { users } from "../../shared/models/auth";
 import { eq } from "drizzle-orm";
 
 export async function setupAuth(app: Express) {
