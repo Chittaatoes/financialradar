@@ -23,12 +23,10 @@ export async function setupAuth(app: Express) {
       resave: false,
       saveUninitialized: false,
       rolling: true,
-      proxy: true,
-      
       cookie: {
-        secure: true,
+        secure: process.env.NODE_ENV === "production",
         httpOnly: true,
-        sameSite: "none",
+        sameSite: "lax",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       },
     })
