@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -87,22 +87,71 @@ function AuthenticatedLayout() {
 function AppContent() {
   const { user, isLoading } = useAuth();
   const guestLoginCalled = useRef(false);
+  const [loginFailed, setLoginFailed] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+
+  const attemptGuestLogin = useCallback(() => {
+    setRetrying(true);
+    setLoginFailed(false);
+    apiRequest("POST", "/api/guest-login", {})
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["user"] });
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["user"] });
+          setRetrying(false);
+        }, 1500);
+      })
+      .catch(() => {
+        setLoginFailed(true);
+        setRetrying(false);
+      });
+  }, []);
 
   useEffect(() => {
     if (!isLoading && !user && !guestLoginCalled.current) {
       guestLoginCalled.current = true;
-      apiRequest("POST", "/api/guest-login", {}).then(() => {
-        queryClient.invalidateQueries({ queryKey: ["user"] });
-      }).catch(() => {});
+      attemptGuestLogin();
     }
-  }, [isLoading, user]);
+  }, [isLoading, user, attemptGuestLogin]);
 
-  if (isLoading || (!user && !guestLoginCalled.current)) {
+  useEffect(() => {
+    if (guestLoginCalled.current && !user && !isLoading && !loginFailed && !retrying) {
+      const timeout = setTimeout(() => {
+        setLoginFailed(true);
+      }, 8000);
+      return () => clearTimeout(timeout);
+    }
+  }, [user, isLoading, loginFailed, retrying]);
+
+  if (isLoading || retrying || (!user && !guestLoginCalled.current)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="space-y-4 text-center">
           <Skeleton className="h-10 w-10 rounded-md mx-auto" />
           <Skeleton className="h-4 w-32 mx-auto" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user && loginFailed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="space-y-4 text-center max-w-sm px-4">
+          <p className="text-lg font-semibold text-foreground">Connection Issue</p>
+          <p className="text-sm text-muted-foreground">
+            Unable to connect to the server. Please check your internet connection and try again.
+          </p>
+          <button
+            onClick={() => {
+              guestLoginCalled.current = false;
+              attemptGuestLogin();
+              guestLoginCalled.current = true;
+            }}
+            className="px-6 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
