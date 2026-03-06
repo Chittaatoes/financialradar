@@ -2,6 +2,14 @@
 
 This guide explains how to deploy Financial Radar to production using **Vercel** (frontend), **Render** (backend API), and **Supabase** (database).
 
+## Architecture
+
+```
+Browser → Vercel (frontend + API proxy) → Render (backend API) → Supabase (database)
+```
+
+All API requests go through Vercel's proxy (configured in `vercel.json`). This ensures cookies work correctly on all browsers including iOS Safari.
+
 ---
 
 ## 1. Supabase Setup (Database)
@@ -34,13 +42,19 @@ This creates all required tables automatically.
 4. Click **Create Credentials → OAuth Client ID**
 5. Select **Web application** as the application type
 6. Set the name to "Financial Radar"
-7. Under **Authorized redirect URIs**, add:
+7. Under **Authorized JavaScript origins**, add your frontend URL:
    ```
-   https://your-backend-url.onrender.com/api/auth/callback/google
+   https://your-project.vercel.app
    ```
-8. Click **Create** and save the **Client ID** and **Client Secret**
+8. Under **Authorized redirect URIs**, add your **frontend URL** (not backend):
+   ```
+   https://your-project.vercel.app/api/auth/callback/google
+   ```
+9. Click **Create** and save the **Client ID** and **Client Secret**
 
-> Important: You also need to configure the **OAuth consent screen** under APIs & Services. Add your email as a test user if the app is in testing mode.
+> Important: The redirect URI must point to your **frontend URL** (Vercel), not the backend URL. Vercel proxies the request to the backend automatically.
+
+> You also need to configure the **OAuth consent screen** under APIs & Services. Add your email as a test user if the app is in testing mode.
 
 ---
 
@@ -63,16 +77,16 @@ This creates all required tables automatically.
    | `SESSION_SECRET` | A random string (32+ characters) |
    | `GOOGLE_CLIENT_ID` | From Google Cloud Console |
    | `GOOGLE_CLIENT_SECRET` | From Google Cloud Console |
-   | `APP_URL` | `https://your-service-name.onrender.com` |
-   | `FRONTEND_URL` | `https://your-project.vercel.app` |
+   | `APP_URL` | Your **frontend URL** (e.g., `https://your-project.vercel.app`) |
+   | `FRONTEND_URL` | Your **frontend URL** (e.g., `https://your-project.vercel.app`) |
    | `NODE_ENV` | `production` |
    | `SUPER_ADMIN_EMAIL` | (Optional) Your email for admin access |
 
 6. Click **Deploy**
 
-> Note: Render automatically sets the `PORT` environment variable. Do not set it manually.
+> Important: `APP_URL` must be set to your **frontend URL** (Vercel), not the Render URL. This is because API requests go through Vercel's proxy, so the OAuth redirect URI must use the frontend domain.
 
-> After deployment, note your backend URL (e.g., `https://financial-radar-api.onrender.com`). You will need this for the frontend.
+> Note: Render automatically sets the `PORT` environment variable. Do not set it manually.
 
 ---
 
@@ -87,53 +101,63 @@ This creates all required tables automatically.
    - **Build Command**: `npm run build`
    - **Output Directory**: `dist`
 
-5. Add the following **Environment Variables**:
-
-   | Variable | Value |
-   |---|---|
-   | `VITE_API_URL` | Your Render backend URL (e.g., `https://financial-radar-api.onrender.com`) |
-   | `VITE_GOOGLE_CLIENT_ID` | Same Google Client ID used for the backend |
+5. No environment variables needed (API is proxied through `vercel.json`)
 
 6. Click **Deploy**
 
-> Important: For Vercel to resolve the `@shared` import alias, the `shared/` folder must be at the repository root (sibling to `frontend/`). Vercel will handle this automatically if you deploy from the full repository.
+> Important: The `vercel.json` file contains a rewrite rule that proxies `/api/*` requests to your Render backend. If your Render URL changes, update the destination URL in `frontend/vercel.json`.
+
+> For Vercel to resolve the `@shared` import alias, the `shared/` folder must be at the repository root (sibling to `frontend/`). Vercel will handle this automatically if you deploy from the full repository.
 
 ---
 
-## 5. Post-Deployment Checklist
+## 5. Updating the API Proxy URL
+
+If your Render backend URL changes, update `frontend/vercel.json`:
+
+```json
+{
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://YOUR-RENDER-URL.onrender.com/api/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
+```
+
+---
+
+## 6. Post-Deployment Checklist
 
 - [ ] Backend is running and accessible at your Render URL
 - [ ] Frontend loads correctly at your Vercel URL
 - [ ] Guest login works (creates anonymous user)
 - [ ] Google login redirects correctly and creates a user
+- [ ] Works on desktop, Android, and iOS Safari
 - [ ] Transactions, accounts, and goals can be created
 - [ ] Database tables were created successfully
 
 ---
 
-## 6. Updating the Google OAuth Redirect URI
-
-After you know your final Render backend URL, go back to Google Cloud Console and update the **Authorized redirect URI** to:
-
-```
-https://your-actual-backend-url.onrender.com/api/auth/callback/google
-```
-
----
-
 ## Troubleshooting
 
-### "CORS error" in browser console
-- Make sure `FRONTEND_URL` on the backend matches your Vercel URL exactly (no trailing slash)
+### iOS Safari shows loading or connection error
+- This is usually caused by cross-origin cookie issues
+- Make sure `vercel.json` has the API proxy rewrite configured correctly
+- The proxy makes API requests same-origin, which fixes iOS Safari cookie restrictions
+
+### "Page Not Found" after Google login
+- Make sure `APP_URL` on the backend is set to your **frontend URL** (Vercel), not the Render URL
+- The Google redirect URI in Google Console must also use the **frontend URL**:
+  `https://your-project.vercel.app/api/auth/callback/google`
 
 ### "401 Unauthorized" on API requests
 - Check that `SESSION_SECRET` is set on the backend
-- Ensure cookies are configured for cross-origin (`sameSite: "none"`, `secure: true` in production)
+- Verify the `vercel.json` proxy is working by visiting `https://your-frontend.vercel.app/api/auth/user` in the browser
 
 ### Google login not working
-- Verify `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are correct
-- Check that the redirect URI in Google Console matches `APP_URL/api/auth/callback/google`
-- Make sure the OAuth consent screen is configured
+- Verify `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are correct on both the backend
+- Check that the redirect URI in Google Console matches your frontend URL + `/api/auth/callback/google`
+- Make sure the OAuth consent screen is configured and your email is added as a test user
 
 ### Database connection errors
 - Verify your Supabase `DATABASE_URL` is correct
