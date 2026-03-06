@@ -1,0 +1,310 @@
+Build a **Budget Planner feature** for my web app called **Financial Radar**.
+
+The UI should follow the visual references I will upload (screenshots 1–7).
+The design style should be modern, minimal, and similar to the Budggt budgeting app but using the Financial Radar green theme.
+
+This feature should allow users to create a monthly budget plan using a step-by-step bottom sheet flow.
+
+---
+
+GENERAL GOAL
+
+Create a budgeting system where users:
+
+1. Enter their expected monthly income
+2. Choose a budgeting strategy
+3. Allocate money across main financial categories
+4. Confirm their budget
+5. View their budget dashboard with progress bars showing spending vs limits.
+
+Budget must be **saved per month** and can be **reset each month**.
+
+---
+
+MAIN CATEGORIES
+
+There are four main budget groups:
+
+* Kebutuhan (Needs)
+* Keinginan (Wants)
+* Tabungan (Savings)
+* Investasi (Investment)
+
+Each group will later contain spending categories like food, housing, transport, etc.
+
+---
+
+BUDGET FLOW
+
+When the user opens the Budget page and **no budget exists for the current month**, automatically show a **bottom sheet modal setup flow**.
+
+The bottom sheet contains a **step-by-step wizard**.
+
+---
+
+STEP 1 — INCOME INPUT
+
+Title:
+"Yuk atur budget kamu"
+
+Subtitle:
+"Pertama, kira-kira dapet pemasukan berapa bulan ini?"
+
+Input:
+Currency input field for income.
+
+Example:
+
+Rp 8.000.000
+
+Button:
+"Lanjut: Pilih Strategi"
+
+---
+
+STEP 2 — STRATEGY SELECTION
+
+Title:
+"Bagaimana cara alokasinya?"
+
+Options:
+
+1. Berbasis Persentase
+   Description: Cocok untuk pendapatan tidak tetap. Gaya 50/30/20.
+
+2. Jumlah Tetap
+   Description: Cocok untuk gaji tetap. Alokasi jumlah pasti.
+
+Cards should be selectable.
+
+Button:
+"Lanjut: Alokasi"
+
+---
+
+STEP 3A — PERCENTAGE STRATEGY
+
+If user selects percentage strategy:
+
+Show sliders for the 4 main groups:
+
+* Kebutuhan
+* Keinginan
+* Tabungan
+* Investasi
+
+Default example:
+
+Kebutuhan = 50%
+Keinginan = 25%
+Tabungan = 15%
+Investasi = 10%
+
+Show slider UI.
+
+Each slider shows:
+
+percentage
+calculated amount
+
+Example:
+
+Kebutuhan
+50% → Rp 4.000.000
+
+Validation rule:
+
+Total must equal 100%.
+
+Display indicator:
+
+TOTAL: 100%
+
+Button:
+"Lanjut"
+
+---
+
+STEP 3B — FIXED AMOUNT STRATEGY
+
+If user selects fixed strategy:
+
+User manually inputs amounts for:
+
+* Kebutuhan
+* Keinginan
+* Tabungan
+* Investasi
+
+Example:
+
+Kebutuhan: Rp 4.000.000
+Keinginan: Rp 2.000.000
+Tabungan: Rp 1.000.000
+Investasi: Rp 1.000.000
+
+Display remaining amount:
+
+SISA: Rp 0
+
+Validation rule:
+
+Total cannot exceed income.
+
+---
+
+STEP 4 — CONFIRMATION
+
+Show summary:
+
+Pendapatan: Rp 8.000.000
+Strategi: Persentase / Jumlah Tetap
+
+Allocation preview:
+
+Kebutuhan: Rp 4.000.000
+Keinginan: Rp 2.000.000
+Tabungan: Rp 1.200.000
+Investasi: Rp 800.000
+
+Button:
+
+"Konfirmasi Anggaran"
+
+---
+
+AFTER CONFIRMATION
+
+Save budget data for the current month.
+
+Structure example:
+
+{
+income: 8000000,
+strategy: "percentage",
+allocations: {
+needs: 4000000,
+wants: 2000000,
+savings: 1200000,
+investment: 800000
+},
+month: "2026-03"
+}
+
+Close bottom sheet and show **Budget Dashboard**.
+
+---
+
+BUDGET DASHBOARD
+
+Top Card:
+
+Large income card showing:
+
+Rp 8.000.000
+
+Labels:
+
+Strategi: Persentase
+Periode: Bulanan
+
+---
+
+CATEGORY GROUPS
+
+Show sections:
+
+KEBUTUHAN
+KEINGINAN
+TABUNGAN
+INVESTASI
+
+Each section contains categories like:
+
+Food
+Transport
+Housing
+Utilities
+Health
+Education
+
+---
+
+PROGRESS BAR SYSTEM
+
+Each group should have a progress bar.
+
+Example:
+
+Batas: Rp 4.000.000
+Terpakai: Rp 122.124
+
+Progress calculation:
+
+progress = spent / limit
+
+Example:
+
+122124 / 4000000 = 3%
+
+Render progress bar visually.
+
+Color rules:
+
+0–70% normal
+70–90% warning
+
+> 100% over budget
+
+---
+
+EDIT / RESET
+
+User must be able to reset their budget.
+
+Button:
+
+"Reset Budget"
+
+Reset clears the budget and reopens the bottom sheet setup.
+
+---
+
+AUTO MONTH HANDLING
+
+Budget is stored per month.
+
+If a new month starts and no budget exists:
+
+Automatically show setup again.
+
+---
+
+UI REQUIREMENTS
+
+* Use bottom sheet modal style
+* Rounded corners
+* Smooth transitions
+* Slider animations
+* Clean modern fintech UI
+
+---
+
+COMPONENT STRUCTURE
+
+BudgetSetupSheet
+BudgetStrategySelector
+BudgetAllocationPercentage
+BudgetAllocationFixed
+BudgetSummary
+BudgetDashboard
+BudgetGroupSection
+BudgetCategoryCard
+BudgetProgressBar
+
+---
+
+IMPORTANT
+
+I will upload multiple screenshots (1–7) that show the UI design reference.
+Match the layout, spacing, and visual hierarchy as closely as possible.

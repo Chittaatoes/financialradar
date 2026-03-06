@@ -1,0 +1,165 @@
+Improve the receipt scanning logic for Indonesian receipts.
+
+The current system sometimes detects incorrect numbers such as transaction IDs instead of the real payment total.
+
+Implement a robust receipt parsing system.
+
+---
+
+STEP 1 — PREPROCESS OCR TEXT
+
+Normalize OCR output:
+
+* convert text to lowercase
+* remove "rp", "idr"
+* replace commas and dots properly
+* remove duplicate spaces
+
+---
+
+STEP 2 — DETECT TOTAL USING KEYWORDS
+
+Search lines that contain these keywords:
+
+Primary keywords:
+
+total
+total bayar
+grand total
+jumlah
+total pembayaran
+total belanja
+total rp
+
+Secondary keywords:
+
+payment
+amount
+amount due
+total due
+
+If a line contains these keywords:
+
+extract the number from the same line.
+
+---
+
+STEP 3 — SUBTOTAL FALLBACK
+
+If no total found:
+
+search lines with:
+
+subtotal
+sub total
+jumlah sementara
+
+Use this value as fallback.
+
+---
+
+STEP 4 — NUMBER EXTRACTION
+
+Extract numbers with regex:
+
+\d{1,3}([.,]\d{3})+
+
+Convert:
+
+43,500
+43.500
+
+into integer:
+
+43500
+
+---
+
+STEP 5 — INVALID NUMBER FILTER
+
+Ignore numbers that are likely:
+
+transaction ID
+invoice number
+phone number
+
+Apply filters:
+
+ignore numbers > 1,000,000
+
+ignore numbers with more than 7 digits
+
+---
+
+STEP 6 — FINAL FALLBACK
+
+If still not found:
+
+extract all numbers from OCR text.
+
+remove numbers:
+
+> 1,000,000
+
+select the largest remaining number.
+
+---
+
+STEP 7 — DATE DETECTION
+
+Detect date formats:
+
+dd/mm/yyyy
+dd-mm-yyyy
+dd month yyyy
+
+Example:
+
+05/03/2026
+10 May 2019
+
+---
+
+STEP 8 — MERCHANT DETECTION
+
+Merchant is usually located in the first 3 lines of the receipt.
+
+Take the first line that:
+
+* contains letters
+* is not numeric
+* length > 3 characters
+
+---
+
+STEP 9 — OUTPUT STRUCTURE
+
+Return structured data:
+
+merchant
+total
+date
+items (optional)
+
+---
+
+IMPORTANT
+
+The parser must prioritize numbers appearing on the same line as TOTAL keywords.
+
+Never treat transaction IDs or order numbers as payment totals.
+
+The goal is to correctly detect totals from Indonesian receipts such as:
+
+Indomaret
+Alfamart
+BreadTalk
+Starbucks
+KFC
+McDonald's
+Superindo
+Transmart
+
+---
+
+This system must work reliably with Indonesian retail receipts.

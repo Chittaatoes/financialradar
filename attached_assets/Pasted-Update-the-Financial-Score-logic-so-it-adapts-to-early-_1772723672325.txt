@@ -1,0 +1,144 @@
+Update the Financial Score logic so it adapts to early-stage users who have very little data.
+
+Do not change the UI layout. Only update the logic and the conditions when the score appears.
+
+---
+
+GOAL
+
+The financial score should only be calculated when the user has enough data.
+
+New users should see a "score unlock progress" instead of a calculated score.
+
+---
+
+MINIMUM DATA REQUIREMENT
+
+Before calculating the score, check:
+
+minimum_transactions = 5
+
+If the user has fewer than 5 transactions:
+
+* Do NOT calculate the score
+* Do NOT assign a tier
+* Show placeholder instead of the score
+
+Example:
+
+Score display:
+"-- / 100"
+
+Tier:
+"Belum tersedia"
+
+---
+
+SCORE UNLOCK PROGRESS
+
+If transactions < 5, show a progress indicator.
+
+Example:
+
+2 / 5 transaksi untuk membuka skor
+
+This message should appear in the score section.
+
+Logic example:
+
+transactions_needed = 5
+progress = current_transactions / transactions_needed
+
+Example:
+
+current_transactions = 2
+
+Display:
+
+"2 / 5 transaksi untuk membuka skor"
+
+---
+
+SCORING ACTIVATION
+
+Only activate scoring if:
+
+transactions >= 5
+
+Once this condition is met, calculate the financial score normally.
+
+---
+
+SAVINGS SCORE ACTIVATION
+
+Savings score should only be calculated if the user has at least one saving goal.
+
+If saving_goals = 0:
+
+* savings_score = null
+* show message inside the savings card:
+
+"Buat target tabungan untuk mengaktifkan skor tabungan"
+
+---
+
+CONSISTENCY SCORE ACTIVATION
+
+Consistency score should only be calculated if:
+
+active_days >= 3
+
+If active_days < 3:
+
+* consistency_score = 0
+* show hint:
+
+"Catat transaksi beberapa hari lagi untuk menghitung konsistensi"
+
+---
+
+TOTAL SCORE CALCULATION
+
+Once requirements are met:
+
+total_score =
+needs_score +
+wants_score +
+savings_score +
+consistency_score
+
+Maximum = 100.
+
+---
+
+TIER SYSTEM
+
+0–30 → Financial Rookie
+30–50 → Bronze
+50–70 → Silver
+70–85 → Gold
+85–100 → Platinum
+
+But tier should only appear if the score is active.
+
+---
+
+USER EXPERIENCE FOR NEW USERS
+
+For users with very few transactions:
+
+Show:
+
+"Mulai catat transaksi untuk membuka skor keuangan."
+
+Also show progress:
+
+"2 / 5 transaksi untuk membuka skor."
+
+---
+
+IMPORTANT
+
+Keep the existing UI design exactly the same.
+
+Only update the logic and conditions so the financial score reflects the user's real data and does not appear too early.

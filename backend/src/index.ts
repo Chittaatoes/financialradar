@@ -1,0 +1,69 @@
+import "dotenv/config";
+import express, { type Request, type Response, type NextFunction } from "express";
+import cors from "cors";
+import { registerRoutes } from "./routes";
+import { createServer } from "http";
+import { log, requestLogger } from "./middleware/logger";
+
+const app = express();
+app.set("trust proxy", 1);
+const httpServer = createServer(app);
+
+declare module "http" {
+  interface IncomingMessage {
+    rawBody: unknown;
+  }
+}
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (process.env.NODE_ENV !== "production") {
+        return callback(null, true);
+      }
+
+      const allowed = process.env.FRONTEND_URL;
+
+      if (!origin || (allowed && origin === allowed)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+      }
+    },
+    credentials: true,
+  })
+);
+
+app.use(
+  express.json({
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
+
+app.use(express.urlencoded({ extended: false }));
+app.use(requestLogger);
+
+(async () => {
+  await registerRoutes(httpServer, app);
+
+  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
+
+    console.error("Internal Server Error:", err);
+
+    if (res.headersSent) {
+      return next(err);
+    }
+
+    return res.status(status).json({ message });
+  });
+
+  const port = parseInt(process.env.PORT || "10000", 10);
+
+  httpServer.listen(port, "0.0.0.0", () => {
+    log(`API server running on port ${port}`);
+  });
+})();
