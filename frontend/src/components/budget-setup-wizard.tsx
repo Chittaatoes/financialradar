@@ -63,7 +63,7 @@ function Step1Income({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col items-center gap-3 text-center">
-        <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #c8f135, #a8d420)" }}>
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-primary/15">
           <span className="text-3xl">💰</span>
         </div>
         <div>
@@ -113,13 +113,13 @@ function Step2Strategy({
       key: "percentage",
       label: t.budget.strategyPercentage,
       desc: t.budget.strategyPercentageDesc,
-      icon: <Percent className="w-5 h-5 text-blue-500" />,
+      icon: <Percent className="w-5 h-5 text-primary" />,
     },
     {
       key: "fixed",
       label: t.budget.strategyFixed,
       desc: t.budget.strategyFixedDesc,
-      icon: <DollarSign className="w-5 h-5 text-emerald-500" />,
+      icon: <DollarSign className="w-5 h-5 text-primary" />,
     },
   ];
 
@@ -373,7 +373,7 @@ function Step4Confirm({
     <div className="flex flex-col gap-5">
       <div className="flex flex-col items-center gap-3 text-center">
         <div className="relative">
-          <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ background: "radial-gradient(circle, rgba(168,212,32,0.2) 0%, rgba(168,212,32,0.05) 70%)" }}>
+          <div className="w-20 h-20 rounded-full flex items-center justify-center bg-primary/10">
             <Sparkles className="w-9 h-9 text-primary" />
           </div>
           <div className="absolute -top-1 -right-1 w-7 h-7 rounded-full bg-background border-2 border-border flex items-center justify-center">
@@ -418,7 +418,6 @@ function Step4Confirm({
           onClick={onConfirm}
           disabled={isPending}
           className="flex-1 min-h-[52px] text-base font-bold"
-          style={{ background: "linear-gradient(135deg, #c8f135, #a8d420)", color: "#1a2e00" }}
           data-testid="wizard-confirm"
         >
           {isPending ? "..." : t.budget.confirmBtn}

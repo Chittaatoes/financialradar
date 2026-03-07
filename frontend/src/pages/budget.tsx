@@ -595,7 +595,7 @@ export default function BudgetPage() {
       <div
         className="rounded-[20px] relative overflow-hidden"
         style={{
-          background: "linear-gradient(145deg, #0d2118 0%, #122b1e 40%, #0f2419 100%)",
+          background: "linear-gradient(145deg, #1E2F26 0%, #16221C 40%, #1a2a22 100%)",
           boxShadow: "0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)",
         }}
         data-testid="card-budget-summary"
@@ -605,7 +605,7 @@ export default function BudgetPage() {
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">{t.budget.expectedIncome}</p>
-              <p className="text-3xl font-mono font-bold" style={{ color: "#c8f135" }} data-testid="text-budget-income">
+              <p className="text-3xl font-mono font-bold text-white/90" data-testid="text-budget-income">
                 {formatCurrency(income)}
               </p>
             </div>
