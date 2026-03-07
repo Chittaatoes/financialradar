@@ -1150,9 +1150,10 @@ const TX_TABS: { type: TxTabType; icon: typeof ArrowUpRight; labelKey: string; c
   { type: "debt_payment", icon: CreditCard, labelKey: "actionDebtPayment", color: "text-orange-600 dark:text-orange-400", activeBg: "bg-orange-500/15", iconBg: "bg-orange-500/10" },
 ];
 
-function TypeTabSelector({ current, onChange, t }: { current: TxTabType; onChange: (t: TxTabType) => void; t: any }) {
+function TypeTabSelector({ current, onChange, onScan, t }: { current: TxTabType; onChange: (t: TxTabType) => void; onScan: () => void; t: any }) {
   const row1 = TX_TABS.slice(0, 3);
-  const row2 = TX_TABS.slice(3);
+  const row2Left = TX_TABS.slice(3, 4);
+  const row2Right = TX_TABS.slice(4);
   const renderTab = (tab: typeof TX_TABS[0]) => {
     const Icon = tab.icon;
     const active = current === tab.type;
@@ -1162,7 +1163,7 @@ function TypeTabSelector({ current, onChange, t }: { current: TxTabType; onChang
         type="button"
         onClick={() => onChange(tab.type)}
         className={cn(
-          "flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl transition-all duration-150 select-none",
+          "flex-1 flex flex-col items-center gap-1 py-2 rounded-xl transition-all duration-150 select-none",
           active ? tab.activeBg : "hover:bg-muted/50"
         )}
         data-testid={`button-tab-${tab.type}`}
@@ -1177,33 +1178,25 @@ function TypeTabSelector({ current, onChange, t }: { current: TxTabType; onChang
     );
   };
   return (
-    <div className="px-6 md:px-0 space-y-1.5 pb-2">
+    <div className="px-6 md:px-0 space-y-1 pb-1.5">
       <div className="flex gap-1.5">{row1.map(renderTab)}</div>
-      <div className="flex gap-1.5 justify-center">
-        {row2.map(tab => {
-          const Icon = tab.icon;
-          const active = current === tab.type;
-          return (
-            <button
-              key={tab.type}
-              type="button"
-              onClick={() => onChange(tab.type)}
-              style={{ width: "calc((100% - 8px) / 3)" }}
-              className={cn(
-                "flex flex-col items-center gap-1 py-2.5 rounded-xl transition-all duration-150 select-none",
-                active ? tab.activeBg : "hover:bg-muted/50"
-              )}
-              data-testid={`button-tab-${tab.type}`}
-            >
-              <div className={cn("rounded-lg p-1.5 transition-colors", active ? tab.iconBg : "bg-muted/30")}>
-                <Icon className={cn("w-4 h-4 transition-colors", active ? tab.color : "text-muted-foreground")} />
-              </div>
-              <span className={cn("text-[10px] font-medium leading-none transition-colors", active ? tab.color : "text-muted-foreground")}>
-                {(t.dashboard as any)[tab.labelKey]}
-              </span>
-            </button>
-          );
-        })}
+      <div className="flex gap-1.5">
+        {row2Left.map(renderTab)}
+        <button
+          key="scan"
+          type="button"
+          onClick={onScan}
+          className="flex-1 flex flex-col items-center gap-1 py-2 rounded-xl transition-all duration-150 select-none bg-violet-500/10 hover:bg-violet-500/15 ring-1 ring-violet-400/30"
+          data-testid="button-tab-scan"
+        >
+          <div className="rounded-lg p-1.5 bg-violet-500/15 transition-colors">
+            <Camera className="w-4 h-4 text-violet-500" />
+          </div>
+          <span className="text-[10px] font-medium leading-none text-violet-600 dark:text-violet-400">
+            Scan
+          </span>
+        </button>
+        {row2Right.map(renderTab)}
       </div>
     </div>
   );
@@ -1239,7 +1232,7 @@ function AddActionDialog({ open, onClose, t, onStreakTriggered, initialAction }:
           <ScanPanel onBack={() => setScanMode(false)} onSave={handleClose} />
         ) : (
           <>
-            <TypeTabSelector current={selectedTab} onChange={setSelectedTab} t={t} />
+            <TypeTabSelector current={selectedTab} onChange={setSelectedTab} onScan={() => setScanMode(true)} t={t} />
 
             {(selectedTab === "income" || selectedTab === "expense" || selectedTab === "transfer") && (
               <TransactionForm key={selectedTab} txType={selectedTab} onClose={handleClose} t={t} />
@@ -1252,23 +1245,6 @@ function AddActionDialog({ open, onClose, t, onStreakTriggered, initialAction }:
             {selectedTab === "debt_payment" && (
               <DebtPaymentForm key="debt_payment" onClose={handleClose} t={t} />
             )}
-
-            <div className="shrink-0 px-6 max-md:px-6 md:px-0 pb-4 pt-2 border-t border-border/40">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">Cara Cepat</p>
-              <button
-                type="button"
-                onClick={() => setScanMode(true)}
-                className="w-full flex items-center gap-2.5 py-2 px-3 rounded-xl border border-dashed border-border hover:bg-violet-500/5 hover:border-violet-400/40 transition-colors group"
-              >
-                <div className="w-7 h-7 rounded-lg bg-violet-500/10 flex items-center justify-center group-hover:bg-violet-500/15 transition-colors shrink-0">
-                  <Camera className="w-3.5 h-3.5 text-violet-500" />
-                </div>
-                <div className="text-left">
-                  <p className="text-xs font-semibold text-foreground">📷 Scan Struk</p>
-                  <p className="text-[10px] text-muted-foreground leading-tight">Foto struk, transaksi otomatis</p>
-                </div>
-              </button>
-            </div>
           </>
         )}
       </DialogContentBottomSheet>

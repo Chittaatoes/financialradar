@@ -18,10 +18,10 @@ Financial Radar is a habit-driven personal finance web application. It helps use
 
 ## Deployment Architecture
 ```
-Frontend (Vercel)  ←→  Backend (Render)  ←→  Database (Supabase PostgreSQL)
-   React SPA + Vite      Express API           Drizzle ORM
-   PWA-enabled           Google OAuth          DATABASE_URL env var
-   VITE_API_URL →        ← FRONTEND_URL
+Browser → Vercel (frontend + /api proxy) → Render (backend API) → Supabase PostgreSQL
+   React SPA + Vite         Express API              Drizzle ORM
+   PWA-enabled              Google OAuth             DATABASE_URL env var
+   vercel.json rewrites     ← APP_URL = frontend URL
 ```
 
 ### Production Deployment

@@ -43,6 +43,10 @@ app.use(
 app.use(express.urlencoded({ extended: false }));
 app.use(requestLogger);
 
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
 (async () => {
   await registerRoutes(app);
 

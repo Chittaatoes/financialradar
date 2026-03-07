@@ -1,0 +1,206 @@
+You are working on an existing full-stack web app called **Financial Radar**.
+
+The app architecture is already deployed and working:
+
+Frontend: React + Vite deployed on Vercel
+Backend: Express + TypeScript deployed on Render
+Database: Supabase Postgres
+
+The application works correctly on **desktop browsers and Android**, but on **iOS Safari the app gets stuck loading or shows "Connection Issue"**.
+
+Important requirements:
+
+DO NOT change the application logic, UI, routing, or business flow.
+DO NOT modify existing features or data models.
+Only fix **connection stability, cookies/session handling, and iOS compatibility**.
+
+The goal is to make the web app **stable across all browsers including iOS Safari**.
+
+---
+
+# Issues to Fix
+
+1. **iOS Safari cannot maintain session**
+2. **Connection Issue screen appears**
+3. **Safari blocks cookies because frontend and backend are on different domains**
+4. **Render cold start sometimes causes timeout**
+5. **Google OAuth redirect must work properly**
+
+---
+
+# Required Fixes
+
+## 1. Ensure all frontend API requests send cookies
+
+Every fetch request must include credentials.
+
+If any fetch exists like:
+
+fetch("/api/...")
+
+Update to:
+
+fetch("/api/...", {
+credentials: "include"
+})
+
+If axios is used, enable globally:
+
+axios.defaults.withCredentials = true
+
+Do NOT change endpoints or logic.
+
+---
+
+## 2. Use Vercel API proxy (same-origin fix)
+
+Create or ensure a `vercel.json` file exists at the project root:
+
+{
+"rewrites": [
+{
+"source": "/api/(.*)",
+"destination": "https://financialradar-api.onrender.com/api/$1"
+}
+]
+}
+
+This ensures:
+
+Browser → Vercel → Render
+
+From the browser perspective it is **same origin**, preventing Safari cookie blocking.
+
+---
+
+## 3. Fix Express session configuration
+
+Update Express session configuration to work behind proxy and Safari.
+
+Use:
+
+proxy: true
+
+Cookie settings:
+
+cookie: {
+secure: true,
+httpOnly: true,
+sameSite: "lax",
+maxAge: 7 * 24 * 60 * 60 * 1000
+}
+
+Do not change session logic or authentication flow.
+
+---
+
+## 4. Ensure Express trusts Render proxy
+
+Add if not present:
+
+app.set("trust proxy", 1)
+
+---
+
+## 5. Add backend health endpoint
+
+Add a lightweight endpoint:
+
+app.get("/health", (req, res) => {
+res.json({ status: "ok" });
+});
+
+This must not touch database or session logic.
+
+---
+
+## 6. Prevent infinite loading in frontend
+
+If the app waits indefinitely for `/api/auth/user`, implement:
+
+• request timeout
+• retry mechanism
+• fallback UI (already present Connection Issue screen)
+
+Ensure the retry does NOT alter existing logic.
+
+---
+
+## 7. Add UptimeRobot support (free tier)
+
+To prevent Render cold start:
+
+Use the new endpoint:
+
+https://financialradar-api.onrender.com/health
+
+Document instructions for UptimeRobot:
+
+Monitor Type: HTTP(s)
+URL: https://financialradar-api.onrender.com/health
+Interval: 5 minutes
+
+This keeps the backend awake.
+
+---
+
+## 8. Ensure Google OAuth works correctly
+
+Google Console settings must be compatible with the Vercel proxy.
+
+Authorized JavaScript origin:
+
+https://financialradar.vercel.app
+
+Authorized redirect URI:
+
+https://financialradar.vercel.app/api/auth/callback/google
+
+Do not change OAuth flow.
+
+---
+
+# Constraints
+
+DO NOT:
+
+• change UI
+• change routes
+• change authentication logic
+• change database schema
+• change API endpoints
+
+Only fix:
+
+• cookies
+• proxy
+• session handling
+• connection stability
+
+---
+
+# Final Goal
+
+The app must work perfectly on:
+
+• Desktop browsers
+• Android Chrome
+• iOS Safari
+• iOS PWA web app
+
+Users must be able to:
+
+• load the dashboard without infinite loading
+• login with Google
+• maintain session
+• use the app without connection errors
+
+---
+
+After implementing these fixes, verify:
+
+1. `/api/auth/user` works through Vercel proxy
+2. cookies persist in Safari
+3. Google login returns to the dashboard correctly
+4. the app never shows infinite loading
+5. uptime monitoring keeps the backend active
