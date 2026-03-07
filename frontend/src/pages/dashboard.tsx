@@ -1186,13 +1186,13 @@ function TypeTabSelector({ current, onChange, onScan, t }: { current: TxTabType;
           key="scan"
           type="button"
           onClick={onScan}
-          className="flex-1 flex flex-col items-center gap-1 py-2 rounded-xl transition-all duration-150 select-none bg-violet-500/10 hover:bg-violet-500/15 ring-1 ring-violet-400/30"
+          className="flex-1 flex flex-col items-center gap-1 py-2 rounded-xl transition-all duration-150 select-none border-2 border-dashed border-gray-300 dark:border-gray-600 bg-transparent hover:border-solid hover:border-green-600 hover:bg-green-50 dark:hover:bg-green-950/30 group"
           data-testid="button-tab-scan"
         >
-          <div className="rounded-lg p-1.5 bg-violet-500/15 transition-colors">
-            <Camera className="w-4 h-4 text-violet-500" />
+          <div className="rounded-lg p-1.5 bg-muted/30 group-hover:bg-green-500/10 transition-colors">
+            <Camera className="w-4 h-4 text-gray-500 dark:text-gray-400 group-hover:text-green-700 dark:group-hover:text-green-400 transition-colors" />
           </div>
-          <span className="text-[10px] font-medium leading-none text-violet-600 dark:text-violet-400">
+          <span className="text-[10px] font-medium leading-none text-gray-500 dark:text-gray-400 group-hover:text-green-800 dark:group-hover:text-green-400 transition-colors">
             Scan
           </span>
         </button>
