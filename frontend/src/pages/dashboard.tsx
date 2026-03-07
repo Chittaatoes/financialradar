@@ -599,12 +599,12 @@ function TransactionForm({
         <div className="space-y-3 px-6 max-md:px-6 md:px-0 max-md:flex-1 max-md:overflow-y-auto scrollbar-hide max-md:pb-2">
           <FormField
             control={form.control}
-            name="amount"
+            name="date"
             render={({ field }) => (
               <FormItem className="space-y-1">
-                <FormLabel className="text-xs">{t.transactions.amount}</FormLabel>
+                <FormLabel className="text-xs">{t.transactions.date}</FormLabel>
                 <FormControl>
-                  <CurrencyInput placeholder="0" className="max-md:min-h-[40px] max-md:h-10 min-h-[48px] text-lg" value={field.value} onChange={field.onChange} data-testid="input-quick-amount" />
+                  <Input type="date" className="max-md:min-h-[40px] max-md:h-10 min-h-[48px]" {...field} data-testid="input-quick-date" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -612,12 +612,12 @@ function TransactionForm({
           />
           <FormField
             control={form.control}
-            name="date"
+            name="amount"
             render={({ field }) => (
               <FormItem className="space-y-1">
-                <FormLabel className="text-xs">{t.transactions.date}</FormLabel>
+                <FormLabel className="text-xs">{t.transactions.amount}</FormLabel>
                 <FormControl>
-                  <Input type="date" className="max-md:min-h-[40px] max-md:h-10 min-h-[48px]" {...field} data-testid="input-quick-date" />
+                  <CurrencyInput placeholder="0" className="max-md:min-h-[40px] max-md:h-10 min-h-[48px] text-lg" value={field.value} onChange={field.onChange} data-testid="input-quick-amount" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -708,7 +708,7 @@ function TransactionForm({
                         <SelectValue placeholder={t.transactions.selectCategory} />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent className="max-h-72">
+                    <SelectContent className="max-h-[200px]">
                       {watchType === "income" ? (
                         <SelectGroup>
                           <SelectLabel>{t.transactions.defaultCategories}</SelectLabel>
