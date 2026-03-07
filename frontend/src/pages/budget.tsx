@@ -658,11 +658,9 @@ export default function BudgetPage() {
         </div>
       </div>
 
-      <div className="flex items-center justify-end">
-        <button type="button" className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors">
-          <span>{t.budget.showArchive}</span>
-        </button>
-      </div>
+      {debtHealth && debtHealth.monthlyIncome > 0 && (
+        <CashflowPressureSection health={debtHealth} />
+      )}
 
       {!budgetPlan ? (
         <Card>
@@ -713,10 +711,6 @@ export default function BudgetPage() {
             colors={GROUP_COLORS.investment}
           />
         </div>
-      )}
-
-      {debtHealth && debtHealth.monthlyIncome > 0 && (
-        <CashflowPressureSection health={debtHealth} />
       )}
 
       {budgetPlan && (

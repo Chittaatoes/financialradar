@@ -1332,7 +1332,7 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
         });
 
       const txCategoryToBudgetKey: Record<string, string[]> = {
-        "Food & Drinks": ["food", "snacks"],
+        "Food & Drinks": ["food"],
         "Transportation": ["transport"],
         "Shopping": ["online_shopping", "lifestyle"],
         "Entertainment": ["entertainment", "hangout", "hobby"],
@@ -1353,6 +1353,7 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
         "Snacks": ["snacks"],
         "Hobby": ["hobby"],
         "Lifestyle": ["lifestyle"],
+        "Online Shopping": ["online_shopping"],
         "Other Needs": [],
       };
 
@@ -1728,8 +1729,8 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
       const monthTxs = txs.filter(t => t.date >= monthStart && t.date <= monthEnd);
       const monthExpenses = monthTxs.filter(t => t.type === "expense");
 
-      const txCategoryToBudgetKey: Record<string, string[]> = {
-        "Food & Drinks": ["food", "snacks"],
+      const txCategoryToBudgetKey2: Record<string, string[]> = {
+        "Food & Drinks": ["food"],
         "Transportation": ["transport"],
         "Shopping": ["online_shopping", "lifestyle"],
         "Entertainment": ["entertainment", "hangout", "hobby"],
@@ -1750,6 +1751,7 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
         "Snacks": ["snacks"],
         "Hobby": ["hobby"],
         "Lifestyle": ["lifestyle"],
+        "Online Shopping": ["online_shopping"],
         "Other Needs": [],
       };
 
@@ -1761,7 +1763,7 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
       monthExpenses.forEach(t => {
         const cat = t.category || "Other";
         const amt = Number(t.amount);
-        const keys = txCategoryToBudgetKey[cat] || [];
+        const keys = txCategoryToBudgetKey2[cat] || [];
         if (keys.length === 0) return;
         const share = amt / keys.length;
         keys.forEach(k => {
