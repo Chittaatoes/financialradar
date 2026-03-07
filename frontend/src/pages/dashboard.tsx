@@ -596,15 +596,15 @@ function TransactionForm({
         }
         mutation.mutate(data);
       })} className="flex flex-col max-md:flex-1 max-md:min-h-0">
-        <div className="space-y-5 px-6 max-md:px-6 md:px-0 max-md:flex-1 max-md:overflow-y-auto scrollbar-hide max-md:pb-4">
+        <div className="space-y-3 px-6 max-md:px-6 md:px-0 max-md:flex-1 max-md:overflow-y-auto scrollbar-hide max-md:pb-2">
           <FormField
             control={form.control}
             name="amount"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t.transactions.amount}</FormLabel>
+              <FormItem className="space-y-1">
+                <FormLabel className="text-xs">{t.transactions.amount}</FormLabel>
                 <FormControl>
-                  <CurrencyInput placeholder="0" className="min-h-[48px] text-lg" value={field.value} onChange={field.onChange} data-testid="input-quick-amount" />
+                  <CurrencyInput placeholder="0" className="max-md:min-h-[40px] max-md:h-10 min-h-[48px] text-lg" value={field.value} onChange={field.onChange} data-testid="input-quick-amount" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -614,10 +614,10 @@ function TransactionForm({
             control={form.control}
             name="date"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t.transactions.date}</FormLabel>
+              <FormItem className="space-y-1">
+                <FormLabel className="text-xs">{t.transactions.date}</FormLabel>
                 <FormControl>
-                  <Input type="date" className="min-h-[48px]" {...field} data-testid="input-quick-date" />
+                  <Input type="date" className="max-md:min-h-[40px] max-md:h-10 min-h-[48px]" {...field} data-testid="input-quick-date" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -629,11 +629,11 @@ function TransactionForm({
               control={form.control}
               name="fromAccountId"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t.transactions.fromAccount}</FormLabel>
+                <FormItem className="space-y-1">
+                  <FormLabel className="text-xs">{t.transactions.fromAccount}</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger className="min-h-[48px]" data-testid="select-quick-from">
+                      <SelectTrigger className="max-md:min-h-[40px] max-md:h-10 min-h-[48px]" data-testid="select-quick-from">
                         <SelectValue placeholder={t.transactions.selectAccount}>
                           {field.value && (() => {
                             const a = (accounts ?? []).find(ac => String(ac.id) === field.value);
@@ -666,11 +666,11 @@ function TransactionForm({
               control={form.control}
               name="toAccountId"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t.transactions.toAccount}</FormLabel>
+                <FormItem className="space-y-1">
+                  <FormLabel className="text-xs">{t.transactions.toAccount}</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger className="min-h-[48px]" data-testid="select-quick-to">
+                      <SelectTrigger className="max-md:min-h-[40px] max-md:h-10 min-h-[48px]" data-testid="select-quick-to">
                         <SelectValue placeholder={t.transactions.selectAccount}>
                           {field.value && (() => {
                             const a = (accounts ?? []).find(ac => String(ac.id) === field.value);
@@ -700,11 +700,11 @@ function TransactionForm({
               control={form.control}
               name="category"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t.transactions.category}</FormLabel>
+                <FormItem className="space-y-1">
+                  <FormLabel className="text-xs">{t.transactions.category}</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <SelectTrigger className="min-h-[48px]" data-testid="select-quick-category">
+                      <SelectTrigger className="max-md:min-h-[40px] max-md:h-10 min-h-[48px]" data-testid="select-quick-category">
                         <SelectValue placeholder={t.transactions.selectCategory} />
                       </SelectTrigger>
                     </FormControl>
@@ -754,10 +754,10 @@ function TransactionForm({
             control={form.control}
             name="note"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t.transactions.note}</FormLabel>
+              <FormItem className="space-y-1">
+                <FormLabel className="text-xs">{t.transactions.note}</FormLabel>
                 <FormControl>
-                  <Textarea placeholder={t.transactions.notePlaceholder} className="resize-none min-h-[48px]" {...field} data-testid="input-quick-note" />
+                  <Textarea placeholder={t.transactions.notePlaceholder} className="resize-none max-md:min-h-[40px] max-md:h-10 min-h-[48px]" {...field} data-testid="input-quick-note" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -765,16 +765,16 @@ function TransactionForm({
           />
         </div>
 
-        <div className="shrink-0 px-6 max-md:px-6 md:px-0 pt-4 pb-6 md:pb-0 max-md:border-t max-md:border-border flex flex-col gap-2 md:flex-row md:justify-end">
+        <div className="shrink-0 px-6 max-md:px-6 md:px-0 pt-2 pb-4 md:pb-0 max-md:border-t max-md:border-border flex flex-col gap-1.5 md:flex-row md:justify-end">
           <Button
             type="submit"
             disabled={mutation.isPending || !!hasInsufficientBalance}
-            className="w-full md:w-auto min-h-[52px] max-md:min-h-[52px] md:min-h-[36px] text-base md:text-sm rounded-md md:order-2"
+            className="w-full md:w-auto min-h-[44px] max-md:min-h-[44px] md:min-h-[36px] text-base md:text-sm rounded-md md:order-2"
             data-testid="button-quick-save"
           >
             {mutation.isPending ? "..." : t.transactions.submit}
           </Button>
-          <Button type="button" variant="ghost" onClick={onClose} className="w-full md:w-auto min-h-[40px] max-md:min-h-[40px] md:min-h-[36px] text-sm text-muted-foreground md:order-1">
+          <Button type="button" variant="ghost" onClick={onClose} className="w-full md:w-auto min-h-[36px] max-md:min-h-[36px] md:min-h-[36px] text-sm text-muted-foreground md:order-1">
             {t.accounts.cancel}
           </Button>
         </div>
@@ -855,16 +855,16 @@ function SavingsForm({ onClose, t }: { onClose: () => void; t: any }) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="flex flex-col max-md:flex-1 max-md:min-h-0">
-        <div className="space-y-5 px-6 max-md:px-6 md:px-0 max-md:flex-1 max-md:overflow-y-auto scrollbar-hide max-md:pb-4">
+        <div className="space-y-3 px-6 max-md:px-6 md:px-0 max-md:flex-1 max-md:overflow-y-auto scrollbar-hide max-md:pb-2">
           <FormField
             control={form.control}
             name="goalId"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t.dashboard.selectGoal}</FormLabel>
+              <FormItem className="space-y-1">
+                <FormLabel className="text-xs">{t.dashboard.selectGoal}</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
-                    <SelectTrigger className="min-h-[48px]" data-testid="select-savings-goal">
+                    <SelectTrigger className="max-md:min-h-[40px] max-md:h-10 min-h-[48px]" data-testid="select-savings-goal">
                       <SelectValue placeholder={t.dashboard.selectGoal} />
                     </SelectTrigger>
                   </FormControl>
@@ -881,8 +881,8 @@ function SavingsForm({ onClose, t }: { onClose: () => void; t: any }) {
             )}
           />
           {selectedGoal && (
-            <div className="rounded-md bg-muted/50 p-3">
-              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground mb-1.5">
+            <div className="rounded-md bg-muted/50 p-2.5">
+              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground mb-1">
                 <span>{selectedGoal.name}</span>
                 <span className="font-mono">{Math.round(Number(selectedGoal.currentAmount) / Number(selectedGoal.targetAmount) * 100)}%</span>
               </div>
@@ -895,10 +895,10 @@ function SavingsForm({ onClose, t }: { onClose: () => void; t: any }) {
             control={form.control}
             name="amount"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t.transactions.amount}</FormLabel>
+              <FormItem className="space-y-1">
+                <FormLabel className="text-xs">{t.transactions.amount}</FormLabel>
                 <FormControl>
-                  <CurrencyInput placeholder="0" className="min-h-[48px] text-lg" value={field.value} onChange={field.onChange} data-testid="input-savings-amount" />
+                  <CurrencyInput placeholder="0" className="max-md:min-h-[40px] max-md:h-10 min-h-[48px] text-lg" value={field.value} onChange={field.onChange} data-testid="input-savings-amount" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -908,11 +908,11 @@ function SavingsForm({ onClose, t }: { onClose: () => void; t: any }) {
             control={form.control}
             name="fromAccountId"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t.transactions.fromAccount}</FormLabel>
+              <FormItem className="space-y-1">
+                <FormLabel className="text-xs">{t.transactions.fromAccount}</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
-                    <SelectTrigger className="min-h-[48px]" data-testid="select-savings-from">
+                    <SelectTrigger className="max-md:min-h-[40px] max-md:h-10 min-h-[48px]" data-testid="select-savings-from">
                       <SelectValue placeholder={t.transactions.selectAccount}>
                         {field.value && (() => {
                           const a = (accounts ?? []).find(ac => String(ac.id) === field.value);
@@ -940,11 +940,11 @@ function SavingsForm({ onClose, t }: { onClose: () => void; t: any }) {
           />
         </div>
 
-        <div className="shrink-0 px-6 max-md:px-6 md:px-0 pt-4 pb-6 md:pb-0 max-md:border-t max-md:border-border flex flex-col gap-2 md:flex-row md:justify-end">
-          <Button type="submit" disabled={mutation.isPending || !!hasBadBalance || !watchFromId} className="w-full md:w-auto min-h-[52px] max-md:min-h-[52px] md:min-h-[36px] text-base md:text-sm rounded-md md:order-2" data-testid="button-savings-save">
+        <div className="shrink-0 px-6 max-md:px-6 md:px-0 pt-2 pb-4 md:pb-0 max-md:border-t max-md:border-border flex flex-col gap-1.5 md:flex-row md:justify-end">
+          <Button type="submit" disabled={mutation.isPending || !!hasBadBalance || !watchFromId} className="w-full md:w-auto min-h-[44px] max-md:min-h-[44px] md:min-h-[36px] text-base md:text-sm rounded-md md:order-2" data-testid="button-savings-save">
             {mutation.isPending ? "..." : t.dashboard.depositToGoal}
           </Button>
-          <Button type="button" variant="ghost" onClick={onClose} className="w-full md:w-auto min-h-[40px] max-md:min-h-[40px] md:min-h-[36px] text-sm text-muted-foreground md:order-1">
+          <Button type="button" variant="ghost" onClick={onClose} className="w-full md:w-auto min-h-[36px] max-md:min-h-[36px] md:min-h-[36px] text-sm text-muted-foreground md:order-1">
             {t.accounts.cancel}
           </Button>
         </div>
@@ -1036,16 +1036,16 @@ function DebtPaymentForm({ onClose, t }: { onClose: () => void; t: any }) {
         }
         mutation.mutate(data);
       })} className="flex flex-col max-md:flex-1 max-md:min-h-0">
-        <div className="space-y-5 px-6 max-md:px-6 md:px-0 max-md:flex-1 max-md:overflow-y-auto scrollbar-hide max-md:pb-4">
+        <div className="space-y-3 px-6 max-md:px-6 md:px-0 max-md:flex-1 max-md:overflow-y-auto scrollbar-hide max-md:pb-2">
           <FormField
             control={form.control}
             name="liabilityId"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t.dashboard.selectDebt}</FormLabel>
+              <FormItem className="space-y-1">
+                <FormLabel className="text-xs">{t.dashboard.selectDebt}</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
-                    <SelectTrigger className="min-h-[48px]" data-testid="select-debt-liability">
+                    <SelectTrigger className="max-md:min-h-[40px] max-md:h-10 min-h-[48px]" data-testid="select-debt-liability">
                       <SelectValue placeholder={t.dashboard.selectDebt} />
                     </SelectTrigger>
                   </FormControl>
@@ -1065,7 +1065,7 @@ function DebtPaymentForm({ onClose, t }: { onClose: () => void; t: any }) {
             )}
           />
           {selectedDebt && (
-            <div className="rounded-md bg-muted/50 p-3">
+            <div className="rounded-md bg-muted/50 p-2.5">
               <div className="flex items-center justify-between gap-2 text-xs">
                 <span className="text-muted-foreground">{selectedDebt.name}</span>
                 <span className="font-mono font-semibold text-orange-600 dark:text-orange-400">{formatCurrency(Number(selectedDebt.amount))}</span>
@@ -1082,10 +1082,10 @@ function DebtPaymentForm({ onClose, t }: { onClose: () => void; t: any }) {
             control={form.control}
             name="amount"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t.transactions.amount}</FormLabel>
+              <FormItem className="space-y-1">
+                <FormLabel className="text-xs">{t.transactions.amount}</FormLabel>
                 <FormControl>
-                  <CurrencyInput placeholder="0" className="min-h-[48px] text-lg" value={field.value} onChange={field.onChange} data-testid="input-debt-amount" />
+                  <CurrencyInput placeholder="0" className="max-md:min-h-[40px] max-md:h-10 min-h-[48px] text-lg" value={field.value} onChange={field.onChange} data-testid="input-debt-amount" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -1095,11 +1095,11 @@ function DebtPaymentForm({ onClose, t }: { onClose: () => void; t: any }) {
             control={form.control}
             name="fromAccountId"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t.transactions.fromAccount}</FormLabel>
+              <FormItem className="space-y-1">
+                <FormLabel className="text-xs">{t.transactions.fromAccount}</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
-                    <SelectTrigger className="min-h-[48px]" data-testid="select-debt-from">
+                    <SelectTrigger className="max-md:min-h-[40px] max-md:h-10 min-h-[48px]" data-testid="select-debt-from">
                       <SelectValue placeholder={t.transactions.selectAccount}>
                         {field.value && (() => {
                           const a = (accounts ?? []).find(ac => String(ac.id) === field.value);
@@ -1127,11 +1127,11 @@ function DebtPaymentForm({ onClose, t }: { onClose: () => void; t: any }) {
           />
         </div>
 
-        <div className="shrink-0 px-6 max-md:px-6 md:px-0 pt-4 pb-6 md:pb-0 max-md:border-t max-md:border-border flex flex-col gap-2 md:flex-row md:justify-end">
-          <Button type="submit" disabled={mutation.isPending || !!hasDebtBadBalance || !watchDebtFromId} className="w-full md:w-auto min-h-[52px] max-md:min-h-[52px] md:min-h-[36px] text-base md:text-sm rounded-md md:order-2" data-testid="button-debt-save">
+        <div className="shrink-0 px-6 max-md:px-6 md:px-0 pt-2 pb-4 md:pb-0 max-md:border-t max-md:border-border flex flex-col gap-1.5 md:flex-row md:justify-end">
+          <Button type="submit" disabled={mutation.isPending || !!hasDebtBadBalance || !watchDebtFromId} className="w-full md:w-auto min-h-[44px] max-md:min-h-[44px] md:min-h-[36px] text-base md:text-sm rounded-md md:order-2" data-testid="button-debt-save">
             {mutation.isPending ? "..." : t.dashboard.payDebt}
           </Button>
-          <Button type="button" variant="ghost" onClick={onClose} className="w-full md:w-auto min-h-[40px] max-md:min-h-[40px] md:min-h-[36px] text-sm text-muted-foreground md:order-1">
+          <Button type="button" variant="ghost" onClick={onClose} className="w-full md:w-auto min-h-[36px] max-md:min-h-[36px] md:min-h-[36px] text-sm text-muted-foreground md:order-1">
             {t.accounts.cancel}
           </Button>
         </div>
@@ -1223,9 +1223,9 @@ function AddActionDialog({ open, onClose, t, onStreakTriggered, initialAction }:
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
       <DialogContentBottomSheet>
-        <DialogHeader className="px-6 max-md:px-6 md:px-0 pt-1 md:pt-0 shrink-0">
-          <DialogTitle className="text-lg">{t.dashboard.addActionTitle}</DialogTitle>
-          <DialogDescription>{t.transactions.dialogDesc}</DialogDescription>
+        <DialogHeader className="px-6 max-md:px-6 md:px-0 pt-0.5 md:pt-0 pb-0 shrink-0">
+          <DialogTitle className="text-base leading-tight">{t.dashboard.addActionTitle}</DialogTitle>
+          <DialogDescription className="text-xs">{t.transactions.dialogDesc}</DialogDescription>
         </DialogHeader>
 
         {scanMode ? (
