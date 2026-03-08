@@ -44,8 +44,8 @@ export async function setupAuth(app: Express) {
         maxAge: 7 * 24 * 60 * 60 * 1000,
       },
     })
->>>>>>> 9573829 (fix: update cors config)
- return res
+
+    return res
         .status(500)
         .json({ message: "Google Auth not configured. Set GOOGLE_CLIENT_ID." });
     }
