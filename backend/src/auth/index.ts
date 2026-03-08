@@ -16,39 +16,21 @@ export async function setupAuth(app: Express) {
     createTableIfMissing: true,
   });
 
-  app.use(
-    session({
-      store: session<<<<<<< HEAD
-  store: sessionStore,
-  secret: process.env.SESSION_SECRET || "dev-secret-financial-radar",
-  resave: false,
-  saveUninitialized: false,
-  rolling: true,
-  cookie: {
-    secure: true,
-    httpOnly: true,
-    sameSite: "none",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  },
-})
-=======
-      store: sessionStore,
-      secret: process.env.SESSION_SECRET || "dev-secret-financial-radar",
-      resave: false,
-      saveUninitialized: false,
-      rolling: true,
-      cookie: {
-        secure: process.env.NODE_ENV === "production",
-        httpOnly: true,
-        sameSite: "none",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      },
-    })
-
-    return res
-        .status(500)
-        .json({ message: "Google Auth not configured. Set GOOGLE_CLIENT_ID." });
-    }
+ app.use(
+  session({
+    store: sessionStore,
+    secret: process.env.SESSION_SECRET || "dev-secret-financial-radar",
+    resave: false,
+    saveUninitialized: false,
+    rolling: true,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      sameSite: "none",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    },
+  })
+);
 
     const appUrl =
       process.env.APP_URL || `http://localhost:${process.env.PORT || 5000}`;
