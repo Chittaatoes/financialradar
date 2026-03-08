@@ -60,8 +60,9 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/auth/callback/google", async (req, res) => {
     const code = req.query.code as string;
-    const frontendUrl = process.env.FRONTEND_URL || "";
-    if (!code) return res.redirect(frontendUrl || "/");
+const frontendUrl =
+  process.env.FRONTEND_URL || "https://financialradar.vercel.app";
+  if (!code) return res.redirect(frontendUrl || "/");
 
     try {
       const appUrl =

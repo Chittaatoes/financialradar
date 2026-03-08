@@ -64,7 +64,7 @@ function GoalForm({ accounts, onClose }: { accounts: Account[]; onClose: () => v
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
         toast({ title: "Unauthorized", description: "Logging in again...", variant: "destructive" });
-        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        setTimeout(() => { window.location.href = `${API_URL}/api/login`; }, 500);
         return;
       }
       toast({ title: t.common.error, description: error.message, variant: "destructive" });
@@ -178,7 +178,7 @@ function EditGoalForm({ goal, accounts, onClose }: { goal: Goal; accounts: Accou
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
         toast({ title: "Unauthorized", description: "Logging in again...", variant: "destructive" });
-        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        setTimeout(() => { window.location.href = `${API_URL}/api/login`; }, 500);
         return;
       }
       toast({ title: t.common.error, description: error.message, variant: "destructive" });
@@ -297,7 +297,7 @@ function DepositForm({ goal, onClose }: { goal: Goal; onClose: () => void }) {
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
         toast({ title: "Unauthorized", description: "Logging in again...", variant: "destructive" });
-        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        setTimeout(() => { window.location.href = `${API_URL}/api/login`; }, 500);
         return;
       }
       toast({ title: t.common.error, description: error.message, variant: "destructive" });

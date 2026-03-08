@@ -85,7 +85,7 @@ function AccountForm({ account, onClose }: { account?: Account; onClose: () => v
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
         toast({ title: "Unauthorized", description: "Logging in again...", variant: "destructive" });
-        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        setTimeout(() => { window.location.href = `${API_URL}/api/login`; }, 500);
         return;
       }
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -174,7 +174,7 @@ export default function Accounts() {
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
         toast({ title: "Unauthorized", description: "Logging in again...", variant: "destructive" });
-        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        setTimeout(() => { window.location.href = `${API_URL}/api/login`; }, 500);
         return;
       }
       toast({ title: "Error", description: error.message, variant: "destructive" });
