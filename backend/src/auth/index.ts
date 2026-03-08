@@ -28,7 +28,6 @@ export async function setupAuth(app: Express) {
     secure: true,
     httpOnly: true,
     sameSite: "none",
-    domain: ".onrender.com",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   },
 })
@@ -163,12 +162,24 @@ export async function setupAuth(app: Express) {
 
 });
 
-  app.get("/api/auth/user", (req, res) => {
-    const user = (req.session as any)?.user;
-    if (!user)
-      return res.status(401).json({ message: "Unauthorized" });
-    res.json(user);
-  });
+  app.get("/api/auth/user", async (req, res) => {
+  const sessionUser = (req.session as any)?.user;
+
+  if (!sessionUser) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, sessionUser.id));
+
+  if (!user) {
+    return res.status(401).json({ message: "User not found" });
+  }
+
+  res.json(user);
+});
 
   app.get("/api/logout", (req, res) => {
     const frontendUrl = process.env.FRONTEND_URL || "";
