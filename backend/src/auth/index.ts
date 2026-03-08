@@ -18,21 +18,20 @@ export async function setupAuth(app: Express) {
 
   app.use(
     session({
-  store: sessionStore,
-  secret: process.env.SESSION_SECRET || "dev-secret-financial-radar",
-  resave: false,
-  saveUninitialized: false,
-  rolling: true,
-  cookie: {
-    secure: true,
-    httpOnly: true,
-    sameSite: "none",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  },
-})
-  );
-
-  app.get("/api/login", (req, res) => {
+      store: sessionStore,
+      secret: process.env.SESSION_SECRET || "dev-secret-financial-radar",
+      resave: false,
+      saveUninitialized: false,
+      rolling: true,
+      cookie: {
+        secure: process.env.NODE_ENV === "production",
+        httpOnly: true,
+        sameSite: "none",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      },
+    })
+pdate cors config)
+eq, res) => {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     if (!clientId) {
       return res
