@@ -66,10 +66,10 @@ export function useAuth() {
   });
 
   useEffect(() => {
-    if (!isLoading && user === null) {
-      guestLoginMutation.mutate();
-    }
-  }, [user, isLoading]);
+  if (!isLoading && user === null && !guestLoginMutation.isPending) {
+    guestLoginMutation.mutate();
+  }
+}, [user, isLoading]);
 
   const logoutMutation = useMutation({
     mutationFn: logout,
