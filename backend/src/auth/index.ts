@@ -156,6 +156,12 @@ export async function setupAuth(app: Express) {
     res.redirect(frontendUrl || "/");
   });
 });
+} catch (error) {
+  console.error("Google auth callback error:", error);
+  res.redirect(`${frontendUrl}/?error=auth_failed`);
+}
+
+});
 
   app.get("/api/auth/user", (req, res) => {
     const user = (req.session as any)?.user;
