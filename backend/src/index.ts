@@ -33,10 +33,9 @@ app.use(
 );
 
 app.use(
-  express.json({
-    verify: (req: any, _res, buf) => {
-      req.rawBody = buf;
-    },
+  cors({
+    origin: true,
+    credentials: true,
   })
 );
 
