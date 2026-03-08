@@ -413,3 +413,18 @@ textarea,
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* ================================================
+   iOS date input consistency fix
+   ================================================ */
+
+input[type="date"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  min-height: inherit;
+}
+
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}

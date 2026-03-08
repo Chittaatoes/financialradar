@@ -59,6 +59,8 @@ import { LevelUpCelebration } from "@/features/gamification/level-up-celebration
 import { SetupFirstAccountModal } from "@/components/setup-first-account-modal";
 import { MonthlyActivityCalendar } from "@/components/monthly-activity-calendar";
 import { ScanPanel } from "@/components/scan-panel";
+import { CalculatorSheet } from "@/components/calculator-sheet";
+import { Calculator } from "lucide-react";
 
 // === DASHBOARD API RESPONSE TYPES ===
 // These interfaces match the JSON returned by /api/dashboard, /api/smart-save, /api/spending-insight
@@ -512,6 +514,7 @@ function TransactionForm({
   const { toast } = useToast();
   const { data: accounts } = useQuery<Account[]>({ queryKey: ["/api/accounts"] });
   const { data: customCategories } = useQuery<CustomCategory[]>({ queryKey: ["/api/custom-categories"] });
+  const [calcOpen, setCalcOpen] = useState(false);
 
   const form = useForm({
     resolver: zodResolver(quickTxSchema),
@@ -604,7 +607,7 @@ function TransactionForm({
               <FormItem className="space-y-1">
                 <FormLabel className="text-xs">{t.transactions.date}</FormLabel>
                 <FormControl>
-                  <Input type="date" className="max-md:min-h-[40px] max-md:h-10 min-h-[48px]" {...field} data-testid="input-quick-date" />
+                  <Input type="date" className="max-md:min-h-[40px] max-md:h-10 min-h-[48px] appearance-none [&::-webkit-date-and-time-value]:text-left" {...field} data-testid="input-quick-date" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -616,13 +619,23 @@ function TransactionForm({
             render={({ field }) => (
               <FormItem className="space-y-1">
                 <FormLabel className="text-xs">{t.transactions.amount}</FormLabel>
-                <FormControl>
-                  <CurrencyInput placeholder="0" className="max-md:min-h-[40px] max-md:h-10 min-h-[48px] text-lg" value={field.value} onChange={field.onChange} data-testid="input-quick-amount" />
-                </FormControl>
+                <div className="flex gap-2 items-center">
+                  <FormControl>
+                    <CurrencyInput placeholder="0" className="max-md:min-h-[40px] max-md:h-10 min-h-[48px] text-lg flex-1" value={field.value} onChange={field.onChange} data-testid="input-quick-amount" />
+                  </FormControl>
+                  <button
+                    type="button"
+                    onClick={() => setCalcOpen(true)}
+                    className="shrink-0 flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-md border border-input bg-background hover:bg-muted transition-colors"
+                  >
+                    <Calculator className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
           />
+          <CalculatorSheet open={calcOpen} onClose={() => setCalcOpen(false)} onConfirm={(val) => form.setValue("amount", val)} />
 
           {(watchType === "expense" || watchType === "transfer") && (
             <FormField
@@ -787,6 +800,7 @@ function SavingsForm({ onClose, t }: { onClose: () => void; t: any }) {
   const { toast } = useToast();
   const { data: goals } = useQuery<Goal[]>({ queryKey: ["/api/goals"] });
   const { data: accounts } = useQuery<Account[]>({ queryKey: ["/api/accounts"] });
+  const [calcOpen, setCalcOpen] = useState(false);
 
   const activeGoals = goals?.filter(g => Number(g.currentAmount) < Number(g.targetAmount)) ?? [];
 
@@ -897,13 +911,23 @@ function SavingsForm({ onClose, t }: { onClose: () => void; t: any }) {
             render={({ field }) => (
               <FormItem className="space-y-1">
                 <FormLabel className="text-xs">{t.transactions.amount}</FormLabel>
-                <FormControl>
-                  <CurrencyInput placeholder="0" className="max-md:min-h-[40px] max-md:h-10 min-h-[48px] text-lg" value={field.value} onChange={field.onChange} data-testid="input-savings-amount" />
-                </FormControl>
+                <div className="flex gap-2 items-center">
+                  <FormControl>
+                    <CurrencyInput placeholder="0" className="max-md:min-h-[40px] max-md:h-10 min-h-[48px] text-lg flex-1" value={field.value} onChange={field.onChange} data-testid="input-savings-amount" />
+                  </FormControl>
+                  <button
+                    type="button"
+                    onClick={() => setCalcOpen(true)}
+                    className="shrink-0 flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-md border border-input bg-background hover:bg-muted transition-colors"
+                  >
+                    <Calculator className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
           />
+          <CalculatorSheet open={calcOpen} onClose={() => setCalcOpen(false)} onConfirm={(val) => form.setValue("amount", val)} />
           <FormField
             control={form.control}
             name="fromAccountId"
@@ -957,6 +981,7 @@ function DebtPaymentForm({ onClose, t }: { onClose: () => void; t: any }) {
   const { toast } = useToast();
   const { data: debts } = useQuery<Liability[]>({ queryKey: ["/api/liabilities"] });
   const { data: accounts } = useQuery<Account[]>({ queryKey: ["/api/accounts"] });
+  const [calcOpen, setCalcOpen] = useState(false);
 
   const activeDebts = debts?.filter(d => {
     if (Number(d.amount) > 0) return true;
@@ -1084,13 +1109,23 @@ function DebtPaymentForm({ onClose, t }: { onClose: () => void; t: any }) {
             render={({ field }) => (
               <FormItem className="space-y-1">
                 <FormLabel className="text-xs">{t.transactions.amount}</FormLabel>
-                <FormControl>
-                  <CurrencyInput placeholder="0" className="max-md:min-h-[40px] max-md:h-10 min-h-[48px] text-lg" value={field.value} onChange={field.onChange} data-testid="input-debt-amount" />
-                </FormControl>
+                <div className="flex gap-2 items-center">
+                  <FormControl>
+                    <CurrencyInput placeholder="0" className="max-md:min-h-[40px] max-md:h-10 min-h-[48px] text-lg flex-1" value={field.value} onChange={field.onChange} data-testid="input-debt-amount" />
+                  </FormControl>
+                  <button
+                    type="button"
+                    onClick={() => setCalcOpen(true)}
+                    className="shrink-0 flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-md border border-input bg-background hover:bg-muted transition-colors"
+                  >
+                    <Calculator className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
           />
+          <CalculatorSheet open={calcOpen} onClose={() => setCalcOpen(false)} onConfirm={(val) => form.setValue("amount", val)} />
           <FormField
             control={form.control}
             name="fromAccountId"

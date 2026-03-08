@@ -8,7 +8,7 @@ import {
   SelectGroup, SelectLabel,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Camera, Upload, Loader2, AlertCircle, CheckCircle2, X, ArrowLeft } from "lucide-react";
+import { Camera, Upload, Loader2, AlertCircle, CheckCircle2, X, ArrowLeft, Calculator } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EXPENSE_CATEGORY_GROUPS } from "@/lib/constants";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Account } from "@shared/schema";
 import { parseTotal, parseMerchant, parseDate, suggestCategory } from "@/lib/receipt-parser";
 import { format } from "date-fns";
+import { CalculatorSheet } from "@/components/calculator-sheet";
 
 interface ScanPanelProps {
   onBack: () => void;
@@ -35,6 +36,7 @@ export function ScanPanel({ onBack, onSave }: ScanPanelProps) {
   const [category, setCategory] = useState("Shopping");
   const [accountId, setAccountId] = useState<string>("");
   const [scanError, setScanError] = useState<string | null>(null);
+  const [calcOpen, setCalcOpen] = useState(false);
 
   const { data: accounts = [] } = useQuery<Account[]>({ queryKey: ["/api/accounts"] });
 
@@ -99,6 +101,8 @@ export function ScanPanel({ onBack, onSave }: ScanPanelProps) {
     }
   }, []);
 
+  const galleryRef = useRef<HTMLInputElement>(null);
+
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) handleFile(file);
@@ -112,6 +116,13 @@ export function ScanPanel({ onBack, onSave }: ScanPanelProps) {
         type="file"
         accept="image/*"
         capture="environment"
+        className="hidden"
+        onChange={handleInputChange}
+      />
+      <input
+        ref={galleryRef}
+        type="file"
+        accept="image/*"
         className="hidden"
         onChange={handleInputChange}
       />
@@ -163,13 +174,7 @@ export function ScanPanel({ onBack, onSave }: ScanPanelProps) {
               type="button"
               variant="outline"
               className="w-full"
-              onClick={() => {
-                if (fileRef.current) {
-                  fileRef.current.removeAttribute("capture");
-                  fileRef.current.click();
-                  setTimeout(() => fileRef.current?.setAttribute("capture", "environment"), 500);
-                }
-              }}
+              onClick={() => galleryRef.current?.click()}
             >
               <Upload className="w-4 h-4 mr-2" />
               Pilih dari Galeri
@@ -229,12 +234,22 @@ export function ScanPanel({ onBack, onSave }: ScanPanelProps) {
 
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total</label>
-              <CurrencyInput value={total} onChange={setTotal} placeholder="0" className="mt-1.5" />
+              <div className="flex gap-2 items-center mt-1.5">
+                <CurrencyInput value={total} onChange={setTotal} placeholder="0" className="flex-1" />
+                <button
+                  type="button"
+                  onClick={() => setCalcOpen(true)}
+                  className="shrink-0 flex items-center justify-center w-10 h-10 rounded-md border border-input bg-background hover:bg-muted transition-colors"
+                >
+                  <Calculator className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </div>
+              <CalculatorSheet open={calcOpen} onClose={() => setCalcOpen(false)} onConfirm={(val) => setTotal(val)} />
             </div>
 
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tanggal</label>
-              <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="mt-1.5" />
+              <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="mt-1.5 appearance-none [&::-webkit-date-and-time-value]:text-left" />
             </div>
 
             <div>

@@ -94,6 +94,7 @@ interface ScanReceiptDialogProps {
 export function ScanReceiptDialog({ open, onOpenChange, onClose }: ScanReceiptDialogProps) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
   const [stage, setStage] = useState<"upload" | "scanning" | "preview">("upload");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [parsed, setParsed] = useState<ParsedReceipt | null>(null);
@@ -213,6 +214,13 @@ export function ScanReceiptDialog({ open, onOpenChange, onClose }: ScanReceiptDi
                 className="hidden"
                 onChange={handleInputChange}
               />
+              <input
+                ref={galleryRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleInputChange}
+              />
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
@@ -241,13 +249,7 @@ export function ScanReceiptDialog({ open, onOpenChange, onClose }: ScanReceiptDi
                 type="button"
                 variant="outline"
                 className="w-full"
-                onClick={() => {
-                  if (fileRef.current) {
-                    fileRef.current.removeAttribute("capture");
-                    fileRef.current.click();
-                    setTimeout(() => fileRef.current?.setAttribute("capture", "environment"), 500);
-                  }
-                }}
+                onClick={() => galleryRef.current?.click()}
               >
                 <Upload className="w-4 h-4 mr-2" />
                 Pilih dari Galeri
