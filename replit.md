@@ -18,23 +18,18 @@ Financial Radar is a habit-driven personal finance web application. It helps use
 
 ## Deployment Architecture
 ```
-Browser → Vercel (frontend + /api proxy) → Render (backend API) → Supabase PostgreSQL
+Browser → Vite dev server (port 5000, /api proxy) → Express API (port 5001) → Replit PostgreSQL
    React SPA + Vite         Express API              Drizzle ORM
-   PWA-enabled              Google OAuth             DATABASE_URL env var
-   vercel.json rewrites     ← APP_URL = frontend URL
+   PWA-enabled              Google OAuth             DATABASE_URL env var (Replit built-in)
+   vite proxy /api          ← APP_URL = Replit dev domain
 ```
 
-### Production Deployment
-- **Frontend:** Vercel — `npm run build` produces `/dist` folder
-- **Backend:** Render — `npm start` runs Express on `PORT` (default 5000)
-- **Database:** Supabase PostgreSQL with `DATABASE_URL`
-- **See:** `DEPLOYMENT.md` for full setup instructions
-
-### Local Development (Replit)
+### Replit Environment
 - **Frontend:** Vite dev server on `0.0.0.0:5000`, proxies `/api` to `localhost:5001`
-- **Backend:** Express on `localhost:5001`, `PORT=5001`
-- **Database:** Replit built-in PostgreSQL via `DATABASE_URL`
+- **Backend:** Express on `localhost:5001`, `PORT=5001` (env var)
+- **Database:** Replit built-in PostgreSQL via `DATABASE_URL` secret
 - **Workflow:** `npm run dev` (concurrently runs backend + frontend)
+- **CORS:** Allows `*.replit.dev` and `*.repl.co` domains automatically
 
 ## Project Structure
 ```

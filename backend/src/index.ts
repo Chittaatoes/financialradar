@@ -13,25 +13,29 @@ declare module "http" {
   }
 }
 
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.APP_URL,
+  "http://localhost:5000",
+  "http://localhost:5173",
+].filter(Boolean) as string[];
+
 app.use(
   cors({
-    origin: [
-      "https://financialradar.vercel.app",
-      "http://localhost:5173",
-      "http://localhost:5000",
-      process.env.FRONTEND_URL || "",
-    ].filter(Boolean),
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      const isAllowed =
+        allowedOrigins.some((o) => origin === o) ||
+        /\.replit\.dev$/.test(origin) ||
+        /\.repl\.co$/.test(origin);
+      if (isAllowed) return callback(null, true);
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   })
 );
 
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-  })
-);
-
+app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(requestLogger);
 
