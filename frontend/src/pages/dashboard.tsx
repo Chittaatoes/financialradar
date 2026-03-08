@@ -1298,8 +1298,12 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
   const { data: insight, isLoading } = useQuery<SpendingInsightData>({
     queryKey: ["/api/spending-insight?period=monthly"],
   });
+  const { data: transactions = [] } = useQuery<Transaction[]>({
+    queryKey: ["/api/transactions"],
+  });
 
   const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const daysPassed = now.getDate();
   const remainingDays = Math.max(1, daysInMonth - daysPassed + 1);
@@ -1310,6 +1314,12 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
   const budgetAmanHariIni = remainingDays > 0 ? remainingBudget / remainingDays : 0;
   const progressPct = totalIncome > 0 ? Math.min((totalExpense / totalIncome) * 100, 100) : 0;
   const expectedSpending = totalIncome > 0 ? (totalIncome / daysInMonth) * daysPassed : 0;
+
+  const todaySpent = transactions
+    .filter(t => t.type === "expense" && t.date === todayStr)
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+  const remainingToday = Math.max(0, budgetAmanHariIni - todaySpent);
+  const isTodayOver = budgetAmanHariIni > 0 && todaySpent > budgetAmanHariIni;
 
   const statusRatio = expectedSpending > 0 ? totalExpense / expectedSpending : 0;
   const status: "on-track" | "careful" | "overspending" =
@@ -1366,6 +1376,33 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
           )}
           {!isLoading && totalIncome === 0 && (
             <p className="text-xs text-white/35 mt-1">Record income this month to see your daily budget</p>
+          )}
+          {/* Daily spending rows */}
+          {!isLoading && totalIncome > 0 && (
+            <div className="mt-2 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-white/50">Pengeluaran Hari Ini</span>
+                <span
+                  className="text-xs font-mono font-semibold text-red-400"
+                  style={{ opacity: animating ? 0 : 1, transition: "opacity 180ms ease-in-out" }}
+                >
+                  {hidden ? "******" : formatCurrency(todaySpent)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-white/50">Sisa Budget Hari Ini</span>
+                <span
+                  className="text-xs font-mono font-semibold"
+                  style={{
+                    opacity: animating ? 0 : 1,
+                    transition: "opacity 180ms ease-in-out",
+                    color: isTodayOver ? "#f87171" : "#6ee7b7",
+                  }}
+                >
+                  {hidden ? "******" : isTodayOver ? "Rp 0 · Overspending" : formatCurrency(remainingToday)}
+                </span>
+              </div>
+            </div>
           )}
         </div>
 
