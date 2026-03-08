@@ -12,6 +12,6 @@ export function redirectToLogin(toast?: (options: { title: string; description: 
     });
   }
   setTimeout(() => {
-    window.location.href = "/api/login";
+    window.location.href = "https://financialradars-api.onrender.com/api/login";
   }, 500);
 }

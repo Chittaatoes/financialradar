@@ -357,7 +357,7 @@ export default function ProfilePage() {
                 </p>
                 <button
                   className="mt-2 flex items-center gap-0.5 text-xs text-primary/80 font-medium hover:text-primary transition-colors"
-                  onClick={() => { window.location.href = "/api/login"; }}
+                  onClick={() => { window.location.href = "https://financialradars-api.onrender.com/api/login"; }}
                   data-testid="profile-button-secure-google"
                 >
                   Tautkan dengan Google

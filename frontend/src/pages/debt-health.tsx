@@ -123,7 +123,7 @@ function LiabilityForm({ onClose }: { onClose: () => void }) {
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
         toast({ title: "Unauthorized", description: "Logging in again...", variant: "destructive" });
-        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        setTimeout(() => { window.location.href = "https://financialradars-api.onrender.com/api/login"; }, 500);
         return;
       }
       toast({ title: t.common.error, description: error.message, variant: "destructive" });
@@ -525,7 +525,7 @@ export default function DebtHealth() {
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
         toast({ title: "Unauthorized", description: "Logging in again...", variant: "destructive" });
-        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        setTimeout(() => { window.location.href = "https://financialradars-api.onrender.com/api/login"; }, 500);
         return;
       }
       toast({ title: t.common.error, description: error.message, variant: "destructive" });
