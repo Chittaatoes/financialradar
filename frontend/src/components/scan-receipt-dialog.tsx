@@ -18,64 +18,10 @@ import { useToast } from "@/hooks/use-toast";
 import type { Account } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { parseTotal, parseMerchant, parseDate, suggestCategory } from "@/lib/receipt-parser";
+import { runOCR } from "@/lib/receipt-ocr";
 
 const EXPENSE_CATEGORIES = EXPENSE_CATEGORY_GROUPS.flatMap(g => g.items.map(i => i.value));
-
-function suggestCategory(merchant: string): string {
-  const m = merchant.toLowerCase();
-  if (/indomaret|alfamart|superindo|circle k|7.eleven|sevel|lawson|family mart/.test(m)) return "Food & Drinks";
-  if (/shell|pertamina|bp|spbu|total|vivo|bensin|bahan bakar/.test(m)) return "Transportation";
-  if (/tokopedia|shopee|lazada|blibli|bukalapak|jd\.id|tiktok shop/.test(m)) return "Shopping";
-  if (/rs |rumah sakit|klinik|apotek|farmasi|puskesmas|dokter|dental|kimia farma|guardian/.test(m)) return "Health";
-  if (/mcd|mcdonalds|kfc|pizza|burger|restoran|warung|cafe|kopi|coffee|bakery|roti/.test(m)) return "Food & Drinks";
-  if (/gramedia|toko buku|buku/.test(m)) return "Education";
-  if (/pln|listrik|pdam|air|telkom|indihome|pbb/.test(m)) return "Electricity";
-  return "Shopping";
-}
-
-function parseTotal(text: string): string {
-  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
-
-  const totalKeywords = /total|jumlah|grand total|bayar|tunai|cash|harga|amount|subtotal/i;
-  for (const line of lines) {
-    if (totalKeywords.test(line)) {
-      const nums = line.match(/[\d.,]+/g);
-      if (nums) {
-        const candidate = nums
-          .map(n => parseFloat(n.replace(/\./g, "").replace(",", ".")))
-          .filter(n => n > 100)
-          .sort((a, b) => b - a)[0];
-        if (candidate) return String(Math.round(candidate));
-      }
-    }
-  }
-
-  const allNums = text.match(/[\d.,]+/g) || [];
-  const largest = allNums
-    .map(n => parseFloat(n.replace(/\./g, "").replace(",", ".")))
-    .filter(n => n >= 1000 && n <= 100_000_000)
-    .sort((a, b) => b - a)[0];
-
-  return largest ? String(Math.round(largest)) : "";
-}
-
-function parseDate(text: string): string {
-  const ddmmyyyy = text.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-  if (ddmmyyyy) {
-    const [, d, m, y] = ddmmyyyy;
-    const year = y.length === 2 ? "20" + y : y;
-    try {
-      const date = new Date(Number(year), Number(m) - 1, Number(d));
-      if (!isNaN(date.getTime())) return format(date, "yyyy-MM-dd");
-    } catch { /* ignore */ }
-  }
-  return format(new Date(), "yyyy-MM-dd");
-}
-
-function parseMerchant(text: string): string {
-  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
-  return lines[0] || "Merchant";
-}
 
 interface ParsedReceipt {
   merchant: string;
@@ -123,6 +69,9 @@ export function ScanReceiptDialog({ open, onOpenChange, onClose }: ScanReceiptDi
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance-score"] });
+      queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith("/api/budget") });
       toast({ title: "Transaksi berhasil disimpan!" });
       handleReset();
       onClose();
@@ -151,15 +100,12 @@ export function ScanReceiptDialog({ open, onOpenChange, onClose }: ScanReceiptDi
     setScanError(null);
 
     try {
-      const { recognize } = await import("tesseract.js");
-      const { data: { text } } = await recognize(file, "eng", {
-        logger: () => {},
-      });
+      const text = await runOCR(file);
 
       const m = parseMerchant(text);
       const d = parseDate(text);
       const t = parseTotal(text);
-      const cat = suggestCategory(m);
+      const cat = suggestCategory(m, text);
       const totalFound = !!t;
 
       const result: ParsedReceipt = {
@@ -180,7 +126,7 @@ export function ScanReceiptDialog({ open, onOpenChange, onClose }: ScanReceiptDi
       if (!totalFound) {
         setScanError("Total tidak ditemukan. Silakan isi manual.");
       }
-    } catch (err) {
+    } catch {
       setScanError("Gagal memproses gambar. Coba foto yang lebih jelas.");
       setStage("upload");
     }

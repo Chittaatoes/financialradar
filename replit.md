@@ -118,6 +118,18 @@ Browser → Vite dev server (port 5000, /api proxy) → Express API (port 5001) 
 | `NODE_ENV` | `production` or `development` |
 | `SUPER_ADMIN_EMAIL` | (Optional) First user with this email gets admin role |
 
+## Receipt Scanner (Scan Struk)
+- **Entry points:** `scan-panel.tsx` (dashboard inline), `scan-receipt-dialog.tsx` (modal)
+- **OCR engine:** Tesseract.js with `eng+ind` language for Indonesian + English support
+- **Preprocessing:** Canvas API — resizes to 1200px max, grayscale, contrast boost (1.5×)
+- **Shared OCR helper:** `frontend/src/lib/receipt-ocr.ts` — `runOCR(file)` preprocesses and recognizes
+- **Shared parser:** `frontend/src/lib/receipt-parser.ts` — `parseTotal`, `parseMerchant`, `parseDate`, `suggestCategory`
+- **Total detection:** Priority keyword search (total bayar → grand total → total → jumlah → subtotal), multi-line support (keyword on line N, amount on N+1), fallback to largest formatted number
+- **Merchant detection:** Bank/e-wallet name for payment proofs; first uppercase-dominant line otherwise
+- **Date formats:** ISO `2026-03-09`, `09/03/2026`, `09-03-2026`, `9 Maret 2026`, `9 March 2026`
+- **Category detection:** Keyword matching against merchant name + full OCR text; covers Indonesian & international merchants
+- **Supported receipts:** Supermarket, restaurant, retail, bank transfer proofs (BCA/BNI/Mandiri/BRI/etc.), QRIS, ATM, international (USD/SGD/MYR/EUR)
+
 ## API Routes
 - `/api/auth/*` — Authentication (login, callback, user, logout)
 - `/api/profile` — User profile (XP, level, streak)

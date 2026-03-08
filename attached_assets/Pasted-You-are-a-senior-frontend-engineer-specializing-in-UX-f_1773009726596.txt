@@ -1,0 +1,188 @@
+You are a senior frontend engineer specializing in UX for fintech dashboards.
+
+Upgrade the existing Today's Budget card in the dashboard.
+
+⚠️ IMPORTANT RULES
+
+DO NOT change:
+
+existing UI structure
+
+existing color theme
+
+existing layout
+
+existing calculations
+
+existing components
+
+Only enhance the card with additional information.
+
+The current card already shows:
+
+Today's Budget (Budget Aman Hari Ini)
+
+Monthly Income
+
+Monthly Expense
+
+Remaining Monthly Budget
+
+Progress bar
+
+We will add two new daily metrics:
+
+Pengeluaran Hari Ini
+Sisa Budget Hari Ini
+GOAL
+
+Make the card more useful for daily spending decisions while keeping it clean.
+
+Users should instantly understand:
+
+Budget Aman Hari Ini
+Pengeluaran Hari Ini
+Sisa Budget Hari Ini
+STEP 1 — Calculate Today's Spending
+
+From the existing transactions data, calculate:
+
+todaySpent
+
+Example logic:
+
+const today = new Date().toISOString().slice(0,10)
+
+const todaySpent = transactions
+  .filter(t => t.type === "expense")
+  .filter(t => t.date.startsWith(today))
+  .reduce((sum, t) => sum + t.amount, 0)
+STEP 2 — Calculate Remaining Today
+
+Use existing daily budget value.
+
+remainingToday = dailyBudget - todaySpent
+
+Ensure it never goes below zero visually.
+
+STEP 3 — UI Placement
+
+Do NOT place these values beside the main number.
+
+Instead place below the main budget number.
+
+Structure should become:
+
+Today's Budget
+
+Rp 189.130
+
+Pengeluaran Hari Ini      Rp 65.000
+Sisa Budget Hari Ini      Rp 124.130
+
+Then keep existing monthly metrics below.
+
+STEP 4 — UI Example Structure
+
+Inside the card:
+
+Today's Budget
+
+Rp 189.130
+
+Spent Today           Rp 65.000
+Remaining Today       Rp 124.130
+
+Pemasukan Bulan Ini
+Pengeluaran Bulan Ini
+Sisa Budget Bulan Ini
+STEP 5 — Color Indicators
+
+Use subtle colors to improve readability.
+
+Spent Today → soft red
+Remaining Today → green
+
+Example:
+
+Spent Today     Rp 65.000   (text-red-400)
+Remaining       Rp 124.130  (text-green-400)
+
+Do NOT change existing theme colors.
+
+STEP 6 — Keep Hero Number Dominant
+
+The main number:
+
+Rp 189.130
+
+must remain the largest element in the card.
+
+Do not reduce its size.
+
+STEP 7 — Handle Overspending
+
+If
+
+todaySpent > dailyBudget
+
+show:
+
+Remaining Today: 0
+Status: Overspending
+
+and change status indicator color to warning.
+
+STEP 8 — Maintain Current Status System
+
+Existing status:
+
+On Track
+
+should remain.
+
+Only extend logic if overspending occurs.
+
+STEP 9 — Performance
+
+Do not create new API calls.
+
+Use existing dashboard transaction data.
+
+STEP 10 — Do Not Break Mobile Layout
+
+Ensure new rows:
+
+Spent Today
+Remaining Today
+
+fit cleanly inside the card on mobile.
+
+Spacing recommendation:
+
+margin-top: 8px
+gap: 6px
+EXPECTED RESULT
+
+The final card should look like:
+
+Today's Budget        ● On Track
+
+Rp 189.130
+
+Spent Today           Rp 65.000
+Remaining Today       Rp 124.130
+
+Pemasukan Bulan Ini   Rp 5.000.000
+Pengeluaran Bulan Ini Rp 650.000
+Sisa Budget Bulan Ini Rp 4.350.000
+
+The card becomes a daily spending decision tool while staying visually clean.
+
+FINAL RULE
+
+This change must enhance the UX without altering existing architecture.
+
+Do not refactor unrelated code.
+
+Only extend the Today's Budget card

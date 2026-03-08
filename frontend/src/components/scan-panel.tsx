@@ -15,6 +15,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Account } from "@shared/schema";
 import { parseTotal, parseMerchant, parseDate, suggestCategory } from "@/lib/receipt-parser";
+import { runOCR } from "@/lib/receipt-ocr";
 import { format } from "date-fns";
 import { CalculatorSheet } from "@/components/calculator-sheet";
 
@@ -54,6 +55,9 @@ export function ScanPanel({ onBack, onSave }: ScanPanelProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance-score"] });
+      queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith("/api/budget") });
       toast({ title: "Transaksi berhasil disimpan!" });
       onSave();
     },
@@ -80,13 +84,12 @@ export function ScanPanel({ onBack, onSave }: ScanPanelProps) {
     setScanError(null);
 
     try {
-      const { recognize } = await import("tesseract.js");
-      const { data: { text } } = await recognize(file, "eng", { logger: () => {} });
+      const text = await runOCR(file);
 
       const m = parseMerchant(text);
       const d = parseDate(text);
       const t = parseTotal(text);
-      const cat = suggestCategory(m);
+      const cat = suggestCategory(m, text);
 
       setMerchant(m);
       setDate(d);
