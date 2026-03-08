@@ -14,7 +14,7 @@ import { EXPENSE_CATEGORY_GROUPS } from "@/lib/constants";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Account } from "@shared/schema";
-import { parseTotal, parseMerchant, parseDate, suggestCategory } from "@/lib/receipt-parser";
+import { parseTotal, parseMerchant, parseDate, suggestCategory, detectTransfer, parseRecipient, detectBankName } from "@/lib/receipt-parser";
 import { runOCR } from "@/lib/receipt-ocr";
 import { format } from "date-fns";
 import { CalculatorSheet } from "@/components/calculator-sheet";
@@ -38,6 +38,7 @@ export function ScanPanel({ onBack, onSave }: ScanPanelProps) {
   const [accountId, setAccountId] = useState<string>("");
   const [scanError, setScanError] = useState<string | null>(null);
   const [calcOpen, setCalcOpen] = useState(false);
+  const [txType, setTxType] = useState<"expense" | "transfer">("expense");
 
   const { data: accounts = [] } = useQuery<Account[]>({ queryKey: ["/api/accounts"] });
 
@@ -48,7 +49,7 @@ export function ScanPanel({ onBack, onSave }: ScanPanelProps) {
         amount: total,
         date,
         fromAccountId: accountId ? Number(accountId) : undefined,
-        category,
+        category: txType === "transfer" ? "Transfer" : category,
         note: merchant || undefined,
       }),
     onSuccess: () => {
@@ -74,6 +75,7 @@ export function ScanPanel({ onBack, onSave }: ScanPanelProps) {
     setTotal("");
     setCategory("Shopping");
     setScanError(null);
+    setTxType("expense");
   }, []);
 
   const handleFile = useCallback(async (file: File) => {
@@ -85,24 +87,52 @@ export function ScanPanel({ onBack, onSave }: ScanPanelProps) {
 
     try {
       const text = await runOCR(file);
+      const isTransfer = detectTransfer(text);
 
-      const m = parseMerchant(text);
-      const d = parseDate(text);
-      const t = parseTotal(text);
-      const cat = suggestCategory(m, text);
+      if (isTransfer) {
+        setTxType("transfer");
+        const d = parseDate(text);
+        const t = parseTotal(text);
+        const bankName = detectBankName(text) ?? "";
+        const recipient = parseRecipient(text);
+        const merchantName = recipient || (bankName ? bankName + " Transfer" : "Transfer");
 
-      setMerchant(m);
-      setDate(d);
-      setTotal(t);
-      setCategory(cat);
-      setStage("preview");
+        setMerchant(merchantName);
+        setDate(d);
+        setTotal(t);
+        setCategory("Transfer");
 
-      if (!t) setScanError("Total tidak ditemukan. Silakan isi manual.");
+        // Auto-match account by bank name
+        if (bankName && accounts.length > 0) {
+          const matched = accounts.find(a =>
+            a.name.toLowerCase().includes(bankName.toLowerCase()) ||
+            bankName.toLowerCase().includes(a.name.toLowerCase())
+          );
+          if (matched) setAccountId(String(matched.id));
+        }
+
+        setStage("preview");
+        if (!t) setScanError("Jumlah tidak ditemukan. Silakan isi manual.");
+      } else {
+        setTxType("expense");
+        const m = parseMerchant(text);
+        const d = parseDate(text);
+        const t = parseTotal(text);
+        const cat = suggestCategory(m, text);
+
+        setMerchant(m);
+        setDate(d);
+        setTotal(t);
+        setCategory(cat);
+        setStage("preview");
+
+        if (!t) setScanError("Total tidak ditemukan. Silakan isi manual.");
+      }
     } catch {
       setScanError("Gagal memproses gambar. Coba foto yang lebih jelas.");
       setStage("upload");
     }
-  }, []);
+  }, [accounts]);
 
   const galleryRef = useRef<HTMLInputElement>(null);
 
@@ -226,17 +256,25 @@ export function ScanPanel({ onBack, onSave }: ScanPanelProps) {
             ) : (
               <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                <p className="text-xs text-emerald-600 dark:text-emerald-400">Struk berhasil dipindai. Periksa data sebelum menyimpan.</p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                  {txType === "transfer"
+                    ? "Transaksi transfer terdeteksi. Periksa data sebelum menyimpan."
+                    : "Struk berhasil dipindai. Periksa data sebelum menyimpan."}
+                </p>
               </div>
             )}
 
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Merchant / Toko</label>
-              <Input value={merchant} onChange={e => setMerchant(e.target.value)} placeholder="Nama merchant" className="mt-1.5" />
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {txType === "transfer" ? "Transfer ke" : "Merchant / Toko"}
+              </label>
+              <Input value={merchant} onChange={e => setMerchant(e.target.value)} placeholder={txType === "transfer" ? "Nama penerima" : "Nama merchant"} className="mt-1.5" />
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total</label>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {txType === "transfer" ? "Jumlah" : "Total"}
+              </label>
               <div className="flex gap-2 items-center mt-1.5">
                 <CurrencyInput value={total} onChange={setTotal} placeholder="0" className="flex-1" />
                 <button
@@ -257,25 +295,29 @@ export function ScanPanel({ onBack, onSave }: ScanPanelProps) {
 
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Kategori</label>
-              <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger className="mt-1.5">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {EXPENSE_CATEGORY_GROUPS.map(group => (
-                    <SelectGroup key={group.groupKey}>
-                      <SelectLabel className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                        {group.groupKey === "needs" ? "Kebutuhan" : "Keinginan"}
-                      </SelectLabel>
-                      {group.items.map(item => (
-                        <SelectItem key={item.value} value={item.value}>
-                          <span className="mr-1.5">{item.emoji}</span>{item.value}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
+              {txType === "transfer" ? (
+                <Input value="Transfer" readOnly className="mt-1.5 bg-muted text-muted-foreground cursor-default" />
+              ) : (
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {EXPENSE_CATEGORY_GROUPS.map(group => (
+                      <SelectGroup key={group.groupKey}>
+                        <SelectLabel className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                          {group.groupKey === "needs" ? "Kebutuhan" : "Keinginan"}
+                        </SelectLabel>
+                        {group.items.map(item => (
+                          <SelectItem key={item.value} value={item.value}>
+                            <span className="mr-1.5">{item.emoji}</span>{item.value}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {accounts.length > 0 && (

@@ -1,0 +1,286 @@
+You are a senior full-stack fintech engineer.
+
+Upgrade the receipt scanner logic in this financial web app.
+
+Important rules:
+
+DO NOT change existing UI components or layout.
+DO NOT refactor unrelated code.
+Only enhance the scanner parsing logic and transaction flow.
+
+The app already contains:
+
+Accounts
+Transactions
+Receipt Scanner
+
+Transactions can be created by scanning receipts.
+
+GOAL
+
+The scanner must automatically detect transaction type and adjust the form.
+
+Supported transaction types:
+
+Expense (spending receipts)
+Transfer (bank transfer proof)
+STEP 1 — Detect Transaction Type
+
+After OCR text is extracted, determine transaction type.
+
+Detect transfer if OCR text contains:
+
+TRANSFER
+TRANSFER BERHASIL
+BUKTI TRANSFER
+TRANSACTION SUCCESS
+
+If detected:
+
+transactionType = "transfer"
+
+Otherwise:
+
+transactionType = "expense"
+STEP 2 — Adjust Form Based On Transaction Type
+
+When scanner detects transaction type, update form fields.
+
+Expense (normal receipts)
+
+Keep existing fields:
+
+Merchant / Toko
+Total
+Tanggal
+Kategori
+Dari Rekening
+Transfer
+
+Modify labels dynamically:
+
+Transfer ke
+Jumlah
+Tanggal
+Dari Rekening
+
+Category must automatically become:
+
+Transfer
+
+User should not need to choose category.
+
+STEP 3 — Extract Transfer Recipient
+
+When transfer is detected, extract recipient name.
+
+Search for keywords:
+
+Penerima
+Recipient
+To
+
+Example OCR:
+
+Penerima
+SDR HUBAL FAKIH
+BNI • 1883841713
+
+Parsing rule:
+
+recipientName = line after "Penerima"
+
+Clean text by removing prefixes:
+
+SDR
+BPK
+MR
+MS
+
+Result:
+
+HUBAL FAKIH
+
+Set:
+
+merchant = recipientName
+recipientName = recipientName
+STEP 4 — Detect Bank From Receipt
+
+Detect bank keywords:
+
+BCA
+BNI
+MANDIRI
+BRI
+CIMB
+PERMATA
+BLU
+JAGO
+SEABANK
+
+Example OCR:
+
+BNI
+TRANSFER BERHASIL
+
+Set:
+
+detectedBank = "BNI"
+STEP 5 — Auto Match User Account
+
+Fetch user accounts.
+
+Example:
+
+BNI (bank)
+Cash
+
+Match logic:
+
+account.name contains detectedBank
+
+Example:
+
+detectedBank = BNI
+account.name = bni
+
+Match found:
+
+selectedAccount = BNI
+
+Auto fill form:
+
+Dari Rekening = BNI
+
+User can still change manually.
+
+STEP 6 — Extract Total Amount
+
+Detect patterns:
+
+Rp
+IDR
+USD
+
+Example:
+
+Rp22.000
+
+Convert to numeric value:
+
+22000
+STEP 7 — Extract Date
+
+Support formats:
+
+09 Mar 2026
+09/03/2026
+2026-03-09
+
+Convert to:
+
+YYYY-MM-DD
+STEP 8 — Ensure Transfer Is Expense
+
+Transfers represent money leaving account.
+
+Force amount to negative:
+
+amount = -abs(amount)
+
+Example:
+
+22000 → -22000
+STEP 9 — Auto Update Account Balance
+
+After transaction is saved:
+
+account.balance = account.balance + amount
+
+Example:
+
+BNI balance = 5.000.000
+transaction = -22000
+new balance = 4.978.000
+
+Save updated account.
+
+STEP 10 — Display Transfer In Transaction List
+
+For transfer category, display transaction differently.
+
+Example layout:
+
+Transfer
+05:50  HUBAL FAKIH
+- Rp 22.000
+
+Structure:
+
+Category
+Time + recipientName
+Amount
+
+Other categories remain unchanged.
+
+STEP 11 — Fallback Safety
+
+If transfer detected but recipient not found:
+
+merchant = detectedBank + " Transfer"
+category = Transfer
+
+Example:
+
+BNI Transfer
+
+User can edit manually.
+
+STEP 12 — Scanner Feedback
+
+After scan show message:
+
+Transaksi transfer terdeteksi.
+Periksa data sebelum menyimpan.
+
+For expense:
+
+Struk berhasil dipindai.
+Periksa data sebelum menyimpan.
+EXPECTED USER EXPERIENCE
+
+User scans BNI transfer receipt.
+
+System automatically detects:
+
+Transfer
+Bank: BNI
+Recipient: HUBAL FAKIH
+Amount: 22000
+Date: 09/03/2026
+
+Form becomes:
+
+Transfer ke     HUBAL FAKIH
+Jumlah          22.000
+Tanggal         09/03/2026
+Dari Rekening   BNI
+Kategori        Transfer
+
+User clicks Simpan Transaksi.
+
+System automatically:
+
+creates transaction
+deducts balance from BNI account
+FINAL RULE
+
+Enhance only:
+
+OCR parsing
+transaction type detection
+account auto matching
+balance update
+
+Do not refactor unrelated components.

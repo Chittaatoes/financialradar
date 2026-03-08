@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Account } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { parseTotal, parseMerchant, parseDate, suggestCategory } from "@/lib/receipt-parser";
+import { parseTotal, parseMerchant, parseDate, suggestCategory, detectTransfer, parseRecipient, detectBankName } from "@/lib/receipt-parser";
 import { runOCR } from "@/lib/receipt-ocr";
 
 const EXPENSE_CATEGORIES = EXPENSE_CATEGORY_GROUPS.flatMap(g => g.items.map(i => i.value));
@@ -50,6 +50,7 @@ export function ScanReceiptDialog({ open, onOpenChange, onClose }: ScanReceiptDi
   const [category, setCategory] = useState("Shopping");
   const [accountId, setAccountId] = useState<string>("");
   const [scanError, setScanError] = useState<string | null>(null);
+  const [txType, setTxType] = useState<"expense" | "transfer">("expense");
 
   const { data: accounts = [] } = useQuery<Account[]>({
     queryKey: ["/api/accounts"],
@@ -62,7 +63,7 @@ export function ScanReceiptDialog({ open, onOpenChange, onClose }: ScanReceiptDi
         amount: total,
         date,
         fromAccountId: accountId ? Number(accountId) : undefined,
-        category,
+        category: txType === "transfer" ? "Transfer" : category,
         note: merchant,
       }),
     onSuccess: () => {
@@ -90,6 +91,7 @@ export function ScanReceiptDialog({ open, onOpenChange, onClose }: ScanReceiptDi
     setTotal("");
     setCategory("Shopping");
     setScanError(null);
+    setTxType("expense");
   }, []);
 
   const handleFile = useCallback(async (file: File) => {
@@ -101,36 +103,55 @@ export function ScanReceiptDialog({ open, onOpenChange, onClose }: ScanReceiptDi
 
     try {
       const text = await runOCR(file);
+      const isTransfer = detectTransfer(text);
 
-      const m = parseMerchant(text);
-      const d = parseDate(text);
-      const t = parseTotal(text);
-      const cat = suggestCategory(m, text);
-      const totalFound = !!t;
+      if (isTransfer) {
+        setTxType("transfer");
+        const d = parseDate(text);
+        const t = parseTotal(text);
+        const bankName = detectBankName(text) ?? "";
+        const recipient = parseRecipient(text);
+        const merchantName = recipient || (bankName ? bankName + " Transfer" : "Transfer");
 
-      const result: ParsedReceipt = {
-        merchant: m,
-        date: d,
-        total: t,
-        category: cat,
-        totalFound,
-      };
+        setParsed({ merchant: merchantName, date: d, total: t, category: "Transfer", totalFound: !!t });
+        setMerchant(merchantName);
+        setDate(d);
+        setTotal(t);
+        setCategory("Transfer");
 
-      setParsed(result);
-      setMerchant(m);
-      setDate(d);
-      setTotal(t);
-      setCategory(cat);
-      setStage("preview");
+        if (bankName && accounts.length > 0) {
+          const matched = accounts.find(a =>
+            a.name.toLowerCase().includes(bankName.toLowerCase()) ||
+            bankName.toLowerCase().includes(a.name.toLowerCase())
+          );
+          if (matched) setAccountId(String(matched.id));
+        }
 
-      if (!totalFound) {
-        setScanError("Total tidak ditemukan. Silakan isi manual.");
+        setStage("preview");
+        if (!t) setScanError("Jumlah tidak ditemukan. Silakan isi manual.");
+      } else {
+        setTxType("expense");
+        const m = parseMerchant(text);
+        const d = parseDate(text);
+        const t = parseTotal(text);
+        const cat = suggestCategory(m, text);
+        const totalFound = !!t;
+
+        const result: ParsedReceipt = { merchant: m, date: d, total: t, category: cat, totalFound };
+        setParsed(result);
+        setMerchant(m);
+        setDate(d);
+        setTotal(t);
+        setCategory(cat);
+        setStage("preview");
+
+        if (!totalFound) setScanError("Total tidak ditemukan. Silakan isi manual.");
       }
     } catch {
       setScanError("Gagal memproses gambar. Coba foto yang lebih jelas.");
       setStage("upload");
     }
-  }, []);
+  }, [accounts]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -246,23 +267,31 @@ export function ScanReceiptDialog({ open, onOpenChange, onClose }: ScanReceiptDi
               {!scanError && (
                 <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400">Struk berhasil dipindai. Periksa data sebelum menyimpan.</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                    {txType === "transfer"
+                      ? "Transaksi transfer terdeteksi. Periksa data sebelum menyimpan."
+                      : "Struk berhasil dipindai. Periksa data sebelum menyimpan."}
+                  </p>
                 </div>
               )}
 
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Merchant / Toko</label>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {txType === "transfer" ? "Transfer ke" : "Merchant / Toko"}
+                  </label>
                   <Input
                     value={merchant}
                     onChange={e => setMerchant(e.target.value)}
-                    placeholder="Nama merchant"
+                    placeholder={txType === "transfer" ? "Nama penerima" : "Nama merchant"}
                     className="mt-1.5"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total</label>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {txType === "transfer" ? "Jumlah" : "Total"}
+                  </label>
                   <CurrencyInput
                     value={total}
                     onChange={setTotal}
@@ -283,16 +312,20 @@ export function ScanReceiptDialog({ open, onOpenChange, onClose }: ScanReceiptDi
 
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Kategori</label>
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger className="mt-1.5">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60">
-                      {EXPENSE_CATEGORIES.map(c => (
-                        <SelectItem key={c} value={c}>{c}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {txType === "transfer" ? (
+                    <Input value="Transfer" readOnly className="mt-1.5 bg-muted text-muted-foreground cursor-default" />
+                  ) : (
+                    <Select value={category} onValueChange={setCategory}>
+                      <SelectTrigger className="mt-1.5">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {EXPENSE_CATEGORIES.map(c => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
 
                 {accounts.length > 0 && (

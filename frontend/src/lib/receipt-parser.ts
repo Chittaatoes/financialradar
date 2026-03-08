@@ -52,6 +52,42 @@ function extractNumber(line: string): number | null {
   return valid.length ? Math.max(...valid) : null;
 }
 
+// Transfer detection keywords
+const TRANSFER_KEYWORDS = [
+  /transfer\s*berhasil/i,
+  /bukti\s*transfer/i,
+  /transaction\s*success/i,
+  /berhasil\s*dikirim/i,
+  /pengiriman\s*berhasil/i,
+  /\btransfer\b/i,
+];
+
+export function detectTransfer(text: string): boolean {
+  return TRANSFER_KEYWORDS.some(kw => kw.test(text));
+}
+
+// Extract recipient name from transfer OCR text
+export function parseRecipient(text: string): string {
+  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+  const RECIPIENT_KEYWORDS = /^(penerima|recipient|kepada|to|transfer\s*ke|nama\s*penerima)$/i;
+  const PREFIX_STRIP = /^(sdr\.?|bpk\.?|ibu\.?|sdri\.?|mr\.?|ms\.?|mrs\.?)\s+/i;
+
+  for (let i = 0; i < lines.length - 1; i++) {
+    if (RECIPIENT_KEYWORDS.test(lines[i])) {
+      const raw = lines[i + 1].replace(PREFIX_STRIP, "").trim();
+      if (raw.length > 1) return raw.slice(0, 60);
+    }
+  }
+
+  // Fallback: look for "Penerima: NAME" on the same line
+  const inline = text.match(/(?:penerima|recipient|to)\s*[:\-]\s*(.+)/i);
+  if (inline) {
+    return inline[1].replace(PREFIX_STRIP, "").trim().slice(0, 60);
+  }
+
+  return "";
+}
+
 // Detect bank/payment provider names in OCR text
 const BANK_PATTERNS: [RegExp, string][] = [
   [/\bbca\b/i,          "BCA"],
@@ -80,6 +116,14 @@ const BANK_PATTERNS: [RegExp, string][] = [
 function detectBank(text: string): string | null {
   const isTransfer = /transfer|kirim|debit|kredit|tarik|setor|payment|pembayaran|transaksi/i.test(text);
   if (!isTransfer) return null;
+  for (const [pat, name] of BANK_PATTERNS) {
+    if (pat.test(text)) return name;
+  }
+  return null;
+}
+
+// Public: detect bank/e-wallet name without requiring transfer context
+export function detectBankName(text: string): string | null {
   for (const [pat, name] of BANK_PATTERNS) {
     if (pat.test(text)) return name;
   }
