@@ -40,6 +40,7 @@ import {
   BarChart3, Plus, Award,
   ArrowDownLeft, ArrowUpRight, ArrowLeftRight,
   PiggyBank, CreditCard, FileText, LineChart, Camera,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, getXpForNextLevel, EXPENSE_CATEGORY_GROUPS, INCOME_CATEGORIES, getTierKey } from "@/lib/constants";
@@ -1287,6 +1288,165 @@ function AddActionDialog({ open, onClose, t, onStreakTriggered, initialAction }:
   );
 }
 
+// === FINANCIAL SUMMARY CARD ===
+// Shows monthly budget overview: safe daily budget, income vs expense, progress bar, status.
+// Data from /api/spending-insight?period=monthly
+function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animating: boolean }) {
+  const { data: insight, isLoading } = useQuery<SpendingInsightData>({
+    queryKey: ["/api/spending-insight?period=monthly"],
+  });
+
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysPassed = now.getDate();
+  const remainingDays = Math.max(1, daysInMonth - daysPassed + 1);
+
+  const totalIncome = insight?.totalIncome ?? 0;
+  const totalExpense = insight?.totalExpense ?? 0;
+  const remainingBudget = totalIncome - totalExpense;
+  const budgetAmanHariIni = remainingDays > 0 ? remainingBudget / remainingDays : 0;
+  const progressPct = totalIncome > 0 ? Math.min((totalExpense / totalIncome) * 100, 100) : 0;
+  const expectedSpending = totalIncome > 0 ? (totalIncome / daysInMonth) * daysPassed : 0;
+
+  const statusRatio = expectedSpending > 0 ? totalExpense / expectedSpending : 0;
+  const status: "on-track" | "careful" | "overspending" =
+    statusRatio <= 1.0 ? "on-track" : statusRatio <= 1.2 ? "careful" : "overspending";
+
+  const statusConfig = {
+    "on-track": { label: "On Track", color: "text-emerald-400", dot: "bg-emerald-400" },
+    "careful": { label: "Be Careful", color: "text-amber-400", dot: "bg-amber-400" },
+    "overspending": { label: "Overspending", color: "text-red-400", dot: "bg-red-400" },
+  };
+  const s = statusConfig[status];
+
+  const MASKED = "Rp......";
+
+  return (
+    <Card
+      className="border-0 text-white overflow-hidden"
+      style={{ background: "linear-gradient(135deg, #133825 0%, #0c2318 100%)" }}
+      data-testid="card-financial-summary"
+    >
+      <CardContent className="p-5 space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-emerald-400/80" />
+            <span className="text-sm font-semibold text-white/80">Today's Budget</span>
+          </div>
+          {totalIncome > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", s.dot)} />
+              <span className={cn("text-xs font-medium", s.color)}>{s.label}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Big number: Budget Aman Hari Ini */}
+        <div>
+          <p className="text-[11px] text-white/45 mb-1 uppercase tracking-wide">Budget Aman Hari Ini</p>
+          {isLoading ? (
+            <Skeleton className="h-9 w-40 bg-white/10" />
+          ) : (
+            <p
+              className="text-3xl font-bold font-mono tracking-tight"
+              data-testid="text-budget-aman"
+              style={{
+                opacity: animating ? 0 : 1,
+                transform: animating ? "scale(0.98)" : "scale(1)",
+                transition: "opacity 180ms ease-in-out, transform 180ms ease-in-out",
+                color: budgetAmanHariIni >= 0 ? "white" : "#f87171",
+              }}
+            >
+              {hidden ? MASKED : formatCurrency(Math.max(0, budgetAmanHariIni))}
+            </p>
+          )}
+          {!isLoading && totalIncome === 0 && (
+            <p className="text-xs text-white/35 mt-1">Record income this month to see your daily budget</p>
+          )}
+        </div>
+
+        {/* Middle: two columns */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-lg bg-white/8 p-3">
+            <p className="text-[11px] text-white/45 mb-1">Pemasukan Bulan Ini</p>
+            {isLoading ? (
+              <Skeleton className="h-5 w-24 bg-white/10" />
+            ) : (
+              <p
+                className="text-sm font-mono font-semibold text-emerald-300"
+                data-testid="text-monthly-income"
+                style={{
+                  opacity: animating ? 0 : 1,
+                  transition: "opacity 180ms ease-in-out",
+                }}
+              >
+                {hidden ? "******" : formatCurrency(totalIncome)}
+              </p>
+            )}
+          </div>
+          <div className="rounded-lg bg-white/8 p-3">
+            <p className="text-[11px] text-white/45 mb-1">Pengeluaran Bulan Ini</p>
+            {isLoading ? (
+              <Skeleton className="h-5 w-24 bg-white/10" />
+            ) : (
+              <p
+                className="text-sm font-mono font-semibold text-red-300"
+                data-testid="text-monthly-expense"
+                style={{
+                  opacity: animating ? 0 : 1,
+                  transition: "opacity 180ms ease-in-out",
+                }}
+              >
+                {hidden ? "******" : formatCurrency(totalExpense)}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom: remaining budget + progress */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs text-white/50">Sisa Budget Bulan Ini</span>
+            {isLoading ? (
+              <Skeleton className="h-4 w-20 bg-white/10" />
+            ) : (
+              <span
+                className="text-sm font-mono font-semibold"
+                data-testid="text-remaining-budget"
+                style={{
+                  opacity: animating ? 0 : 1,
+                  transition: "opacity 180ms ease-in-out",
+                  color: remainingBudget >= 0 ? "#6ee7b7" : "#f87171",
+                }}
+              >
+                {hidden ? "******" : formatCurrency(remainingBudget)}
+              </span>
+            )}
+          </div>
+          <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${progressPct}%`,
+                background: status === "on-track"
+                  ? "linear-gradient(90deg, #34d399, #10b981)"
+                  : status === "careful"
+                  ? "linear-gradient(90deg, #fbbf24, #f59e0b)"
+                  : "linear-gradient(90deg, #f87171, #ef4444)",
+              }}
+              data-testid="progress-budget"
+            />
+          </div>
+          <p className="text-[10px] text-white/30 text-right" data-testid="text-budget-progress-pct">
+            {Math.round(progressPct)}% used · {remainingDays} days left
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // === MAIN DASHBOARD COMPONENT ===
 // Layout (top to bottom):
 // 1. Header row: welcome text + "Spend Nothing Today" button (always visible)
@@ -1510,7 +1670,10 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* 3. Total Assets — Hero card (full width) */}
+      {/* 3. Financial Summary — Today's Budget card */}
+      <FinancialSummaryCard hidden={hidden} animating={animating} />
+
+      {/* 4. Total Assets — Hero card (full width) */}
       <Card className="border-0 text-white" style={{ background: "linear-gradient(135deg, #1E2F26 0%, #16221C 100%)" }} data-testid="card-total-assets">
         <CardContent className="p-5 space-y-4">
           <div className="flex items-center justify-between gap-3">
