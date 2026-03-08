@@ -18,18 +18,18 @@ export async function setupAuth(app: Express) {
 
   app.use(
     session({
-      store: sessionStore,
-      secret: process.env.SESSION_SECRET || "dev-secret-financial-radar",
-      resave: false,
-      saveUninitialized: false,
-      rolling: true,
-      cookie: {
-        secure: process.env.NODE_ENV === "production",
-        httpOnly: true,
-        sameSite: "lax",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      },
-    })
+  store: sessionStore,
+  secret: process.env.SESSION_SECRET || "dev-secret-financial-radar",
+  resave: false,
+  saveUninitialized: false,
+  rolling: true,
+  cookie: {
+    secure: true,
+    httpOnly: true,
+    sameSite: "none",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  },
+})
   );
 
   app.get("/api/login", (req, res) => {
