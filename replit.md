@@ -45,8 +45,10 @@ Browser → Vercel (frontend + /api proxy) → Render (backend API) → Supabase
 │   ├── src/
 │   │   ├── App.tsx                       # Auth-gated routing
 │   │   ├── main.tsx                      # React entry point
-│   │   ├── index.css                     # Tailwind + theme CSS variables
+│   │   ├── index.css                     # Tailwind + theme CSS variables + iOS date fix
 │   │   ├── components/                   # UI components (Shadcn UI 40+)
+│   │   │   ├── calculator-sheet.tsx      # Calculator bottom sheet (safe arithmetic parser)
+│   │   │   └── budget-summary-card.tsx   # Today's Budget card (daily budget, monthly income/expense, progress)
 │   │   ├── features/                     # Feature modules (score, gamification, onboarding)
 │   │   ├── hooks/                        # Custom React hooks
 │   │   ├── lib/                          # API client, i18n, constants, utils

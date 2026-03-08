@@ -56,7 +56,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const handleGoogleLogin = () => {
     const onboardingData = { primaryGoal, habitType, focusAreas };
     localStorage.setItem("fr_onboarding", JSON.stringify(onboardingData));
-    window.location.href = "https://financialradars-api.onrender.com/api/login";
+    window.location.href = "/api/login";
   };
 
   const handleGuestLogin = async () => {
@@ -158,7 +158,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 </Button>
                 <button
                   className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-2"
-                  onClick={() => { window.location.href = "https://financialradars-api.onrender.com/api/login"; }}
+                  onClick={() => { window.location.href = "/api/login"; }}
                 >
                   Already have an account?{" "}
                   <span className="underline underline-offset-2">Sign in</span>

@@ -1,0 +1,10 @@
+Changelog - File yang diubah (2 jam terakhir)
+=============================================
+
+backend/src/auth/index.ts
+frontend/src/components/calculator-sheet.tsx
+frontend/src/components/scan-panel.tsx
+frontend/src/components/scan-receipt-dialog.tsx
+frontend/src/index.css
+frontend/src/pages/dashboard.tsx
+replit.md

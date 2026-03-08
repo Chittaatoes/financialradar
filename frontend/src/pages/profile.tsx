@@ -247,7 +247,7 @@ function NotificationSection() {
 }
 
 export default function ProfilePage() {
-  const { user, logout } = useAuth();
+  const { user, logout, isGuest, isAuthenticated } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const pt = (t as any).profile;
@@ -357,7 +357,7 @@ export default function ProfilePage() {
                 </p>
                 <button
                   className="mt-2 flex items-center gap-0.5 text-xs text-primary/80 font-medium hover:text-primary transition-colors"
-                  onClick={() => { window.location.href = "https://financialradars-api.onrender.com/api/login"; }}
+                  onClick={() => { window.location.href = "/api/login"; }}
                   data-testid="profile-button-secure-google"
                 >
                   Tautkan dengan Google
@@ -544,15 +544,17 @@ export default function ProfilePage() {
         </Link>
       )}
 
-      <Button
-        variant="ghost"
-        onClick={() => logout()}
-        className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-2xl h-11"
-        data-testid="profile-button-logout"
-      >
-        <LogOut className="w-4 h-4 mr-2" />
-        {t.auth.logout}
-      </Button>
+      {isAuthenticated && (
+        <Button
+          variant="ghost"
+          onClick={() => logout()}
+          className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-2xl h-11"
+          data-testid="profile-button-logout"
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          {t.auth.logout}
+        </Button>
+      )}
 
       <ProfileAuthorFooter />
     </div>

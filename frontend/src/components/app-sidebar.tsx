@@ -53,7 +53,7 @@ import { getTierKey } from "@/lib/constants";
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { user } = useAuth();
+  const { user, isGuest, isAuthenticated } = useAuth();
   const { data: profile } = useQuery<UserProfile>({
     queryKey: ["/api/profile"],
   });
@@ -181,22 +181,24 @@ export function AppSidebar() {
           <Avatar className="w-8 h-8">
             <AvatarImage src={user?.profileImageUrl || ""} />
             <AvatarFallback className="text-xs bg-primary/10 text-primary">
-              {user?.firstName?.[0] || user?.email?.[0]?.toUpperCase() || "U"}
+              {user?.firstName?.[0] || (user as any)?.email?.[0]?.toUpperCase() || "G"}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate" data-testid="text-user-name">
-              {user?.firstName || user?.email || "User"}
+              {isGuest ? "Guest" : (user?.firstName || (user as any)?.email || "User")}
             </p>
             <p className="text-xs text-muted-foreground" data-testid="text-user-tier">
               {(t.tiers as any)[getTierKey(level)]} &middot; Lv {level}
             </p>
           </div>
-          <a href="/api/logout">
-            <Button size="icon" variant="ghost" data-testid="button-logout">
-              <LogOut className="w-4 h-4" />
-            </Button>
-          </a>
+          {isAuthenticated && (
+            <a href="/api/logout">
+              <Button size="icon" variant="ghost" data-testid="button-logout">
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </a>
+          )}
         </div>
       </SidebarFooter>
     </Sidebar>

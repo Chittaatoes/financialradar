@@ -15,19 +15,12 @@ declare module "http" {
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (process.env.NODE_ENV !== "production") {
-        return callback(null, true);
-      }
-
-      const allowed = process.env.FRONTEND_URL;
-
-      if (!origin || (allowed && origin === allowed)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS: origin ${origin} not allowed`));
-      }
-    },
+    origin: [
+      "https://financialradar.vercel.app",
+      "http://localhost:5173",
+      "http://localhost:5000",
+      process.env.FRONTEND_URL || "",
+    ].filter(Boolean),
     credentials: true,
   })
 );
