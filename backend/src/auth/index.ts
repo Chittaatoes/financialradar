@@ -16,21 +16,23 @@ export async function setupAuth(app: Express) {
     createTableIfMissing: true,
   });
 
+  const isProduction = process.env.NODE_ENV === "production";
+
   app.use(
     session({
-  store: sessionStore,
-  secret: process.env.SESSION_SECRET || "dev-secret-financial-radar",
-  resave: false,
-  saveUninitialized: false,
-  rolling: true,
-  proxy: true,
-  cookie: {
-    secure: true,
-    httpOnly: true,
-    sameSite: "none",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  },
-})
+      store: sessionStore,
+      secret: process.env.SESSION_SECRET || "dev-secret-financial-radar",
+      resave: false,
+      saveUninitialized: false,
+      rolling: true,
+      proxy: true,
+      cookie: {
+        secure: isProduction,
+        httpOnly: true,
+        sameSite: isProduction ? "none" : "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      },
+    })
   );
 
   app.get("/api/login", (req, res) => {

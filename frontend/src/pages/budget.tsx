@@ -518,17 +518,29 @@ export default function BudgetPage() {
 
   const { data: budgetPlan, isLoading: planLoading } = useQuery<BudgetPlan | null>({
     queryKey: ["/api/budget-plan", currentMonth],
-    queryFn: () => fetch(`${API_URL}/api/budget-plan?month=${currentMonth}`, { credentials: "include" }).then(r => r.json()),
+    queryFn: async () => {
+      const r = await fetch(`${API_URL}/api/budget-plan?month=${currentMonth}`, { credentials: "include" });
+      if (!r.ok) return null;
+      return r.json();
+    },
   });
 
   const { data: summary, isLoading: summaryLoading } = useQuery<BudgetSummaryData>({
     queryKey: ["/api/budget/summary", currentMonth],
-    queryFn: () => fetch(`${API_URL}/api/budget/summary?month=${currentMonth}`, { credentials: "include" }).then(r => r.json()),
+    queryFn: async () => {
+      const r = await fetch(`${API_URL}/api/budget/summary?month=${currentMonth}`, { credentials: "include" });
+      if (!r.ok) return null;
+      return r.json();
+    },
   });
 
   const { data: allocations } = useQuery<BudgetAllocation[]>({
     queryKey: ["/api/budget", currentMonth],
-    queryFn: () => fetch(`${API_URL}/api/budget?month=${currentMonth}`, { credentials: "include" }).then(r => r.json()),
+    queryFn: async () => {
+      const r = await fetch(`${API_URL}/api/budget?month=${currentMonth}`, { credentials: "include" });
+      if (!r.ok) return [];
+      return r.json();
+    },
   });
 
   const { data: goals = [] } = useQuery<Goal[]>({

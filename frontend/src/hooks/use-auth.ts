@@ -79,10 +79,15 @@ export function useAuth() {
     },
   });
 
+  const isGuest = !!(user && (user as any).isGuest);
+  const isAuthenticated = !!(user && !(user as any).isGuest);
+
   return {
     user,
     isLoading,
     isError,
+    isGuest,
+    isAuthenticated,
     guestLogin: guestLoginMutation.mutate,
     logout: logoutMutation.mutate,
     isGuestLoggingIn: guestLoginMutation.isPending,

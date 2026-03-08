@@ -1,0 +1,242 @@
+You are a senior full-stack engineer and system architect.
+Act like a top tier technical lead and carefully repair the project.
+Project structure:
+•	frontend → deployed on Vercel
+•	backend → deployed on Render
+•	stack → React + Vite + Express + TypeScript
+•	frontend calls backend via /api/...
+Current issues:
+•	Many API errors: 400 / 500
+•	CORS issues
+•	budget-plan save error
+•	accounts endpoint returns 400
+•	goals endpoint returns 400
+•	incorrect redirect to /api/login
+•	no login page (login should only happen through Google linking)
+•	user should start as guest
+•	when Google is linked → user becomes authenticated
+•	need logout button in profile
+Important rule:
+⚠️ DO NOT change existing business logic or UI structure unnecessarily.
+Only fix broken parts and missing infrastructure.
+________________________________________
+TASK 1 — Fix API Base URL (Frontend)
+Ensure frontend always calls the Render backend.
+Create or fix:
+frontend/src/lib/api.ts
+export const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "https://financialradars-api.onrender.com";
+
+export async function apiRequest(
+  method: string,
+  endpoint: string,
+  data?: any
+) {
+  const res = await fetch(`${API_URL}${endpoint}`, {
+    method,
+    headers: {
+      "Content-Type": "application/json"
+    },
+    credentials: "include",
+    body: data ? JSON.stringify(data) : undefined
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "API request failed");
+  }
+
+  return res.json();
+}
+Replace any direct fetch like:
+fetch("/api/...")
+with
+apiRequest(...)
+________________________________________
+TASK 2 — Fix incorrect login redirect
+Currently code redirects to:
+window.location.href = `${API_URL}/api/login`
+This is wrong because /api/login is an API endpoint.
+Replace all such redirects with:
+window.location.href = "/profile"
+or simply reload the page.
+User authentication should only depend on Google linking.
+________________________________________
+TASK 3 — Implement Guest Mode
+User should start as guest.
+Backend /api/user endpoint must return:
+{
+  guest: true
+}
+if user is not authenticated.
+Frontend must interpret:
+guest === true
+as guest state.
+When Google account is linked, backend should return:
+{
+  id,
+  email,
+  name,
+  picture,
+  guest: false
+}
+________________________________________
+TASK 4 — Google Account Linking
+The system must support linking a Google account instead of a login page.
+When user clicks Link Google in profile:
+1.	redirect to backend /auth/google
+2.	backend handles OAuth
+3.	backend sets session cookie
+4.	backend redirects back to frontend /profile
+After redirect, frontend should call:
+GET /api/user
+to load the authenticated user.
+________________________________________
+TASK 5 — Backend Session & CORS Fix
+Fix CORS in Express backend.
+In backend/src/index.ts:
+import cors from "cors";
+
+app.use(
+  cors({
+    origin: [
+      "https://financialradar.vercel.app",
+      "http://localhost:5173"
+    ],
+    credentials: true
+  })
+);
+Also ensure:
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+________________________________________
+TASK 6 — Fix API 400 Errors
+Ensure POST endpoints validate body safely.
+Example:
+app.post("/api/accounts", async (req, res) => {
+  try {
+    const data = req.body;
+
+    if (!data) {
+      return res.status(400).json({
+        message: "Invalid request body"
+      });
+    }
+
+    const account = await createAccount(data);
+
+    res.json(account);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      message: "Failed to create account"
+    });
+  }
+});
+Do the same pattern for:
+/api/accounts
+/api/goals
+/api/budget-plan
+________________________________________
+TASK 7 — Fix Budget Plan 500 Error
+Wrap logic with safe validation.
+app.post("/api/budget-plan", async (req, res) => {
+  try {
+    const {
+      income,
+      needs,
+      wants,
+      savings,
+      investment
+    } = req.body;
+
+    if (!income) {
+      return res.status(400).json({
+        message: "Income required"
+      });
+    }
+
+    const plan = await db.budgetPlan.create({
+      data: {
+        income,
+        needs,
+        wants,
+        savings,
+        investment
+      }
+    });
+
+    res.json(plan);
+  } catch (err) {
+    console.error("Budget plan error:", err);
+
+    res.status(500).json({
+      message: "Failed to save budget plan"
+    });
+  }
+});
+________________________________________
+TASK 8 — Logout System
+Add logout endpoint.
+Backend:
+app.post("/api/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.clearCookie("connect.sid");
+    res.json({ success: true });
+  });
+});
+________________________________________
+TASK 9 — Logout Button (Profile Page)
+In profile.tsx add logout button only when user is authenticated.
+{!user?.guest && (
+  <button
+    onClick={async () => {
+      await apiRequest("POST", "/api/logout");
+      window.location.reload();
+    }}
+    className="mt-6 w-full rounded-lg bg-red-500 text-white py-2"
+  >
+    Logout
+  </button>
+)}
+________________________________________
+TASK 10 — Fix React Query Refetch
+Ensure these endpoints refresh properly:
+/api/user
+/api/accounts
+/api/goals
+/api/budget-plan
+/api/debt-health
+/api/net-worth
+Use:
+queryClient.invalidateQueries()
+after mutations.
+________________________________________
+TASK 11 — Environment Variables
+Frontend .env
+VITE_API_URL=https://financialradars-api.onrender.com
+Backend .env
+FRONTEND_URL=https://financialradar.vercel.app
+SESSION_SECRET=supersecret
+________________________________________
+TASK 12 — Stability Rules
+Ensure:
+•	no API returns 500 without try/catch
+•	all POST endpoints validate body
+•	frontend handles guest user
+•	Google linking upgrades guest → authenticated user
+•	logout removes session
+•	no redirect to /api/login
+________________________________________
+EXPECTED RESULT
+After fixing:
+✅ No more 400 / 500 errors
+✅ Google linking works
+✅ guest → authenticated transition works
+✅ logout button appears in profile
+✅ frontend and backend communicate correctly
+✅ CORS works between Vercel and Render
+✅ budget plan saves correctly
+✅ Transaction work properly and everything should can be run normal
+
