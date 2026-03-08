@@ -176,7 +176,7 @@ export async function setupAuth(app: Express) {
       res.json({ ok: true });
     });
   });
-}
+};
 
 export const isAuthenticated: RequestHandler = (
   req,
