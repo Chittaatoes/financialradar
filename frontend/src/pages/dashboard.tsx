@@ -558,6 +558,7 @@ function TransactionForm({
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance-score"] });
       queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith("/api/spending-insight") });
+      queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith("/api/budget") });
       queryClient.invalidateQueries({ queryKey: ["/api/daily-focus"] });
       toast({ title: t.transactions.submit, description: "+5 XP" });
       form.reset();
@@ -833,6 +834,7 @@ function SavingsForm({ onClose, t }: { onClose: () => void; t: any }) {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance-score"] });
       queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith("/api/spending-insight") });
+      queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith("/api/budget") });
       toast({ title: t.dashboard.savingsRecorded, description: "+8 XP" });
       form.reset();
       onClose();
@@ -1019,6 +1021,7 @@ function DebtPaymentForm({ onClose, t }: { onClose: () => void; t: any }) {
       queryClient.invalidateQueries({ queryKey: ["/api/finance-score"] });
       queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith("/api/spending-insight") });
       queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith("/api/debt-health") });
+      queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith("/api/budget") });
       toast({ title: t.dashboard.debtPaymentRecorded, description: "+8 XP" });
       form.reset();
       onClose();

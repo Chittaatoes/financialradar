@@ -1,0 +1,322 @@
+You are a senior AI + full-stack engineer improving an existing feature.
+
+This project already has a working receipt scan UI in the frontend.
+
+⚠️ IMPORTANT RULE
+Do NOT change the existing UI or form structure.
+
+The current frontend already contains fields:
+
+Merchant / Toko
+Total
+Tanggal
+Kategori
+Dari Rekening
+
+The scanner must auto-fill these fields using OCR.
+
+The UI must remain exactly the same.
+
+Only improve the scan logic and parsing engine.
+
+CURRENT FRONTEND FLOW (DO NOT CHANGE)
+
+The user flow already works like this:
+
+User opens Scan Struk
+
+Uploads an image
+
+OCR runs
+
+Fields auto-fill:
+
+merchant
+total
+date
+category
+
+User edits if needed
+
+User clicks Simpan Transaksi
+
+⚠️ This flow must remain unchanged.
+
+GOAL
+
+Upgrade the scanner so it can detect:
+
+Receipts
+
+supermarket receipts
+
+restaurant receipts
+
+retail receipts
+
+shopping receipts
+
+international receipts
+
+Payment proofs
+
+BCA mobile banking
+
+BNI mobile banking
+
+Mandiri Livin
+
+BRI mobile
+
+ATM receipts
+
+QRIS payment screenshot
+
+transfer receipt
+
+International receipts
+
+USD
+
+SGD
+
+MYR
+
+EUR
+
+STEP 1 — Improve OCR Engine
+
+Use Tesseract.js if already used.
+
+If OCR already exists, do not replace it.
+
+Only improve accuracy.
+
+Install if missing:
+
+npm install tesseract.js sharp
+STEP 2 — Image Preprocessing
+
+Before OCR runs, preprocess the image to improve accuracy.
+
+Example:
+
+import sharp from "sharp"
+
+async function preprocessImage(imageBuffer) {
+  return await sharp(imageBuffer)
+    .resize({ width: 1200 })
+    .grayscale()
+    .normalize()
+    .sharpen()
+    .toBuffer()
+}
+
+This dramatically improves OCR accuracy.
+
+STEP 3 — OCR Recognition
+
+Run OCR with Indonesian + English.
+
+Example:
+
+const { data } = await Tesseract.recognize(
+  image,
+  "eng+ind"
+)
+
+const text = data.text
+STEP 4 — Smart TOTAL Detection
+
+Improve total detection logic.
+
+Search for keywords:
+
+TOTAL
+TOTAL BAYAR
+TOTAL BELANJA
+JUMLAH
+GRAND TOTAL
+AMOUNT
+SUBTOTAL
+
+Regex:
+
+(total|grand total|jumlah|total bayar)[^\d]*(\d+[.,]?\d*)
+
+Also detect currency:
+
+Rp
+IDR
+USD
+SGD
+MYR
+EUR
+
+Convert to number:
+
+Rp 45.000 → 45000
+$10.50 → 10.50
+STEP 5 — Merchant Detection
+
+Merchant is usually:
+
+first line
+
+uppercase
+
+brand name
+
+Examples:
+
+INDOMARET
+ALFAMART
+STARBUCKS
+MCDONALDS
+TOKOPEDIA
+SUSHI TEI
+
+Logic:
+
+first uppercase line
+
+if none found → use first text line
+
+STEP 6 — Date Detection
+
+Support formats:
+
+09/03/2026
+09-03-2026
+2026-03-09
+9 Mar 2026
+
+Regex:
+
+\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}
+STEP 7 — Bank / Payment Proof Detection
+
+Detect payment provider.
+
+Keywords:
+
+BCA
+BNI
+MANDIRI
+BRI
+CIMB
+PERMATA
+
+Also detect:
+
+QRIS
+DEBIT
+TRANSFER
+VISA
+MASTERCARD
+
+Example OCR:
+
+TRANSFER BERHASIL
+BANK BCA
+Rp 250.000
+
+Result:
+
+merchant: Transfer
+category: Transfer
+total: 250000
+STEP 8 — Category Auto Detection
+
+Use merchant keywords.
+
+Food:
+
+restaurant
+cafe
+starbucks
+mcd
+kfc
+pizza
+
+Groceries:
+
+indomaret
+alfamart
+supermarket
+hypermart
+
+Shopping:
+
+mall
+store
+fashion
+
+Transport:
+
+grab
+uber
+taxi
+
+Default:
+
+Shopping
+STEP 9 — Return Structured Result
+
+Scanner should return:
+
+{
+  "merchant": "Indomaret",
+  "total": 45000,
+  "date": "2026-03-09",
+  "category": "Groceries"
+}
+STEP 10 — Integrate With Existing Form
+
+DO NOT change UI.
+
+After scanning, auto-fill existing fields.
+
+Example:
+
+setMerchant(result.merchant)
+setTotal(result.total)
+setDate(result.date)
+setCategory(result.category)
+
+If value not found:
+
+keep current fallback message:
+
+Total tidak ditemukan. Silakan isi manual.
+STEP 11 — Performance Optimization
+
+Resize image before OCR:
+
+max width: 1200px
+
+This improves speed significantly.
+
+STEP 12 — Error Handling
+
+If OCR fails:
+
+Total tidak ditemukan. Silakan isi manual.
+
+But still try to detect merchant and date.
+
+EXPECTED RESULT
+
+The scanner should now detect automatically:
+
+✅ supermarket receipts
+✅ restaurant receipts
+✅ Indonesian receipts
+✅ international receipts
+✅ bank transfer proofs
+✅ ATM receipts
+✅ QRIS screenshots
+
+Accuracy target:
+
+70-90% detection

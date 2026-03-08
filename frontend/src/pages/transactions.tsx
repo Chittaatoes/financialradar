@@ -162,6 +162,7 @@ function TransactionForm({ accounts, onClose }: { accounts: Account[]; onClose: 
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance-score"] });
+      queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith("/api/budget") });
       toast({ title: "Transaction recorded! +5 XP" });
       onClose();
     },
@@ -183,6 +184,7 @@ function TransactionForm({ accounts, onClose }: { accounts: Account[]; onClose: 
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance-score"] });
+      queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith("/api/budget") });
       toast({ title: "Savings deposited! +8 XP" });
       setSavGoalId(""); setSavAmount(""); setSavFromAcc("");
       onClose();
@@ -793,6 +795,7 @@ export default function Transactions() {
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance-score"] });
       queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith("/api/spending-insight") });
+      queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith("/api/budget") });
       toast({ title: t.transactions.deleted });
     },
     onError: (error: Error) => {
