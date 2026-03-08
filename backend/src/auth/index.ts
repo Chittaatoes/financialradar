@@ -18,6 +18,20 @@ export async function setupAuth(app: Express) {
 
   app.use(
     session({
+      store: session<<<<<<< HEAD
+  store: sessionStore,
+  secret: process.env.SESSION_SECRET || "dev-secret-financial-radar",
+  resave: false,
+  saveUninitialized: false,
+  rolling: true,
+  cookie: {
+    secure: true,
+    httpOnly: true,
+    sameSite: "none",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  },
+})
+=======
       store: sessionStore,
       secret: process.env.SESSION_SECRET || "dev-secret-financial-radar",
       resave: false,
@@ -30,11 +44,8 @@ export async function setupAuth(app: Express) {
         maxAge: 7 * 24 * 60 * 60 * 1000,
       },
     })
-pdate cors config)
-eq, res) => {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    if (!clientId) {
-      return res
+>>>>>>> 9573829 (fix: update cors config)
+ return res
         .status(500)
         .json({ message: "Google Auth not configured. Set GOOGLE_CLIENT_ID." });
     }
