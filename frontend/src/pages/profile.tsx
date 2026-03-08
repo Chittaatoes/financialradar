@@ -1,3 +1,4 @@
+import { API_URL } from "@/lib/api";
 import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -357,7 +358,7 @@ export default function ProfilePage() {
                 </p>
                 <button
                   className="mt-2 flex items-center gap-0.5 text-xs text-primary/80 font-medium hover:text-primary transition-colors"
-                  onClick={() => { window.location.href = "/api/login"; }}
+                  onClick={() => window.location.href = `${API_URL}/api/login`}
                   data-testid="profile-button-secure-google"
                 >
                   Tautkan dengan Google
