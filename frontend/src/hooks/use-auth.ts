@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
 import { API_URL } from "@/lib/api";
 
 export interface User {
@@ -15,8 +14,8 @@ async function fetchUser(): Promise<User | null> {
   });
 
   if (res.status === 401) {
-  return { isGuest: true } as any;
-}
+    return null;
+  }
   if (!res.ok) throw new Error("Failed to fetch user");
 
   return res.json();
@@ -64,12 +63,6 @@ export function useAuth() {
       queryClient.invalidateQueries({ queryKey: ["user"] });
     },
   });
-
-  useEffect(() => {
-  if (!isLoading && user === null && !guestLoginMutation.isPending) {
-    guestLoginMutation.mutate();
-  }
-}, [user, isLoading]);
 
   const logoutMutation = useMutation({
     mutationFn: logout,

@@ -17,13 +17,14 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
   process.env.APP_URL,
   "http://localhost:5000",
+  "http://localhost:5001",
   "http://localhost:5173",
 ].filter(Boolean) as string[];
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
+      if (!origin || origin === "null") return callback(null, true);
       const isAllowed =
         allowedOrigins.some((o) => origin === o) ||
         /\.replit\.dev$/.test(origin) ||

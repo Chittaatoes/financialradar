@@ -101,7 +101,7 @@ function AppContent() {
       guestLoginCalled.current = true;
       apiRequest("POST", "/api/guest-login", {})
         .then(() => {
-          queryClient.invalidateQueries({ queryKey: ["user"] });
+          queryClient.invalidateQueries();
         })
         .catch(() => {
           setReady(true);
