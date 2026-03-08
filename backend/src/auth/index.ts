@@ -138,21 +138,24 @@ export async function setupAuth(app: Express) {
         })
         .returning();
 
-      (req.session as any).user = user;
+      req.session.regenerate((err) => {
+  if (err) {
+    console.error("Session regenerate error:", err);
+    return res.redirect(`${frontendUrl}/?error=session_failed`);
+  }
 
-      req.session.save((err) => {
-        if (err) {
-          console.error("Session save error:", err);
-          return res.redirect(`${frontendUrl}/?error=session_failed`);
-        }
+  (req.session as any).user = user;
+  (req.session as any).isGuest = false;
 
-        res.redirect(frontendUrl || "/");
-      });
-    } catch (error) {
-      console.error("Google auth callback error:", error);
-      res.redirect(`${frontendUrl}/?error=auth_failed`);
+  req.session.save((err) => {
+    if (err) {
+      console.error("Session save error:", err);
+      return res.redirect(`${frontendUrl}/?error=session_failed`);
     }
+
+    res.redirect(frontendUrl || "/");
   });
+});
 
   app.get("/api/auth/user", (req, res) => {
     const user = (req.session as any)?.user;
