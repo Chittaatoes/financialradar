@@ -27,6 +27,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useLanguage } from "@/lib/i18n";
 import { useTheme } from "@/components/theme-provider";
 import { getTierKey } from "@/lib/constants";
@@ -188,6 +189,7 @@ function TimezoneSelector({
 }
 
 function NotificationSection() {
+  const isMobile = useIsMobile();
   const [settings, setSettings] = useState<NotificationSettings>(() => getNotificationSettings());
   const [showPicker, setShowPicker] = useState(false);
   const pickerDropdownRef = useRef<HTMLDivElement>(null);
@@ -290,24 +292,40 @@ function NotificationSection() {
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                 Waktu Pengingat
               </p>
-              <button
-                ref={timeButtonRef}
-                className="flex items-center gap-2 text-sm font-mono font-semibold text-foreground border rounded-lg px-3 py-2 w-full hover:bg-muted/50 transition-colors"
-                onClick={() => setShowPicker(!showPicker)}
-                data-testid="profile-notif-time"
-              >
-                {timeLabel}
-                <Clock className="w-3.5 h-3.5 text-muted-foreground ml-auto" />
-              </button>
-              {showPicker && (
-                <div
-                  ref={pickerDropdownRef}
-                  className="absolute top-full left-0 z-50 mt-1.5 bg-background border border-border rounded-xl shadow-xl p-3 flex items-center gap-3"
-                >
-                  <ScrollPicker values={hours} selected={settings.hour} onSelect={handleHour} />
-                  <span className="font-bold text-lg text-muted-foreground">:</span>
-                  <ScrollPicker values={minutes} selected={settings.minute} onSelect={handleMinute} />
-                </div>
+              {!isMobile ? (
+                <input
+                  type="time"
+                  value={timeLabel}
+                  onChange={(e) => {
+                    const [h, m] = e.target.value.split(":").map(Number);
+                    if (!isNaN(h)) handleHour(h);
+                    if (!isNaN(m)) handleMinute(m);
+                  }}
+                  className="flex items-center gap-2 text-sm font-mono font-semibold text-foreground border rounded-lg px-3 py-2 w-full hover:bg-muted/50 transition-colors bg-background"
+                  data-testid="profile-notif-time"
+                />
+              ) : (
+                <>
+                  <button
+                    ref={timeButtonRef}
+                    className="flex items-center gap-2 text-sm font-mono font-semibold text-foreground border rounded-lg px-3 py-2 w-full hover:bg-muted/50 transition-colors"
+                    onClick={() => setShowPicker(!showPicker)}
+                    data-testid="profile-notif-time"
+                  >
+                    {timeLabel}
+                    <Clock className="w-3.5 h-3.5 text-muted-foreground ml-auto" />
+                  </button>
+                  {showPicker && (
+                    <div
+                      ref={pickerDropdownRef}
+                      className="absolute top-full left-0 z-50 mt-1.5 bg-background border border-border rounded-xl shadow-xl p-3 flex items-center gap-3"
+                    >
+                      <ScrollPicker values={hours} selected={settings.hour} onSelect={handleHour} />
+                      <span className="font-bold text-lg text-muted-foreground">:</span>
+                      <ScrollPicker values={minutes} selected={settings.minute} onSelect={handleMinute} />
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
