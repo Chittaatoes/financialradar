@@ -1716,8 +1716,10 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* 3. Financial Summary — Today's Budget card */}
-      <FinancialSummaryCard hidden={hidden} animating={animating} />
+      {/* 3. Financial Summary — Today's Budget card (only if user has set monthly income via budget wizard) */}
+      {!profileLoading && Number(profile?.monthlyIncome || 0) > 0 && (
+        <FinancialSummaryCard hidden={hidden} animating={animating} />
+      )}
 
       {/* 4. Total Assets — Hero card (full width) */}
       <Card className="border-0 text-white" style={{ background: "linear-gradient(135deg, #1E2F26 0%, #16221C 100%)" }} data-testid="card-total-assets">
