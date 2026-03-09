@@ -91,6 +91,7 @@ export async function setupAuth(app: Express) {
   });
 
   const isProduction = process.env.NODE_ENV === "production";
+  const isHttps = isProduction || !!process.env.REPLIT_DEV_DOMAIN;
 
   app.use(
     session({
@@ -101,9 +102,9 @@ export async function setupAuth(app: Express) {
       rolling: true,
       proxy: true,
       cookie: {
-        secure: isProduction,
+        secure: isHttps,
         httpOnly: true,
-        sameSite: isProduction ? "none" : "lax",
+        sameSite: isHttps ? "none" : "lax",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       },
     })
@@ -122,6 +123,11 @@ export async function setupAuth(app: Express) {
       (replitDomain ? `https://${replitDomain}` : `http://localhost:${process.env.PORT || 5000}`);
     const redirectUri = `${appUrl}/api/auth/callback/google`;
 
+    const sessionUser = (req.session as any)?.user;
+    if (sessionUser?.isGuest === true) {
+      (req.session as any).guestId = sessionUser.id;
+    }
+
     const googleUrl = new URL(
       "https://accounts.google.com/o/oauth2/v2/auth"
     );
@@ -132,7 +138,9 @@ export async function setupAuth(app: Express) {
     googleUrl.searchParams.set("access_type", "offline");
     googleUrl.searchParams.set("prompt", "consent");
 
-    res.redirect(googleUrl.toString());
+    req.session.save(() => {
+      res.redirect(googleUrl.toString());
+    });
   });
 
   app.get("/api/auth/callback/google", async (req, res) => {
@@ -173,7 +181,9 @@ export async function setupAuth(app: Express) {
 
       const sessionUser = (req.session as any)?.user;
       const isCurrentlyGuest = sessionUser?.isGuest === true;
-      const guestId: string | null = isCurrentlyGuest ? sessionUser.id : null;
+      const guestId: string | null =
+        (req.session as any).guestId ||
+        (isCurrentlyGuest ? sessionUser.id : null);
 
       const existingUsers = await db
         .select()
@@ -217,9 +227,10 @@ export async function setupAuth(app: Express) {
 
       (req.session as any).user = { id: user.id };
       (req.session as any).isGuest = false;
+      delete (req.session as any).guestId;
 
       req.session.save(() => {
-        res.redirect(frontendUrl || "/");
+        res.redirect(`${frontendUrl || ""}/?login=success`);
       });
     } catch (error) {
       console.error("Google auth callback error:", error);

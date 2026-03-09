@@ -24,6 +24,7 @@ import NotFound from "@/pages/not-found";
 import { MobileBottomNav } from "@/components/mobile-nav";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 function useNavPlusHandler() {
   const [location, setLocation] = useLocation();
@@ -86,8 +87,25 @@ function AuthenticatedLayout() {
 
 function AppContent() {
   const { user, isLoading } = useAuth();
+  const { toast } = useToast();
   const guestLoginCalled = useRef(false);
   const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const loginResult = params.get("login");
+    const errorResult = params.get("error");
+    if (loginResult === "success" || errorResult) {
+      const clean = window.location.pathname;
+      window.history.replaceState({}, "", clean);
+      if (loginResult === "success") {
+        queryClient.invalidateQueries();
+        toast({ title: "Login berhasil!", description: "Akun Google kamu sudah terhubung." });
+      } else if (errorResult === "auth_failed") {
+        toast({ title: "Login gagal", description: "Autentikasi Google gagal. Coba lagi.", variant: "destructive" });
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (isLoading) return;

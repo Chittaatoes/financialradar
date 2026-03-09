@@ -11,7 +11,7 @@ import {
   Dialog, DialogContentBottomSheet, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  AlertTriangle, CheckCircle2, AlertCircle, Gauge, Pencil, CalendarDays, ChevronDown, ChevronUp, Plus, Trash2,
+  AlertTriangle, CheckCircle2, AlertCircle, Gauge, Pencil, CalendarDays, ChevronDown, ChevronUp, Plus, Trash2, Lock,
 } from "lucide-react";
 import type { CustomCategory } from "@shared/schema";
 import { formatCurrency } from "@/lib/constants";
@@ -19,6 +19,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { API_URL } from "@/lib/api";
 import { useLanguage } from "@/lib/i18n";
+import { useAuth } from "@/hooks/use-auth";
+import { Link } from "wouter";
 import type { UserProfile, BudgetAllocation, BudgetPlan, Goal } from "@shared/schema";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { BudgetSetupWizard } from "@/components/budget-setup-wizard";
@@ -367,6 +369,7 @@ function CategoryGroup({
   spentByCategory,
   month,
   colors,
+  isGoogleUser,
 }: {
   groupKey: keyof typeof GROUP_COLORS;
   title: string;
@@ -376,6 +379,7 @@ function CategoryGroup({
   spentByCategory: Record<string, number>;
   month: string;
   colors: typeof GROUP_COLORS.needs;
+  isGoogleUser: boolean;
 }) {
   const { t } = useLanguage();
   const { toast } = useToast();
@@ -572,19 +576,21 @@ function CategoryGroup({
                     {hasAlloc && <p className="text-[10px] text-muted-foreground font-mono">{formatCurrency(alloc)}</p>}
                   </div>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setDeletingCat(cat)}
-                  className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {isGoogleUser && (
+                  <button
+                    type="button"
+                    onClick={() => setDeletingCat(cat)}
+                    className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             );
           })}
 
-          {/* Add category button */}
-          {isManageable && (
+          {/* Add category button — Google users only */}
+          {isManageable && isGoogleUser && (
             <button
               type="button"
               onClick={() => setAddCatOpen(true)}
@@ -593,6 +599,14 @@ function CategoryGroup({
               <Plus className="w-4 h-4" />
               <span className="text-sm">Tambah Kategori</span>
             </button>
+          )}
+          {isManageable && !isGoogleUser && (
+            <Link href="/profile">
+              <div className="w-full rounded-xl border border-dashed border-border/50 p-3 flex items-center justify-center gap-2 text-muted-foreground/60 mt-1 cursor-pointer hover:bg-muted/20 transition-colors">
+                <Lock className="w-3.5 h-3.5" />
+                <span className="text-xs">Tautkan Google untuk tambah kategori</span>
+              </div>
+            </Link>
           )}
         </div>
       )}
@@ -724,6 +738,8 @@ function CategoryGroup({
 export default function BudgetPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const { isGuest } = useAuth();
+  const isGoogleUser = !isGuest;
   const currentMonth = format(new Date(), "yyyy-MM");
   const monthStart = format(startOfMonth(new Date()), "dd MMM");
   const monthEnd = format(endOfMonth(new Date()), "dd MMM");
@@ -912,6 +928,7 @@ export default function BudgetPage() {
             spentByCategory={spentByCategory}
             month={currentMonth}
             colors={GROUP_COLORS.needs}
+            isGoogleUser={isGoogleUser}
           />
           <CategoryGroup
             groupKey="wants"
@@ -922,6 +939,7 @@ export default function BudgetPage() {
             spentByCategory={spentByCategory}
             month={currentMonth}
             colors={GROUP_COLORS.wants}
+            isGoogleUser={isGoogleUser}
           />
           <SavingsGoalGroup
             title={t.budget.savingsGroup}
@@ -939,6 +957,7 @@ export default function BudgetPage() {
             spentByCategory={spentByCategory}
             month={currentMonth}
             colors={GROUP_COLORS.investment}
+            isGoogleUser={isGoogleUser}
           />
         </div>
       )}

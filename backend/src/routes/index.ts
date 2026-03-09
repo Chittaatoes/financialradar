@@ -357,11 +357,13 @@ export async function registerRoutes(
     try {
       const userId = getUserId(req);
       const id = parseInt(req.params.id);
-      const { name, type, balance } = req.body;
+      const { name, type, balance, color, note } = req.body;
       const updated = await storage.updateAccount(id, userId, {
         name,
         type,
         balance: String(balance),
+        ...(color !== undefined && { color }),
+        ...(note !== undefined && { note }),
       });
       if (!updated) return res.status(404).json({ message: "Account not found" });
       res.json(updated);

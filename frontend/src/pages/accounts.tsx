@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Plus, Wallet, Landmark, Smartphone, Pencil, Trash2,
-  CheckCircle2, TrendingUp, Target, Lightbulb,
+  CheckCircle2, TrendingUp, Target, Lightbulb, SlidersHorizontal,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
@@ -55,6 +55,94 @@ const FEATURES = [
   { icon: Target, label: "Set savings goals and monitor progress" },
   { icon: Lightbulb, label: "Unlock smart financial insights" },
 ];
+
+const COLOR_PRESETS = [
+  { label: "Default", value: null, bg: "bg-chart-1/10", text: "text-chart-1" },
+  { label: "Biru", value: "blue", bg: "bg-blue-500/15", text: "text-blue-500" },
+  { label: "Hijau", value: "green", bg: "bg-emerald-500/15", text: "text-emerald-500" },
+  { label: "Ungu", value: "purple", bg: "bg-purple-500/15", text: "text-purple-500" },
+  { label: "Oranye", value: "orange", bg: "bg-orange-500/15", text: "text-orange-500" },
+  { label: "Merah", value: "red", bg: "bg-red-500/15", text: "text-red-500" },
+  { label: "Kuning", value: "yellow", bg: "bg-yellow-500/15", text: "text-yellow-500" },
+  { label: "Pink", value: "pink", bg: "bg-pink-500/15", text: "text-pink-500" },
+];
+
+function getColorClasses(color: string | null | undefined): { bg: string; text: string } {
+  const preset = COLOR_PRESETS.find(p => p.value === (color ?? null));
+  return preset ? { bg: preset.bg, text: preset.text } : { bg: "bg-chart-1/10", text: "text-chart-1" };
+}
+
+function AccountSettingsForm({ account, onClose }: { account: Account; onClose: () => void }) {
+  const { toast } = useToast();
+  const [color, setColor] = useState<string | null>(account.color ?? null);
+  const [note, setNote] = useState(account.note ?? "");
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiRequest("PATCH", `/api/accounts/${account.id}`, {
+        name: account.name,
+        type: account.type,
+        balance: String(account.balance),
+        color: color,
+        note: note,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      toast({ title: "Pengaturan akun disimpan" });
+      onClose();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Gagal menyimpan", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className="text-sm font-medium mb-2">Warna Akun</p>
+        <div className="flex flex-wrap gap-2">
+          {COLOR_PRESETS.map((preset) => {
+            const isSelected = (color ?? null) === preset.value;
+            return (
+              <button
+                key={preset.label}
+                type="button"
+                onClick={() => setColor(preset.value)}
+                className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${preset.bg} ${
+                  isSelected ? "border-primary scale-110" : "border-transparent"
+                }`}
+                title={preset.label}
+              >
+                {isSelected && <span className={`text-xs ${preset.text}`}>✓</span>}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          {COLOR_PRESETS.find(p => p.value === color)?.label ?? "Default"}
+        </p>
+      </div>
+
+      <div>
+        <p className="text-sm font-medium mb-1">Catatan Akun</p>
+        <Input
+          placeholder="Contoh: Rekening gaji bulanan..."
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          maxLength={120}
+        />
+        <p className="text-xs text-muted-foreground mt-1">{note.length}/120</p>
+      </div>
+
+      <div className="flex justify-end gap-2 pt-1">
+        <Button type="button" variant="outline" onClick={onClose}>Batal</Button>
+        <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+          {mutation.isPending ? "Menyimpan..." : "Simpan"}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function AccountForm({ account, onClose }: { account?: Account; onClose: () => void }) {
   const { toast } = useToast();
@@ -159,6 +247,7 @@ export default function Accounts() {
   const { t } = useLanguage();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editAccount, setEditAccount] = useState<Account | undefined>();
+  const [settingsAccount, setSettingsAccount] = useState<Account | undefined>();
 
   const { data: accounts, isLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts"],
@@ -196,6 +285,26 @@ export default function Accounts() {
 
   return (
     <>
+      {/* Account settings dialog */}
+      <Dialog open={!!settingsAccount} onOpenChange={(open) => { if (!open) setSettingsAccount(undefined); }}>
+        <DialogContentBottomSheet>
+          <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-background px-6 pt-2 pb-4 shrink-0 md:-mx-6 md:-mt-6">
+            <DialogHeader className="text-center md:text-left space-y-1">
+              <DialogTitle className="font-serif">Pengaturan Akun</DialogTitle>
+              <DialogDescription>{settingsAccount?.name}</DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="overflow-y-auto px-6 pt-4 pb-6 md:px-0 md:pt-2 md:pb-0">
+            {settingsAccount && (
+              <AccountSettingsForm
+                account={settingsAccount}
+                onClose={() => setSettingsAccount(undefined)}
+              />
+            )}
+          </div>
+        </DialogContentBottomSheet>
+      </Dialog>
+
       {/* Account create/edit dialog — always rendered so edit works */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditAccount(undefined); }}>
         <DialogContentBottomSheet>
@@ -235,18 +344,25 @@ export default function Accounts() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {accounts!.map((account) => {
               const Icon = typeIcons[account.type as keyof typeof typeIcons] || Wallet;
-              const colorClass = typeColors[account.type as keyof typeof typeColors] || "bg-muted text-muted-foreground";
+              const { bg, text } = getColorClasses((account as any).color);
               return (
                 <Card key={account.id} className="hover-elevate transition-all duration-200" data-testid={`card-account-${account.id}`}>
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${colorClass}`}>
+                        <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${bg} ${text}`}>
                           <Icon className="w-4 h-4" />
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex items-center gap-1.5">
                           <p className="text-sm font-semibold truncate">{account.name}</p>
-                          <Badge variant="secondary" className="text-[10px] mt-0.5">{account.type}</Badge>
+                          <button
+                            type="button"
+                            onClick={() => setSettingsAccount(account)}
+                            className="shrink-0 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                            title="Pengaturan akun"
+                          >
+                            <SlidersHorizontal className="w-3 h-3" />
+                          </button>
                         </div>
                       </div>
                       <div className="flex items-center gap-0.5 shrink-0">
@@ -284,9 +400,14 @@ export default function Accounts() {
                         </AlertDialog>
                       </div>
                     </div>
-                    <p className="text-lg font-bold font-mono" data-testid={`text-balance-${account.id}`}>
-                      {formatCurrency(account.balance)}
-                    </p>
+                    <div>
+                      <p className="text-lg font-bold font-mono" data-testid={`text-balance-${account.id}`}>
+                        {formatCurrency(account.balance)}
+                      </p>
+                      {(account as any).note && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{(account as any).note}</p>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               );

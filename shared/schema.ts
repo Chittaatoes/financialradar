@@ -39,6 +39,8 @@ export const accounts = pgTable("accounts", {
   name: text("name").notNull(),
   type: accountTypeEnum("type").notNull(),
   balance: numeric("balance", { precision: 15, scale: 2 }).notNull().default("0"),
+  color: text("color"),
+  note: text("note"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
