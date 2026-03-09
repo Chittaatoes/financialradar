@@ -43,8 +43,9 @@ export async function setupAuth(app: Express) {
         .json({ message: "Google Auth not configured. Set GOOGLE_CLIENT_ID." });
     }
 
-    const appUrl =
-      process.env.APP_URL || `http://localhost:${process.env.PORT || 5000}`;
+    const replitDomain = process.env.REPLIT_DEV_DOMAIN;
+    const appUrl = process.env.APP_URL ||
+      (replitDomain ? `https://${replitDomain}` : `http://localhost:${process.env.PORT || 5000}`);
     const redirectUri = `${appUrl}/api/auth/callback/google`;
 
     const googleUrl = new URL(
@@ -62,13 +63,15 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/auth/callback/google", async (req, res) => {
     const code = req.query.code as string;
-const frontendUrl =
-  process.env.FRONTEND_URL || "https://financialradar.vercel.app";
-  if (!code) return res.redirect(frontendUrl || "/");
+    const replitDomain3 = process.env.REPLIT_DEV_DOMAIN;
+    const frontendUrl = process.env.FRONTEND_URL ||
+      (replitDomain3 ? `https://${replitDomain3}` : "http://localhost:5000");
+    if (!code) return res.redirect(frontendUrl || "/");
 
     try {
-      const appUrl =
-        process.env.APP_URL || `http://localhost:${process.env.PORT || 5000}`;
+      const replitDomain2 = process.env.REPLIT_DEV_DOMAIN;
+      const appUrl = process.env.APP_URL ||
+        (replitDomain2 ? `https://${replitDomain2}` : `http://localhost:${process.env.PORT || 5000}`);
       const redirectUri = `${appUrl}/api/auth/callback/google`;
 
       const tokenRes = await fetch(
