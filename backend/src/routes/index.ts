@@ -1686,8 +1686,15 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
       });
 
       (req.session as any).user = user;
+      (req.session as any).isGuest = true;
 
-      res.json(user);
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ message: "Failed to save guest session" });
+        }
+        res.json(user);
+      });
     } catch (error) {
       console.error("Error creating guest login:", error);
       res.status(500).json({ message: "Failed to create guest session" });
