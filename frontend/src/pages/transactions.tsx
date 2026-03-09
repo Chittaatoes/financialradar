@@ -16,6 +16,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   Plus, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, X, Trash2, Calendar, PiggyBank, CreditCard,
+  Wallet, Layers, ChevronDown, Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, EXPENSE_CATEGORY_GROUPS, INCOME_CATEGORIES } from "@/lib/constants";
@@ -747,16 +748,24 @@ function SpendingChart({ transactions, t }: { transactions: { date: string; labe
   );
 }
 
+type TypeFilter = "all" | "income" | "expense" | "transfer";
+
 export default function Transactions() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-  const [dateFilter, setDateFilter] = useState<DateFilter>("last7");
-  const [pendingFilter, setPendingFilter] = useState<DateFilter>("last7");
-  const [customStart, setCustomStart] = useState(() => format(subDays(new Date(), 30), "yyyy-MM-dd"));
+  const [dateFilter, setDateFilter] = useState<DateFilter>("thisMonth");
+  const [pendingFilter, setPendingFilter] = useState<DateFilter>("thisMonth");
+  const [customStart, setCustomStart] = useState(() => format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [customEnd, setCustomEnd] = useState(() => format(new Date(), "yyyy-MM-dd"));
-  const [pendingStart, setPendingStart] = useState(() => format(subDays(new Date(), 30), "yyyy-MM-dd"));
+  const [pendingStart, setPendingStart] = useState(() => format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [pendingEnd, setPendingEnd] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const [accountFilter, setAccountFilter] = useState<number | null>(null);
+  const [pendingAccountFilter, setPendingAccountFilter] = useState<number | null>(null);
+  const [accountSheetOpen, setAccountSheetOpen] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [pendingTypeFilter, setPendingTypeFilter] = useState<TypeFilter>("all");
+  const [typeSheetOpen, setTypeSheetOpen] = useState(false);
   const { toast } = useToast();
   const { t, language } = useLanguage();
 
@@ -807,8 +816,13 @@ export default function Transactions() {
     if (!transactions) return [];
     return transactions
       .filter((tx) => tx.date >= dateRange.start && tx.date <= dateRange.end)
+      .filter((tx) => {
+        if (accountFilter === null) return true;
+        return tx.fromAccountId === accountFilter || tx.toAccountId === accountFilter;
+      })
+      .filter((tx) => typeFilter === "all" || tx.type === typeFilter)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [transactions, dateRange]);
+  }, [transactions, dateRange, accountFilter, typeFilter]);
 
   const groupedTransactions = useMemo(() => {
     const todayStr = format(new Date(), "yyyy-MM-dd");
@@ -860,6 +874,18 @@ export default function Transactions() {
     return `${customStart} — ${customEnd}`;
   }, [dateFilter, customStart, customEnd, t]);
 
+  const accountFilterLabel = useMemo(() => {
+    if (accountFilter === null) return t.transactions.allAccounts;
+    return accounts?.find((a) => a.id === accountFilter)?.name ?? t.transactions.allAccounts;
+  }, [accountFilter, accounts, t]);
+
+  const typeFilterLabel = useMemo(() => {
+    if (typeFilter === "all") return t.transactions.allTypes;
+    if (typeFilter === "income") return t.transactions.income;
+    if (typeFilter === "expense") return t.transactions.expense;
+    return t.transactions.transfer;
+  }, [typeFilter, t]);
+
   const openFilterSheet = () => {
     setPendingFilter(dateFilter);
     setPendingStart(customStart);
@@ -874,6 +900,16 @@ export default function Transactions() {
       setCustomEnd(pendingEnd);
     }
     setFilterSheetOpen(false);
+  };
+
+  const applyAccountFilter = () => {
+    setAccountFilter(pendingAccountFilter);
+    setAccountSheetOpen(false);
+  };
+
+  const applyTypeFilter = () => {
+    setTypeFilter(pendingTypeFilter);
+    setTypeSheetOpen(false);
   };
 
   if (isLoading) {
@@ -930,24 +966,45 @@ export default function Transactions() {
         </Dialog>
       </div>
 
-      <div className="flex items-center gap-2" data-testid="filter-date-range">
+      <div className="grid grid-cols-3 gap-2" data-testid="filter-date-range">
         <button
           type="button"
           onClick={openFilterSheet}
-          className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-muted/40 text-sm font-medium text-foreground hover:bg-muted/70 transition-colors"
+          className="flex items-center justify-center gap-1 px-2 py-2 rounded-full border border-border bg-muted/40 text-sm font-medium text-foreground hover:bg-muted/70 transition-colors overflow-hidden"
           data-testid="button-open-filter"
         >
-          <Calendar className="w-4 h-4 text-muted-foreground" />
-          <span>{filterLabel}</span>
-          <svg className="w-3.5 h-3.5 text-muted-foreground ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
+          <Calendar className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+          <span className="text-xs truncate">{filterLabel}</span>
+          <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setPendingAccountFilter(accountFilter); setAccountSheetOpen(true); }}
+          className="flex items-center justify-center gap-1 px-2 py-2 rounded-full border border-border bg-muted/40 text-sm font-medium text-foreground hover:bg-muted/70 transition-colors overflow-hidden"
+          data-testid="button-open-account-filter"
+        >
+          <Wallet className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+          <span className="text-xs truncate">{accountFilterLabel}</span>
+          <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setPendingTypeFilter(typeFilter); setTypeSheetOpen(true); }}
+          className="flex items-center justify-center gap-1 px-2 py-2 rounded-full border border-border bg-muted/40 text-sm font-medium text-foreground hover:bg-muted/70 transition-colors overflow-hidden"
+          data-testid="button-open-type-filter"
+        >
+          <Layers className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+          <span className="text-xs truncate">{typeFilterLabel}</span>
+          <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0" />
         </button>
       </div>
 
       <Dialog open={filterSheetOpen} onOpenChange={(v) => { if (!v) setFilterSheetOpen(false); }}>
         <DialogContentBottomSheet>
           <div className="px-6 pt-2 pb-6 flex flex-col gap-5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t.transactions.filterByDate}</p>
             <div className="flex rounded-lg border border-border p-1 gap-1 bg-muted/40">
               {(["last7", "thisMonth", "custom"] as const).map((f) => {
                 const label = f === "last7" ? t.transactions.last7Days
@@ -998,6 +1055,88 @@ export default function Transactions() {
             )}
 
             <Button onClick={applyFilter} className="w-full min-h-[48px]">
+              {t.transactions.applyFilter}
+            </Button>
+          </div>
+        </DialogContentBottomSheet>
+      </Dialog>
+
+      <Dialog open={accountSheetOpen} onOpenChange={(v) => { if (!v) setAccountSheetOpen(false); }}>
+        <DialogContentBottomSheet>
+          <div className="px-6 pt-2 pb-6 flex flex-col gap-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t.transactions.filterByAccount}</p>
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => setPendingAccountFilter(null)}
+                className={cn(
+                  "flex items-center justify-between w-full px-4 py-3 rounded-lg border text-sm font-medium transition-colors",
+                  pendingAccountFilter === null
+                    ? "border-primary bg-primary/5 text-foreground"
+                    : "border-border bg-muted/20 text-muted-foreground hover:bg-muted/40"
+                )}
+              >
+                <span>{t.transactions.allAccounts}</span>
+                {pendingAccountFilter === null && <Check className="w-4 h-4 text-primary" />}
+              </button>
+              {(accounts ?? []).map((acc) => (
+                <button
+                  key={acc.id}
+                  type="button"
+                  onClick={() => setPendingAccountFilter(acc.id)}
+                  className={cn(
+                    "flex items-center justify-between w-full px-4 py-3 rounded-lg border text-sm font-medium transition-colors",
+                    pendingAccountFilter === acc.id
+                      ? "border-primary bg-primary/5 text-foreground"
+                      : "border-border bg-muted/20 text-muted-foreground hover:bg-muted/40"
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    {acc.color && (
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: acc.color }} />
+                    )}
+                    <span>{acc.name}</span>
+                  </div>
+                  {pendingAccountFilter === acc.id && <Check className="w-4 h-4 text-primary" />}
+                </button>
+              ))}
+            </div>
+            <Button onClick={applyAccountFilter} className="w-full min-h-[48px]">
+              {t.transactions.applyFilter}
+            </Button>
+          </div>
+        </DialogContentBottomSheet>
+      </Dialog>
+
+      <Dialog open={typeSheetOpen} onOpenChange={(v) => { if (!v) setTypeSheetOpen(false); }}>
+        <DialogContentBottomSheet>
+          <div className="px-6 pt-2 pb-6 flex flex-col gap-5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t.transactions.filterByType}</p>
+            <div className="flex rounded-lg border border-border p-1 gap-1 bg-muted/40">
+              {(["all", "income", "expense", "transfer"] as const).map((f) => {
+                const label = f === "all" ? t.transactions.typeAll
+                  : f === "income" ? t.transactions.income
+                  : f === "expense" ? t.transactions.expense
+                  : t.transactions.transfer;
+                return (
+                  <button
+                    key={f}
+                    type="button"
+                    className={cn(
+                      "flex-1 py-2 rounded-md text-xs font-medium transition-all duration-150",
+                      pendingTypeFilter === f
+                        ? "bg-background shadow-sm text-foreground"
+                        : "text-muted-foreground"
+                    )}
+                    onClick={() => setPendingTypeFilter(f)}
+                    data-testid={`button-type-filter-${f}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <Button onClick={applyTypeFilter} className="w-full min-h-[48px]">
               {t.transactions.applyFilter}
             </Button>
           </div>

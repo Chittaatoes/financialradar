@@ -283,6 +283,12 @@ const translations = {
       spendingOverview: "Spending Overview",
       noSpendingPeriod: "No spending recorded in this period.",
       dailySpending: "Daily Spending",
+      allAccounts: "All Wallets",
+      allTypes: "All Types",
+      filterByDate: "Filter by Period",
+      filterByAccount: "Filter by Wallet",
+      filterByType: "Filter by Type",
+      typeAll: "All",
     },
 
     categories: {
@@ -933,6 +939,12 @@ const translations = {
       spendingOverview: "Ringkasan Pengeluaran",
       noSpendingPeriod: "Tidak ada pengeluaran dalam periode ini.",
       dailySpending: "Pengeluaran Harian",
+      allAccounts: "Semua Dompet",
+      allTypes: "Semua Tipe",
+      filterByDate: "Filter Periode",
+      filterByAccount: "Filter Dompet",
+      filterByType: "Filter Tipe",
+      typeAll: "Semua",
     },
 
     categories: {
