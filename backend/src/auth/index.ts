@@ -1,9 +1,33 @@
-import type { Express, RequestHandler } from "express";
+import type { Express, Request, RequestHandler } from "express";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool, db } from "../db";
 import { users } from "../../shared/models/auth";
 import { eq } from "drizzle-orm";
+
+function getBaseUrl(req: Request): string {
+  const forwardedHost = req.get("x-forwarded-host");
+  if (forwardedHost) {
+    const host = forwardedHost.split(",")[0].trim();
+    const proto = (req.get("x-forwarded-proto") || "https").split(",")[0].trim();
+    return `${proto}://${host}`;
+  }
+  if (process.env.APP_URL) return process.env.APP_URL;
+  if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+  return `http://localhost:${process.env.PORT || 5000}`;
+}
+
+function getFrontendUrl(req: Request): string {
+  const forwardedHost = req.get("x-forwarded-host");
+  if (forwardedHost) {
+    const host = forwardedHost.split(",")[0].trim();
+    const proto = (req.get("x-forwarded-proto") || "https").split(",")[0].trim();
+    return `${proto}://${host}`;
+  }
+  if (process.env.FRONTEND_URL) return process.env.FRONTEND_URL;
+  if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+  return "http://localhost:5000";
+}
 
 async function migrateGuestDataToGoogleUser(guestId: string, googleId: string): Promise<void> {
   const client = await pool.connect();
@@ -118,9 +142,7 @@ export async function setupAuth(app: Express) {
         .json({ message: "Google Auth not configured. Set GOOGLE_CLIENT_ID." });
     }
 
-    const replitDomain = process.env.REPLIT_DEV_DOMAIN;
-    const appUrl = process.env.APP_URL ||
-      (replitDomain ? `https://${replitDomain}` : `http://localhost:${process.env.PORT || 5000}`);
+    const appUrl = getBaseUrl(req);
     const redirectUri = `${appUrl}/api/auth/callback/google`;
 
     const sessionUser = (req.session as any)?.user;
@@ -145,14 +167,11 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/auth/callback/google", async (req, res) => {
     const code = req.query.code as string;
-    const replitDomain = process.env.REPLIT_DEV_DOMAIN;
-    const frontendUrl = process.env.FRONTEND_URL ||
-      (replitDomain ? `https://${replitDomain}` : "http://localhost:5000");
+    const frontendUrl = getFrontendUrl(req);
     if (!code) return res.redirect(frontendUrl || "/");
 
     try {
-      const appUrl = process.env.APP_URL ||
-        (replitDomain ? `https://${replitDomain}` : `http://localhost:${process.env.PORT || 5000}`);
+      const appUrl = getBaseUrl(req);
       const redirectUri = `${appUrl}/api/auth/callback/google`;
 
       const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
