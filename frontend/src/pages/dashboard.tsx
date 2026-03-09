@@ -1296,6 +1296,7 @@ function AddActionDialog({ open, onClose, t, onStreakTriggered, initialAction }:
 // Shows monthly budget overview: safe daily budget, income vs expense, progress bar, status.
 // Data from /api/spending-insight?period=monthly
 function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animating: boolean }) {
+  const { t } = useLanguage();
   const { data: insight, isLoading } = useQuery<SpendingInsightData>({
     queryKey: ["/api/spending-insight?period=monthly"],
   });
@@ -1327,9 +1328,9 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
     statusRatio <= 1.0 ? "on-track" : statusRatio <= 1.2 ? "careful" : "overspending";
 
   const statusConfig = {
-    "on-track": { label: "On Track", color: "text-emerald-400", dot: "bg-emerald-400" },
-    "careful": { label: "Be Careful", color: "text-amber-400", dot: "bg-amber-400" },
-    "overspending": { label: "Overspending", color: "text-red-400", dot: "bg-red-400" },
+    "on-track": { label: t.dashboard.statusOnTrack, color: "text-emerald-400", dot: "bg-emerald-400" },
+    "careful": { label: t.dashboard.statusCareful, color: "text-amber-400", dot: "bg-amber-400" },
+    "overspending": { label: t.dashboard.statusOverspending, color: "text-red-400", dot: "bg-red-400" },
   };
   const s = statusConfig[status];
 
@@ -1346,7 +1347,7 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <CalendarDays className="w-4 h-4 text-emerald-400/80" />
-            <span className="text-sm font-semibold text-white/80">Today's Budget</span>
+            <span className="text-sm font-semibold text-white/80">{t.dashboard.todaysBudget}</span>
           </div>
           {totalIncome > 0 && (
             <div className="flex items-center gap-1.5">
@@ -1356,9 +1357,9 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
           )}
         </div>
 
-        {/* Big number: Budget Aman Hari Ini */}
+        {/* Big number: daily safe budget */}
         <div>
-          <p className="text-[11px] text-white/45 mb-1 uppercase tracking-wide">Budget Aman Hari Ini</p>
+          <p className="text-[11px] text-white/45 mb-1 uppercase tracking-wide">{t.dashboard.dailySafeSpend}</p>
           {isLoading ? (
             <Skeleton className="h-9 w-40 bg-white/10" />
           ) : (
@@ -1376,13 +1377,13 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
             </p>
           )}
           {!isLoading && totalIncome === 0 && (
-            <p className="text-xs text-white/35 mt-1">Record income this month to see your daily budget</p>
+            <p className="text-xs text-white/35 mt-1">{t.dashboard.recordIncomeHint}</p>
           )}
           {/* Daily spending rows */}
           {!isLoading && totalIncome > 0 && (
             <div className="mt-2 space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-white/50">Pengeluaran Hari Ini</span>
+                <span className="text-xs text-white/50">{t.dashboard.spentToday}</span>
                 <span
                   className="text-xs font-mono font-semibold text-red-400"
                   style={{ opacity: animating ? 0 : 1, transition: "opacity 180ms ease-in-out" }}
@@ -1391,7 +1392,7 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-white/50">Sisa Budget Hari Ini</span>
+                <span className="text-xs text-white/50">{t.dashboard.remainingToday}</span>
                 <span
                   className="text-xs font-mono font-semibold"
                   style={{
@@ -1400,7 +1401,7 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
                     color: isTodayOver ? "#f87171" : "#6ee7b7",
                   }}
                 >
-                  {hidden ? "******" : isTodayOver ? "Rp 0 · Overspending" : formatCurrency(remainingToday)}
+                  {hidden ? "******" : isTodayOver ? `Rp 0 · ${t.dashboard.statusOverspending}` : formatCurrency(remainingToday)}
                 </span>
               </div>
             </div>
@@ -1410,7 +1411,7 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
         {/* Middle: two columns */}
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-lg bg-white/8 p-3">
-            <p className="text-[11px] text-white/45 mb-1">Pemasukan Bulan Ini</p>
+            <p className="text-[11px] text-white/45 mb-1">{t.dashboard.monthlyIncome}</p>
             {isLoading ? (
               <Skeleton className="h-5 w-24 bg-white/10" />
             ) : (
@@ -1427,7 +1428,7 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
             )}
           </div>
           <div className="rounded-lg bg-white/8 p-3">
-            <p className="text-[11px] text-white/45 mb-1">Pengeluaran Bulan Ini</p>
+            <p className="text-[11px] text-white/45 mb-1">{t.dashboard.monthlyExpense}</p>
             {isLoading ? (
               <Skeleton className="h-5 w-24 bg-white/10" />
             ) : (
@@ -1448,7 +1449,7 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
         {/* Bottom: remaining budget + progress */}
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-white/50">Sisa Budget Bulan Ini</span>
+            <span className="text-xs text-white/50">{t.dashboard.monthlyRemaining}</span>
             {isLoading ? (
               <Skeleton className="h-4 w-20 bg-white/10" />
             ) : (
@@ -1480,7 +1481,7 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
             />
           </div>
           <p className="text-[10px] text-white/30 text-right" data-testid="text-budget-progress-pct">
-            {Math.round(progressPct)}% used · {remainingDays} days left
+            {Math.round(progressPct)}{t.dashboard.percentUsed} · {remainingDays} {t.dashboard.smartSaveDaysLeft}
           </p>
         </div>
       </CardContent>
@@ -1497,7 +1498,7 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
 // 5. Spending Insight section (chart + categories)
 // 6. Floating quick-add transaction button (fixed bottom center)
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const { toast } = useToast();
   const { t } = useLanguage();
   const { hidden, toggle, animating } = useAmountVisibility();
@@ -1593,7 +1594,7 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daily-focus"] });
-      toast({ title: "Recorded!", description: "No spending today. +5 XP earned!" });
+      toast({ title: t.dashboard.noSpendingToastTitle, description: t.dashboard.noSpendingToastDesc });
     },
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
@@ -1650,7 +1651,9 @@ export default function Dashboard() {
             }}
           >
             <h1 className="text-xl font-serif font-bold" data-testid="text-dashboard-title">
-              Hi, {user?.firstName || "Guest"} 👋
+              {isGuest || !user?.firstName
+                ? `${t.dashboard.greetingGuest} 👋`
+                : `${t.dashboard.greetingUser}, ${user.firstName} 👋`}
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
               Level {level} · {xpInfo.current}/{xpInfo.next} XP
@@ -1658,7 +1661,9 @@ export default function Dashboard() {
           </div>
           {scrollCollapsed && (
             <p className="text-sm font-medium text-muted-foreground" style={{ transition: "opacity 0.2s ease" }}>
-              👋 Hi, {user?.firstName || "Guest"}
+              {isGuest || !user?.firstName
+                ? `👋 ${t.dashboard.greetingGuest}`
+                : `👋 ${t.dashboard.greetingUser}, ${user.firstName}`}
             </p>
           )}
         </div>

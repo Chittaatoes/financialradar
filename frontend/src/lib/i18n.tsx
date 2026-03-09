@@ -175,6 +175,23 @@ const translations = {
       levelUpUnlocked: "Unlocked",
       levelUpMessage: "Your wealth journey just advanced.",
       levelUpProgress: "Progress to Level",
+
+      todaysBudget: "Today's Budget",
+      dailySafeSpend: "Safe Daily Budget",
+      spentToday: "Today's Spending",
+      remainingToday: "Remaining Today",
+      monthlyIncome: "Monthly Income",
+      monthlyExpense: "Monthly Expense",
+      monthlyRemaining: "Monthly Budget Left",
+      statusOnTrack: "On Track",
+      statusCareful: "Be Careful",
+      statusOverspending: "Overspending",
+      recordIncomeHint: "Record income this month to see your daily budget",
+      percentUsed: "% used",
+      noSpendingToastTitle: "Recorded!",
+      noSpendingToastDesc: "No spending today. +5 XP earned!",
+      greetingUser: "Hello",
+      greetingGuest: "Hello",
     },
 
     accounts: {
@@ -191,6 +208,7 @@ const translations = {
       type: "Type",
       balance: "Balance",
       save: "Save",
+      saving: "Saving...",
       delete: "Delete",
       deleteTitle: "Delete Account",
       deleteDesc: "This will permanently remove this account and its data. This action cannot be undone.",
@@ -199,6 +217,22 @@ const translations = {
       typeCash: "Cash",
       typeBank: "Bank",
       typeEwallet: "E-Wallet",
+      settingsTitle: "Account Settings",
+      colorLabel: "Account Color",
+      noteLabel: "Account Note",
+      notePlaceholder: "e.g. Monthly salary account...",
+      settingsSaved: "Settings saved",
+      settingsFailed: "Failed to save",
+      accountCreated: "Account created",
+      accountUpdated: "Account updated",
+      emptyTitle: "Start Your Financial Journey",
+      emptySubtitle: "Create your first account to start tracking money, hitting goals, and building real financial clarity.",
+      emptySubtitleDesktop: "Create your first account to track income, expenses, and savings all in one place.",
+      emptyBtn: "Create My First Account",
+      emptyTip: "Takes less than 30 seconds · Your data stays private",
+      feature1: "Track income & expenses automatically",
+      feature2: "Set savings goals and monitor progress",
+      feature3: "Unlock smart financial insights",
     },
 
     transactions: {
@@ -791,6 +825,23 @@ const translations = {
       levelUpUnlocked: "Terbuka",
       levelUpMessage: "Perjalanan finansialmu baru saja maju.",
       levelUpProgress: "Menuju Level",
+
+      todaysBudget: "Anggaran Hari Ini",
+      dailySafeSpend: "Budget Aman Hari Ini",
+      spentToday: "Pengeluaran Hari Ini",
+      remainingToday: "Sisa Budget Hari Ini",
+      monthlyIncome: "Pemasukan Bulan Ini",
+      monthlyExpense: "Pengeluaran Bulan Ini",
+      monthlyRemaining: "Sisa Budget Bulan Ini",
+      statusOnTrack: "Aman",
+      statusCareful: "Hati-hati",
+      statusOverspending: "Boros",
+      recordIncomeHint: "Catat pemasukan bulan ini untuk melihat budget harian",
+      percentUsed: "% terpakai",
+      noSpendingToastTitle: "Tercatat!",
+      noSpendingToastDesc: "Tidak ada pengeluaran hari ini. +5 XP diperoleh!",
+      greetingUser: "Halo",
+      greetingGuest: "Halo",
     },
 
     accounts: {
@@ -807,6 +858,7 @@ const translations = {
       type: "Jenis",
       balance: "Saldo",
       save: "Simpan",
+      saving: "Menyimpan...",
       delete: "Hapus",
       deleteTitle: "Hapus Rekening",
       deleteDesc: "Rekening ini akan dihapus secara permanen. Tindakan ini tidak dapat dibatalkan.",
@@ -815,6 +867,22 @@ const translations = {
       typeCash: "Tunai",
       typeBank: "Bank",
       typeEwallet: "E-Wallet",
+      settingsTitle: "Pengaturan Akun",
+      colorLabel: "Warna Akun",
+      noteLabel: "Catatan Akun",
+      notePlaceholder: "Contoh: Rekening gaji bulanan...",
+      settingsSaved: "Pengaturan akun disimpan",
+      settingsFailed: "Gagal menyimpan",
+      accountCreated: "Rekening dibuat",
+      accountUpdated: "Rekening diperbarui",
+      emptyTitle: "Mulai Perjalanan Finansial",
+      emptySubtitle: "Buat rekening pertama untuk mulai melacak keuangan, mencapai target, dan membangun kejelasan finansial.",
+      emptySubtitleDesktop: "Buat rekening pertama untuk melacak pemasukan, pengeluaran, dan tabungan dalam satu tempat.",
+      emptyBtn: "Buat Rekening Pertama",
+      emptyTip: "Kurang dari 30 detik · Data Anda aman",
+      feature1: "Lacak pemasukan & pengeluaran otomatis",
+      feature2: "Tetapkan target tabungan dan pantau perkembangan",
+      feature3: "Dapatkan wawasan finansial cerdas",
     },
 
     transactions: {
@@ -1253,9 +1321,9 @@ const LanguageContext = createContext<LanguageContextType | null>(null);
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
     if (typeof window !== "undefined") {
-      return (localStorage.getItem("fr-lang") as Language) || "en";
+      return (localStorage.getItem("fr-lang") as Language) || "id";
     }
-    return "en";
+    return "id";
   });
 
   const setLanguage = useCallback((lang: Language) => {

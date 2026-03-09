@@ -50,11 +50,7 @@ const typeColors = {
   ewallet: "bg-chart-3/10 text-chart-3",
 };
 
-const FEATURES = [
-  { icon: TrendingUp, label: "Track income & expenses automatically" },
-  { icon: Target, label: "Set savings goals and monitor progress" },
-  { icon: Lightbulb, label: "Unlock smart financial insights" },
-];
+const FEATURE_ICONS = [TrendingUp, Target, Lightbulb];
 
 const COLOR_PRESETS = [
   { label: "Default", value: null, bg: "bg-chart-1/10", text: "text-chart-1" },
@@ -74,6 +70,7 @@ function getColorClasses(color: string | null | undefined): { bg: string; text: 
 
 function AccountSettingsForm({ account, onClose }: { account: Account; onClose: () => void }) {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [color, setColor] = useState<string | null>(account.color ?? null);
   const [note, setNote] = useState(account.note ?? "");
 
@@ -88,18 +85,18 @@ function AccountSettingsForm({ account, onClose }: { account: Account; onClose: 
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
-      toast({ title: "Pengaturan akun disimpan" });
+      toast({ title: t.accounts.settingsSaved });
       onClose();
     },
     onError: (error: Error) => {
-      toast({ title: "Gagal menyimpan", description: error.message, variant: "destructive" });
+      toast({ title: t.accounts.settingsFailed, description: error.message, variant: "destructive" });
     },
   });
 
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-sm font-medium mb-2">Warna Akun</p>
+        <p className="text-sm font-medium mb-2">{t.accounts.colorLabel}</p>
         <div className="flex flex-wrap gap-2">
           {COLOR_PRESETS.map((preset) => {
             const isSelected = (color ?? null) === preset.value;
@@ -124,9 +121,9 @@ function AccountSettingsForm({ account, onClose }: { account: Account; onClose: 
       </div>
 
       <div>
-        <p className="text-sm font-medium mb-1">Catatan Akun</p>
+        <p className="text-sm font-medium mb-1">{t.accounts.noteLabel}</p>
         <Input
-          placeholder="Contoh: Rekening gaji bulanan..."
+          placeholder={t.accounts.notePlaceholder}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           maxLength={120}
@@ -135,9 +132,9 @@ function AccountSettingsForm({ account, onClose }: { account: Account; onClose: 
       </div>
 
       <div className="flex justify-end gap-2 pt-1">
-        <Button type="button" variant="outline" onClick={onClose}>Batal</Button>
+        <Button type="button" variant="outline" onClick={onClose}>{t.accounts.cancel}</Button>
         <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-          {mutation.isPending ? "Menyimpan..." : "Simpan"}
+          {mutation.isPending ? t.accounts.saving : t.accounts.save}
         </Button>
       </div>
     </div>
@@ -167,7 +164,7 @@ function AccountForm({ account, onClose }: { account?: Account; onClose: () => v
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      toast({ title: isEdit ? "Account updated" : "Account created" });
+      toast({ title: isEdit ? t.accounts.accountUpdated : t.accounts.accountCreated });
       onClose();
     },
     onError: (error: Error) => {
@@ -290,7 +287,7 @@ export default function Accounts() {
         <DialogContentBottomSheet>
           <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-background px-6 pt-2 pb-4 shrink-0 md:-mx-6 md:-mt-6">
             <DialogHeader className="text-center md:text-left space-y-1">
-              <DialogTitle className="font-serif">Pengaturan Akun</DialogTitle>
+              <DialogTitle className="font-serif">{t.accounts.settingsTitle}</DialogTitle>
               <DialogDescription>{settingsAccount?.name}</DialogDescription>
             </DialogHeader>
           </div>
@@ -359,7 +356,7 @@ export default function Accounts() {
                             type="button"
                             onClick={() => setSettingsAccount(account)}
                             className="shrink-0 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-                            title="Pengaturan akun"
+                            title={t.accounts.settingsTitle}
                           >
                             <SlidersHorizontal className="w-3 h-3" />
                           </button>
@@ -436,29 +433,27 @@ export default function Accounts() {
                 </div>
               </div>
 
-              {/* Step badge */}
-              <span className="inline-flex items-center bg-primary/10 text-primary text-[11px] font-semibold px-3 py-1 rounded-full mb-4">
-                Step 1 of 4
-              </span>
-
               {/* Headline */}
               <h1 className="text-2xl font-serif font-bold text-foreground mb-2 leading-tight">
-                Start Your Financial Journey
+                {t.accounts.emptyTitle}
               </h1>
               <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
-                Create your first account to start tracking money, hitting goals, and building real financial clarity.
+                {t.accounts.emptySubtitle}
               </p>
 
               {/* Feature rows */}
               <div className="mt-8 w-full max-w-xs space-y-3 text-left">
-                {FEATURES.map(({ icon: Icon, label }) => (
-                  <div key={label} className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                      <Icon className="w-3.5 h-3.5 text-primary" />
+                {([t.accounts.feature1, t.accounts.feature2, t.accounts.feature3] as string[]).map((label, i) => {
+                  const Icon = FEATURE_ICONS[i];
+                  return (
+                    <div key={label} className="flex items-center gap-3">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <Icon className="w-3.5 h-3.5 text-primary" />
+                      </div>
+                      <span className="text-sm text-foreground/80">{label}</span>
                     </div>
-                    <span className="text-sm text-foreground/80">{label}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -469,10 +464,10 @@ export default function Accounts() {
                 onClick={() => { setEditAccount(undefined); setDialogOpen(true); }}
                 data-testid="button-empty-create-account"
               >
-                <Plus className="w-5 h-5 mr-2" /> Create My First Account
+                <Plus className="w-5 h-5 mr-2" /> {t.accounts.emptyBtn}
               </Button>
               <p className="text-center text-xs text-muted-foreground">
-                Takes less than 30 seconds &nbsp;·&nbsp; Your data stays private
+                {t.accounts.emptyTip}
               </p>
             </div>
           </motion.div>
@@ -490,20 +485,17 @@ export default function Accounts() {
                 <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-primary/15 mb-5 shadow-[0_4px_24px_rgba(0,0,0,0.08)]">
                   <Wallet className="w-10 h-10 text-primary" />
                 </div>
-                <span className="inline-flex items-center bg-primary/10 text-primary text-[11px] font-semibold px-3 py-1 rounded-full mb-4">
-                  Step 1 of 4
-                </span>
                 <h2 className="text-xl font-serif font-bold text-foreground mb-2">
-                  Start Your Financial Journey
+                  {t.accounts.emptyTitle}
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
-                  Create your first account to track income, expenses, and savings all in one place.
+                  {t.accounts.emptySubtitleDesktop}
                 </p>
               </div>
 
               {/* Feature list */}
               <CardContent className="px-8 pt-5 pb-2 bg-background space-y-3">
-                {FEATURES.map(({ icon: Icon, label }) => (
+                {([t.accounts.feature1, t.accounts.feature2, t.accounts.feature3] as string[]).map((label) => (
                   <div key={label} className="flex items-center gap-3">
                     <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
                     <span className="text-sm text-foreground/80">{label}</span>
@@ -518,10 +510,10 @@ export default function Accounts() {
                   onClick={() => { setEditAccount(undefined); setDialogOpen(true); }}
                   data-testid="button-empty-create-account-desktop"
                 >
-                  <Plus className="w-4 h-4 mr-2" /> Create My First Account
+                  <Plus className="w-4 h-4 mr-2" /> {t.accounts.emptyBtn}
                 </Button>
                 <p className="text-center text-xs text-muted-foreground">
-                  Takes less than 30 seconds &nbsp;·&nbsp; Your data stays private
+                  {t.accounts.emptyTip}
                 </p>
               </CardContent>
             </Card>
