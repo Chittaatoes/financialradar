@@ -1363,7 +1363,10 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
         const cat = t.category || "Other";
         const amt = Number(t.amount);
         spentByCategory[cat] = (spentByCategory[cat] || 0) + amt;
-        const keys = txCategoryToBudgetKey[cat] || [];
+        const mappedKeys = txCategoryToBudgetKey[cat];
+        // Known categories with empty mapping → ignored (e.g. "Other Needs")
+        // Unknown/custom categories (not in map at all) → use category name as budget key
+        const keys = mappedKeys !== undefined ? mappedKeys : [cat];
         if (keys.length > 0) {
           const share = amt / keys.length;
           keys.forEach(k => {
@@ -1468,13 +1471,14 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
   app.post("/api/custom-categories", isAuthenticated, async (req, res) => {
     try {
       const userId = getUserId(req);
-      const { name, type } = req.body;
+      const { name, emoji, type } = req.body;
       if (!name || name.trim().length === 0) {
         return res.status(400).json({ message: "Category name is required" });
       }
       const cat = await storage.createCustomCategory({
         userId,
         name: name.trim(),
+        emoji: emoji || "📌",
         type: type || "expense",
       });
       res.json(cat);

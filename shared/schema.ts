@@ -141,6 +141,7 @@ export const customCategories = pgTable("custom_categories", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: varchar("user_id").notNull().references(() => users.id),
   name: text("name").notNull(),
+  emoji: text("emoji").default("📌"),
   type: text("type").notNull().default("expense"),
   createdAt: timestamp("created_at").defaultNow(),
 });

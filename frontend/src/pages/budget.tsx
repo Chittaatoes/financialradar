@@ -11,8 +11,9 @@ import {
   Dialog, DialogContentBottomSheet, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  AlertTriangle, CheckCircle2, AlertCircle, Gauge, Pencil, CalendarDays, ChevronDown, ChevronUp,
+  AlertTriangle, CheckCircle2, AlertCircle, Gauge, Pencil, CalendarDays, ChevronDown, ChevronUp, Plus, Trash2,
 } from "lucide-react";
+import type { CustomCategory } from "@shared/schema";
 import { formatCurrency } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -355,6 +356,8 @@ function SavingsGoalGroup({
   );
 }
 
+const EMOJI_PRESETS = ["🍱","💊","🚇","🔌","🧹","🛒","🔧","📱","🎯","🎬","🎸","🛋️","💅","🌟","🎁","🏋️","📚","🎨","🐾","🚀","🌺","🍕","☕","🏠","💡","💧","🏥","🎓","🛍️","🎮","🍩","✨","📌","⭐","💎"];
+
 function CategoryGroup({
   groupKey,
   title,
@@ -375,8 +378,51 @@ function CategoryGroup({
   colors: typeof GROUP_COLORS.needs;
 }) {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const [collapsed, setCollapsed] = useState(false);
   const [editingCat, setEditingCat] = useState<{ key: string; emoji: string; label: string } | null>(null);
+  const [addCatOpen, setAddCatOpen] = useState(false);
+  const [deletingCat, setDeletingCat] = useState<CustomCategory | null>(null);
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatEmoji, setNewCatEmoji] = useState("📌");
+
+  const isManageable = groupKey === "needs" || groupKey === "wants";
+
+  const { data: customCats = [] } = useQuery<CustomCategory[]>({
+    queryKey: ["/api/custom-categories"],
+    enabled: isManageable,
+  });
+  const groupCustomCats = customCats.filter(c => c.type === groupKey);
+
+  const addMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/custom-categories", {
+      name: newCatName.trim(),
+      emoji: newCatEmoji,
+      type: groupKey,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-categories"] });
+      setAddCatOpen(false);
+      setNewCatName("");
+      setNewCatEmoji("📌");
+      toast({ title: "Kategori berhasil ditambahkan!" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Gagal menambahkan kategori", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/custom-categories/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-categories"] });
+      setDeletingCat(null);
+      toast({ title: "Kategori berhasil dihapus." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Gagal menghapus kategori", description: err.message, variant: "destructive" });
+    },
+  });
 
   const getAllocation = (key: string) => {
     const a = allocations.find((al) => al.category === key);
@@ -387,7 +433,9 @@ function CategoryGroup({
     return a?.note ?? "";
   };
 
-  const groupSpent = categories.reduce((sum, cat) => sum + (spentByCategory[cat.key] ?? 0), 0);
+  const defaultGroupSpent = categories.reduce((sum, cat) => sum + (spentByCategory[cat.key] ?? 0), 0);
+  const customGroupSpent = groupCustomCats.reduce((sum, cat) => sum + (spentByCategory[cat.name] ?? 0), 0);
+  const groupSpent = defaultGroupSpent + customGroupSpent;
   const pct = groupLimit > 0 ? Math.min((groupSpent / groupLimit) * 100, 100) : 0;
   const isOver = groupSpent > groupLimit && groupLimit > 0;
   const isWarn = pct > 70 && !isOver;
@@ -440,6 +488,7 @@ function CategoryGroup({
 
       {!collapsed && (
         <div className="px-4 pb-4 flex flex-col gap-2">
+          {/* Default categories */}
           {categories.map((cat) => {
             const label = (t.budget as any)[cat.i18nKey] || cat.key;
             const alloc = getAllocation(cat.key);
@@ -484,9 +533,74 @@ function CategoryGroup({
               </button>
             );
           })}
+
+          {/* Custom categories */}
+          {isManageable && groupCustomCats.map((cat) => {
+            const alloc = getAllocation(cat.name);
+            const spent = spentByCategory[cat.name] ?? 0;
+            const hasAlloc = alloc > 0;
+
+            return (
+              <div key={cat.id} className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingCat({ key: cat.name, emoji: cat.emoji ?? "📌", label: cat.name })}
+                  className="flex-1 text-left rounded-xl border border-dashed border-border p-3 flex items-center gap-3 hover:bg-muted/50 transition-colors"
+                >
+                  <span className="text-xl shrink-0">{cat.emoji ?? "📌"}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">{cat.name}</p>
+                    {!hasAlloc && (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                        <p className="text-[11px] text-amber-500 uppercase font-semibold tracking-wide">{t.budget.notAllocated}</p>
+                      </div>
+                    )}
+                    {hasAlloc && (
+                      <div className="space-y-1 mt-1">
+                        <div className="h-1 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={cn(
+                              "h-full rounded-full transition-all duration-500",
+                              spent > alloc ? colors.barOver : (spent / alloc) > 0.7 ? colors.barWarn : colors.bar
+                            )}
+                            style={{ width: `${Math.min((spent / alloc) * 100, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-mono font-medium text-foreground/80">{formatCurrency(spent)}</p>
+                    {hasAlloc && <p className="text-[10px] text-muted-foreground font-mono">{formatCurrency(alloc)}</p>}
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeletingCat(cat)}
+                  className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            );
+          })}
+
+          {/* Add category button */}
+          {isManageable && (
+            <button
+              type="button"
+              onClick={() => setAddCatOpen(true)}
+              className="w-full rounded-xl border border-dashed border-border p-3 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors mt-1"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="text-sm">Tambah Kategori</span>
+            </button>
+          )}
         </div>
       )}
 
+      {/* Budget edit dialog */}
       {editingCat && (
         <SetBudgetDialog
           open={!!editingCat}
@@ -499,6 +613,114 @@ function CategoryGroup({
           month={month}
         />
       )}
+
+      {/* Add category bottom sheet */}
+      <Dialog open={addCatOpen} onOpenChange={(v) => { if (!v) { setAddCatOpen(false); setNewCatName(""); setNewCatEmoji("📌"); } }}>
+        <DialogContentBottomSheet>
+          <DialogHeader className="px-6 pt-1">
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Tambah Kategori
+            </DialogTitle>
+            <DialogDescription>
+              Tambah kategori kustom ke grup {groupKey === "needs" ? "Kebutuhan" : "Keinginan"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-6 pb-6 space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nama Kategori</label>
+              <Input
+                value={newCatName}
+                onChange={e => setNewCatName(e.target.value)}
+                placeholder="Contoh: Gym, Skincare, Laundry..."
+                className="mt-1.5"
+                maxLength={40}
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Pilih Emoji</label>
+              <div className="grid grid-cols-9 gap-1.5 mb-3">
+                {EMOJI_PRESETS.map(em => (
+                  <button
+                    key={em}
+                    type="button"
+                    onClick={() => setNewCatEmoji(em)}
+                    className={cn(
+                      "w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-colors",
+                      newCatEmoji === em ? "bg-primary/20 ring-2 ring-primary" : "hover:bg-muted"
+                    )}
+                  >
+                    {em}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl w-10 h-10 flex items-center justify-center rounded-lg border border-border bg-muted">{newCatEmoji}</span>
+                <Input
+                  value={newCatEmoji}
+                  onChange={e => setNewCatEmoji(e.target.value.slice(-2) || "📌")}
+                  placeholder="Atau ketik emoji"
+                  className="flex-1 text-center"
+                  maxLength={2}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => { setAddCatOpen(false); setNewCatName(""); setNewCatEmoji("📌"); }}>
+                Batal
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={() => addMutation.mutate()}
+                disabled={addMutation.isPending || !newCatName.trim()}
+              >
+                {addMutation.isPending ? "Menyimpan..." : "Simpan"}
+              </Button>
+            </div>
+          </div>
+        </DialogContentBottomSheet>
+      </Dialog>
+
+      {/* Delete confirmation bottom sheet */}
+      <Dialog open={!!deletingCat} onOpenChange={(v) => { if (!v) setDeletingCat(null); }}>
+        <DialogContentBottomSheet>
+          <DialogHeader className="px-6 pt-1">
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-4 h-4 text-destructive" />
+              Hapus Kategori
+            </DialogTitle>
+            <DialogDescription>
+              Tindakan ini tidak dapat dibatalkan.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-6 pb-6 space-y-4">
+            <div className="rounded-xl bg-muted p-4 flex items-center gap-3">
+              <span className="text-2xl">{deletingCat?.emoji ?? "📌"}</span>
+              <div>
+                <p className="font-semibold">{deletingCat?.name}</p>
+                <p className="text-xs text-muted-foreground">Kategori kustom · {groupKey === "needs" ? "Kebutuhan" : "Keinginan"}</p>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Kategori <span className="font-semibold text-foreground">{deletingCat?.name}</span> akan dihapus dari daftar kategori. Data transaksi yang sudah ada tidak akan terpengaruh.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setDeletingCat(null)}>
+                Batal
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={() => deletingCat && deleteMutation.mutate(deletingCat.id)}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? "Menghapus..." : "Hapus"}
+              </Button>
+            </div>
+          </div>
+        </DialogContentBottomSheet>
+      </Dialog>
     </div>
   );
 }

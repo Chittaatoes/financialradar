@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Camera, Upload, Loader2, AlertCircle, CheckCircle2, X } from "lucide-react";
@@ -15,13 +15,12 @@ import { cn } from "@/lib/utils";
 import { EXPENSE_CATEGORY_GROUPS } from "@/lib/constants";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Account } from "@shared/schema";
+import type { Account, CustomCategory } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { parseTotal, parseMerchant, parseDate, suggestCategory, detectTransfer, parseRecipient, detectBankName } from "@/lib/receipt-parser";
 import { runOCR } from "@/lib/receipt-ocr";
 
-const EXPENSE_CATEGORIES = EXPENSE_CATEGORY_GROUPS.flatMap(g => g.items.map(i => i.value));
 
 interface ParsedReceipt {
   merchant: string;
@@ -52,9 +51,9 @@ export function ScanReceiptDialog({ open, onOpenChange, onClose }: ScanReceiptDi
   const [scanError, setScanError] = useState<string | null>(null);
   const [txType, setTxType] = useState<"expense" | "transfer">("expense");
 
-  const { data: accounts = [] } = useQuery<Account[]>({
-    queryKey: ["/api/accounts"],
-  });
+  const { data: accounts = [] } = useQuery<Account[]>({ queryKey: ["/api/accounts"] });
+  const { data: customCategories = [] } = useQuery<CustomCategory[]>({ queryKey: ["/api/custom-categories"] });
+  const customExpenseCats = customCategories.filter(c => c.type === "needs" || c.type === "wants" || c.type === "expense");
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -320,8 +319,22 @@ export function ScanReceiptDialog({ open, onOpenChange, onClose }: ScanReceiptDi
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="max-h-60">
-                        {EXPENSE_CATEGORIES.map(c => (
-                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        {EXPENSE_CATEGORY_GROUPS.map(group => (
+                          <SelectGroup key={group.groupKey}>
+                            <SelectLabel className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                              {group.groupKey === "needs" ? "Kebutuhan" : "Keinginan"}
+                            </SelectLabel>
+                            {group.items.map(item => (
+                              <SelectItem key={item.value} value={item.value}>
+                                <span className="mr-1.5">{item.emoji}</span>{item.value}
+                              </SelectItem>
+                            ))}
+                            {customExpenseCats.filter(c => c.type === group.groupKey).map(c => (
+                              <SelectItem key={`custom-${c.id}`} value={c.name}>
+                                <span className="mr-1.5">{c.emoji ?? "📌"}</span>{c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
                         ))}
                       </SelectContent>
                     </Select>

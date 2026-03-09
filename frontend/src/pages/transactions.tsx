@@ -143,7 +143,10 @@ function TransactionForm({ accounts, onClose }: { accounts: Account[]; onClose: 
   });
 
   const watchType = form.watch("type");
-  const userCategories = customCategories?.filter(c => c.type === watchType) || [];
+  const userCategories = customCategories?.filter(c =>
+    c.type === watchType ||
+    (watchType === "expense" && (c.type === "needs" || c.type === "wants"))
+  ) || [];
 
   const txMutation = useMutation({
     mutationFn: (data: z.infer<typeof transactionFormSchema>) => {

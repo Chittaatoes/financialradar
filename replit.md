@@ -118,6 +118,16 @@ Browser → Vite dev server (port 5000, /api proxy) → Express API (port 5001) 
 | `NODE_ENV` | `production` or `development` |
 | `SUPER_ADMIN_EMAIL` | (Optional) First user with this email gets admin role |
 
+## Custom Categories (Budget Page)
+- **Location**: Budget page → NEEDS and WANTS `CategoryGroup` sections only
+- **Storage**: `custom_categories` table — `id`, `userId`, `name`, `emoji`, `type`, `createdAt`
+- **Type field values**: `"needs"` or `"wants"` (to group them), `"expense"` for legacy categories
+- **Budget key**: Category `name` string (exact match) — backend maps unmapped transaction categories to their own name in `spentByBudgetKey`
+- **Add flow**: "+ Tambah Kategori" button at bottom of list → bottom sheet form with name input + emoji picker (preset grid + manual input)
+- **Delete flow**: Trash icon on each custom category row → bottom sheet confirmation dialog before deletion
+- **Transaction forms**: Custom categories appear in expense category pickers in dashboard quick-add, transactions page, scan panel, scan dialog — filtered as expense-compatible (`type === "needs" || "wants" || "expense"`)
+- **Spending tracking**: Backend now falls through unmapped categories (custom) to use their name as budget key, so custom category spending shows on budget cards
+
 ## Receipt Scanner (Scan Struk)
 - **Entry points:** `scan-panel.tsx` (dashboard inline), `scan-receipt-dialog.tsx` (modal)
 - **OCR engine:** Tesseract.js with `eng+ind` language for Indonesian + English support

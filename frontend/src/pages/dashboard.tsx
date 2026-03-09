@@ -531,7 +531,10 @@ function TransactionForm({
   });
 
   const watchType = txType;
-  const userCategories = customCategories?.filter(c => c.type === watchType) || [];
+  const userCategories = customCategories?.filter(c =>
+    c.type === watchType ||
+    (watchType === "expense" && (c.type === "needs" || c.type === "wants"))
+  ) || [];
 
   const mutation = useMutation({
     mutationFn: (data: z.infer<typeof quickTxSchema>) => {
