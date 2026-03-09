@@ -481,42 +481,21 @@ function TransactionForm({ accounts, onClose }: { accounts: Account[]; onClose: 
                                 {(t.categories as Record<string, string>)[item.value] || item.value}
                               </SelectItem>
                             ))}
-                          </SelectGroup>
-                        ))
-                      )}
-                      {userCategories.length > 0 && (
-                        <>
-                          <SelectSeparator />
-                          <SelectGroup>
-                            <SelectLabel>{t.transactions.customCategories}</SelectLabel>
-                            {userCategories.map((c) => (
+                            {userCategories.filter(c =>
+                              c.type === group.groupKey ||
+                              (group.groupKey === "wants" && c.type === "expense")
+                            ).map((c) => (
                               <SelectItem key={`custom-${c.id}`} value={c.name}>
-                                <span>{c.name}</span>
+                                <span className="mr-2">{c.emoji ?? "📌"}</span>
+                                {c.name}
                               </SelectItem>
                             ))}
                           </SelectGroup>
-                        </>
+                        ))
                       )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
-                  {userCategories.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {userCategories.map((c) => (
-                        <Badge key={c.id} variant="secondary" className="text-[10px] gap-1">
-                          {c.name}
-                          <button
-                            type="button"
-                            onClick={() => deleteCategoryMutation.mutate(c.id)}
-                            className="ml-0.5"
-                            data-testid={`button-delete-category-${c.id}`}
-                          >
-                            <X className="w-2.5 h-2.5" />
-                          </button>
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
                 </FormItem>
               )}
             />

@@ -659,10 +659,9 @@ function CategoryGroup({
                 <span className="text-2xl w-10 h-10 flex items-center justify-center rounded-lg border border-border bg-muted">{newCatEmoji}</span>
                 <Input
                   value={newCatEmoji}
-                  onChange={e => setNewCatEmoji(e.target.value.slice(-2) || "📌")}
+                  onChange={e => { if (e.target.value) setNewCatEmoji(e.target.value); }}
                   placeholder="Atau ketik emoji"
                   className="flex-1 text-center"
-                  maxLength={2}
                 />
               </div>
             </div>

@@ -746,19 +746,17 @@ function TransactionForm({
                                 {(t.categories as Record<string, string>)[item.value] || item.value}
                               </SelectItem>
                             ))}
-                          </SelectGroup>
-                        ))
-                      )}
-                      {userCategories.length > 0 && (
-                        <>
-                          <SelectSeparator />
-                          <SelectGroup>
-                            <SelectLabel>{t.transactions.customCategories}</SelectLabel>
-                            {userCategories.map((c) => (
-                              <SelectItem key={`custom-${c.id}`} value={c.name}>{c.name}</SelectItem>
+                            {userCategories.filter(c =>
+                              c.type === group.groupKey ||
+                              (group.groupKey === "wants" && c.type === "expense")
+                            ).map((c) => (
+                              <SelectItem key={`custom-${c.id}`} value={c.name}>
+                                <span className="mr-2">{c.emoji ?? "📌"}</span>
+                                {c.name}
+                              </SelectItem>
                             ))}
                           </SelectGroup>
-                        </>
+                        ))
                       )}
                     </SelectContent>
                   </Select>
