@@ -24,6 +24,7 @@ import { Link } from "wouter";
 import type { UserProfile, BudgetAllocation, BudgetPlan, Goal } from "@shared/schema";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { BudgetSetupWizard } from "@/components/budget-setup-wizard";
+import { EmojiPicker } from "@/components/emoji-picker";
 import { cn } from "@/lib/utils";
 
 interface BudgetSummaryData {
@@ -358,7 +359,6 @@ function SavingsGoalGroup({
   );
 }
 
-const EMOJI_PRESETS = ["🍱","💊","🚇","🔌","🧹","🛒","🔧","📱","🎯","🎬","🎸","🛋️","💅","🌟","🎁","🏋️","📚","🎨","🐾","🚀","🌺","🍕","☕","🏠","💡","💧","🏥","🎓","🛍️","🎮","🍩","✨","📌","⭐","💎"];
 
 function CategoryGroup({
   groupKey,
@@ -637,7 +637,7 @@ function CategoryGroup({
               Tambah kategori kustom ke grup {groupKey === "needs" ? "Kebutuhan" : "Keinginan"}
             </DialogDescription>
           </DialogHeader>
-          <div className="px-6 pb-6 space-y-4">
+          <div className="overflow-y-auto flex-1 px-6 pb-6 space-y-4">
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nama Kategori</label>
               <Input
@@ -650,31 +650,11 @@ function CategoryGroup({
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Pilih Emoji</label>
-              <div className="grid grid-cols-9 gap-1.5 mb-3">
-                {EMOJI_PRESETS.map(em => (
-                  <button
-                    key={em}
-                    type="button"
-                    onClick={() => setNewCatEmoji(em)}
-                    className={cn(
-                      "w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-colors",
-                      newCatEmoji === em ? "bg-primary/20 ring-2 ring-primary" : "hover:bg-muted"
-                    )}
-                  >
-                    {em}
-                  </button>
-                ))}
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pilih Emoji</label>
+                <span className="text-2xl w-9 h-9 flex items-center justify-center rounded-lg border border-border bg-muted leading-none">{newCatEmoji}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl w-10 h-10 flex items-center justify-center rounded-lg border border-border bg-muted">{newCatEmoji}</span>
-                <Input
-                  value={newCatEmoji}
-                  onChange={e => { if (e.target.value) setNewCatEmoji(e.target.value); }}
-                  placeholder="Atau ketik emoji"
-                  className="flex-1 text-center"
-                />
-              </div>
+              <EmojiPicker value={newCatEmoji} onChange={setNewCatEmoji} />
             </div>
             <div className="flex gap-2 pt-1">
               <Button variant="outline" className="flex-1" onClick={() => { setAddCatOpen(false); setNewCatName(""); setNewCatEmoji("📌"); }}>
