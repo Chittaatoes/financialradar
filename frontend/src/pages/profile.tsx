@@ -471,7 +471,7 @@ export default function ProfilePage() {
                 <p className="text-sm font-semibold truncate" data-testid="text-profile-name">
                   {displayName}
                 </p>
-                {!user?.isGuest && (
+                {user && !user.isGuest && (
                   <button
                     onClick={() => { setNameInput(user?.firstName || ""); setEditingName(true); }}
                     className="text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0"
@@ -499,7 +499,7 @@ export default function ProfilePage() {
           </span>
         </div>
 
-        {user?.isGuest && (
+        {(!user || user.isGuest) && (
           <div className="mt-4 pt-3 border-t border-border/50" data-testid="card-secure-account">
             <div className="flex items-start gap-2">
               <Lock className="w-3.5 h-3.5 text-muted-foreground/50 mt-0.5 shrink-0" />
