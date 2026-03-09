@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { API_URL } from "@/lib/api";
 
 export interface User {
@@ -11,6 +12,7 @@ export interface User {
 async function fetchUser(): Promise<User | null> {
   const res = await fetch(`${API_URL}/api/auth/user`, {
     credentials: "include",
+    cache: "no-store",
   });
 
   if (res.status === 401) {
@@ -25,6 +27,7 @@ async function guestLogin() {
   const res = await fetch(`${API_URL}/api/guest-login`, {
     method: "POST",
     credentials: "include",
+    cache: "no-store",
   });
 
   if (!res.ok) throw new Error("Guest login failed");
@@ -36,6 +39,7 @@ async function logout() {
   const res = await fetch(`${API_URL}/api/auth/logout`, {
     method: "POST",
     credentials: "include",
+    cache: "no-store",
   });
 
   if (!res.ok) throw new Error("Logout failed");
@@ -50,12 +54,28 @@ export function useAuth() {
     data: user,
     isLoading,
     isError,
+    refetch,
   } = useQuery({
     queryKey: ["user"],
     queryFn: fetchUser,
     retry: false,
-    staleTime: Infinity,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
+
+  useEffect(() => {
+    refetch();
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      const staleKeys = ["auth-user", "fr-user", "user"];
+      staleKeys.forEach((k) => {
+        if (localStorage.getItem(k)) localStorage.removeItem(k);
+      });
+    }
+  }, [user]);
 
   const guestLoginMutation = useMutation({
     mutationFn: guestLogin,

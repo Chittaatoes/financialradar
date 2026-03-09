@@ -1,0 +1,106 @@
+You are a senior frontend engineer fixing an iOS Safari session caching issue in an existing React + Vite web app.
+
+IMPORTANT RULES:
+
+Do NOT change the existing login or logout logic.
+
+Do NOT change API endpoints.
+
+Do NOT modify authentication flow or session structure.
+
+Only improve reliability on iOS Safari / PWA where cached auth state causes UI mismatch.
+
+Problem:
+On iOS Safari, the app sometimes shows a stale auth state:
+
+The backend session is already logged out
+
+But the frontend still thinks the user is logged in or vice versa
+
+This hides the "Tautkan dengan Google" button or logout button incorrectly.
+
+Android and desktop work correctly.
+
+Goal:
+Ensure the frontend always synchronizes with the real backend session state on page load and navigation.
+
+Implement the following improvements safely:
+
+Prevent cached /api/user responses on Safari.
+
+Update the fetch request for the user session check so it includes:
+
+cache: "no-store"
+credentials: "include"
+
+Example:
+
+fetch("/api/user", {
+  credentials: "include",
+  cache: "no-store"
+});
+
+This ensures Safari never returns a cached auth response.
+
+Add a frontend session sanity check.
+
+In the auth hook (likely use-auth.ts), add a lightweight safety check:
+
+If the API returns no user but localStorage still contains auth state, clear the local cache.
+
+Example logic:
+
+if (!user && localStorage.getItem("auth-user")) {
+  localStorage.removeItem("auth-user");
+}
+
+Do NOT change login logic. Only clean stale frontend state.
+
+Ensure auth state refreshes when the page loads.
+
+Add a safe session revalidation on initial mount so Safari cannot reuse stale state.
+
+Example:
+
+useEffect(() => {
+  refetchUser();
+}, []);
+
+Disable aggressive caching for session endpoints.
+
+Ensure that requests for:
+
+/api/user
+/api/profile
+/api/session
+
+are always fetched with cache: "no-store".
+
+Do not modify backend behavior.
+
+Service Worker Safety (important for iOS PWA)
+
+If a service worker exists, exclude API routes from caching.
+
+Example rule:
+
+Do NOT cache:
+
+/api/*
+
+This prevents stale authentication state in Safari.
+
+UI fallback protection.
+
+If the API returns no authenticated user, always render the guest state which includes:
+
+"Pengguna Tamu"
+
+"Tautkan dengan Google"
+
+Never hide that option due to cached state.
+
+Do NOT change styling or layout.
+
+Result:
+The app should behave exactly the same, but iOS Safari must always reflect the true backend session state and never show stale login UI.
