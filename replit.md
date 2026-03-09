@@ -3,7 +3,8 @@
 ## Overview
 Financial Radar is a habit-driven personal finance web application. It helps users track assets (Cash, Bank, E-Wallet), manage income/expenses, set savings goals, and build financial discipline through subtle gamification (XP, Levels, Streaks, Finance Score).
 
-**Positioning:** Calm Premium Habit-Based Finance System
+**Positioning:** Calm Premium Habit-Based Finance System  
+**Default Language:** Bahasa Indonesia (ID) — toggle to English available
 
 ## Tech Stack
 - **Frontend:** React 18 + TypeScript + Vite 7 + Tailwind CSS 3 + Shadcn UI + Framer Motion + PWA
@@ -38,15 +39,18 @@ Browser → Vite dev server (port 5000, /api proxy) → Express API (port 5001) 
 │   ├── index.html
 │   ├── public/                           # Static assets, PWA icons, manifest
 │   ├── src/
-│   │   ├── App.tsx                       # Auth-gated routing
-│   │   ├── main.tsx                      # React entry point
+│   │   ├── App.tsx                       # Auth-gated routing + LanguageProvider in main.tsx
+│   │   ├── main.tsx                      # React entry point — wraps app in LanguageProvider
 │   │   ├── index.css                     # Tailwind + theme CSS variables + iOS date fix
 │   │   ├── components/                   # UI components (Shadcn UI 40+)
 │   │   │   ├── calculator-sheet.tsx      # Calculator bottom sheet (safe arithmetic parser)
+│   │   │   ├── emoji-picker.tsx          # Full emoji picker (10 categories, ~700 emojis, search)
 │   │   │   └── budget-summary-card.tsx   # Today's Budget card (daily budget, monthly income/expense, progress)
 │   │   ├── features/                     # Feature modules (score, gamification, onboarding)
 │   │   ├── hooks/                        # Custom React hooks
+│   │   │   └── use-toast.ts              # Toast with typed helpers: toast.success/error/warning/radar()
 │   │   ├── lib/                          # API client, i18n, constants, utils
+│   │   │   └── i18n.tsx                  # EN/ID translations — default language: ID
 │   │   └── pages/                        # Route pages
 │   ├── vite.config.ts
 │   ├── vercel.json                       # SPA routing for Vercel
@@ -83,7 +87,7 @@ Browser → Vite dev server (port 5000, /api proxy) → Express API (port 5001) 
 ## Database Tables
 - **users** — User accounts (id, email, firstName, lastName, profileImageUrl, role, isGuest)
 - **sessions** — Express session store (auto-created by connect-pg-simple)
-- **accounts** — Financial accounts (cash/bank/ewallet with balances)
+- **accounts** — Financial accounts (cash/bank/ewallet with balances, `color`, `note` fields)
 - **transactions** — Income/expense/transfer records
 - **goals** — Savings goals with target amount and deadline
 - **liabilities** — Debt tracking (one_time or installment type)
@@ -94,7 +98,7 @@ Browser → Vite dev server (port 5000, /api proxy) → Express API (port 5001) 
 - **badges** — 19 predefined badges across 4 categories
 - **user_badges** — Tracks which badges each user has unlocked
 - **daily_focus** — Daily missions (3 per day)
-- **custom_categories** — User-defined transaction categories
+- **custom_categories** — User-defined transaction categories (Google users only)
 - **budget_plans** — Monthly budget strategies
 
 ## Environment Variables
@@ -118,15 +122,57 @@ Browser → Vite dev server (port 5000, /api proxy) → Express API (port 5001) 
 | `NODE_ENV` | `production` or `development` |
 | `SUPER_ADMIN_EMAIL` | (Optional) First user with this email gets admin role |
 
+## i18n (Internationalization)
+- **File:** `frontend/src/lib/i18n.tsx`
+- **Languages:** English (EN) and Bahasa Indonesia (ID)
+- **Default:** ID — stored in `localStorage` under key `fr-lang`
+- **Hook:** `useLanguage()` returns `{ t, language, setLanguage }`
+- **Provider:** `LanguageProvider` wraps the app in `main.tsx`
+- **Scope:** All pages (dashboard, accounts, transactions, budget, goals, profile, etc.)
+- **Key sections:** `nav`, `dashboard`, `accounts`, `transactions`, `categories`, `goals`, `budget`, `common`, `profile`, `landing`, `mainMenu`, `tiers`
+
+## Gamification System
+- **XP & Levels:** Transactions, daily focus, no-spend days, savings deposits, debt payments all award XP
+- **Streaks:** Daily activity tracked; weekly revive available (3 per week)
+- **Badges:** 19 badges across discipline, debt, wealth, and smart_money categories
+- **Finance Score:** Gold/Silver/Bronze tier based on spending ratios and consistency
+- **Daily Focus:** 3 auto-generated missions per day with XP rewards
+- **Level Up & Streak Celebrations:** Modal overlays on XP milestone / streak increase
+
+## Account Settings (Color + Note)
+- Each account has optional `color` and `note` fields in the DB
+- Gear icon (SlidersHorizontal) next to account name opens settings bottom sheet
+- Color picker: 8 presets (Default, Biru, Hijau, Ungu, Oranye, Merah, Kuning, Pink)
+- Note field: max 120 chars, free text
+- Fully translated (EN/ID)
+
+## Toast System
+- **File:** `frontend/src/hooks/use-toast.ts`
+- **Renderer:** `frontend/src/components/ui/toaster.tsx` — dual position (top for errors, bottom for others)
+- **Helpers:** `toast.success()`, `toast.error()`, `toast.warning()`, `toast.radar()`
+- **Auto-dismiss:** 3s (success/warning/radar), 4s (errors)
+- **Position:** Errors slide from top; all others appear 90px above the FAB
+
+## Budget Reset Confirmation
+- "Reset Budget" opens a bottom sheet requiring user to type "Hapus" to confirm
+- Shows what gets deleted before confirming
+- Located in budget page (`frontend/src/pages/budget.tsx`)
+
+## Emoji Picker
+- **File:** `frontend/src/components/emoji-picker.tsx`
+- **Categories:** 10 categories, ~700+ Unicode emojis
+- **Features:** Search bar, scrollable grid (9 columns), category tab navigation
+- **Used in:** Budget page for custom category emoji selection
+
 ## Custom Categories (Budget Page)
-- **Location**: Budget page → NEEDS and WANTS `CategoryGroup` sections only
-- **Storage**: `custom_categories` table — `id`, `userId`, `name`, `emoji`, `type`, `createdAt`
-- **Type field values**: `"needs"` or `"wants"` (to group them), `"expense"` for legacy categories
-- **Budget key**: Category `name` string (exact match) — backend maps unmapped transaction categories to their own name in `spentByBudgetKey`
-- **Add flow**: "+ Tambah Kategori" button at bottom of list → bottom sheet form with name input + emoji picker (preset grid + manual input)
-- **Delete flow**: Trash icon on each custom category row → bottom sheet confirmation dialog before deletion
-- **Transaction forms**: Custom categories appear in expense category pickers in dashboard quick-add, transactions page, scan panel, scan dialog — filtered as expense-compatible (`type === "needs" || "wants" || "expense"`)
-- **Spending tracking**: Backend now falls through unmapped categories (custom) to use their name as budget key, so custom category spending shows on budget cards
+- **Location:** Budget page → NEEDS and WANTS `CategoryGroup` sections only
+- **Storage:** `custom_categories` table — `id`, `userId`, `name`, `emoji`, `type`, `createdAt`
+- **Type field values:** `"needs"` or `"wants"` (to group them), `"expense"` for legacy categories
+- **Budget key:** Category `name` string (exact match) — backend maps unmapped transaction categories to their own name in `spentByBudgetKey`
+- **Add flow:** "+ Tambah Kategori" button at bottom of list → bottom sheet form with name input + emoji picker
+- **Delete flow:** Trash icon on each custom category row → bottom sheet confirmation dialog before deletion
+- **Restriction:** Google-authenticated users only (guests cannot add custom categories)
+- **Transaction forms:** Custom categories appear in expense category pickers in dashboard quick-add, transactions page, scan panel, scan dialog
 
 ## Receipt Scanner (Scan Struk)
 - **Entry points:** `scan-panel.tsx` (dashboard inline), `scan-receipt-dialog.tsx` (modal)
@@ -134,17 +180,16 @@ Browser → Vite dev server (port 5000, /api proxy) → Express API (port 5001) 
 - **Preprocessing:** Canvas API — resizes to 1200px max, grayscale, contrast boost (1.5×)
 - **Shared OCR helper:** `frontend/src/lib/receipt-ocr.ts` — `runOCR(file)` preprocesses and recognizes
 - **Shared parser:** `frontend/src/lib/receipt-parser.ts` — `parseTotal`, `parseMerchant`, `parseDate`, `suggestCategory`
-- **Total detection:** Priority keyword search (total bayar → grand total → total → jumlah → subtotal), multi-line support (keyword on line N, amount on N+1), fallback to largest formatted number
+- **Total detection:** Priority keyword search (total bayar → grand total → total → jumlah → subtotal), multi-line support, fallback to largest formatted number
 - **Merchant detection:** Bank/e-wallet name for payment proofs; first uppercase-dominant line otherwise
 - **Date formats:** ISO `2026-03-09`, `09/03/2026`, `09-03-2026`, `9 Maret 2026`, `9 March 2026`
-- **Category detection:** Keyword matching against merchant name + full OCR text; covers Indonesian & international merchants
-- **Supported receipts:** Supermarket, restaurant, retail, bank transfer proofs (BCA/BNI/Mandiri/BRI/etc.), QRIS, ATM, international (USD/SGD/MYR/EUR)
+- **Category detection:** Keyword matching against merchant name + full OCR text
 
 ## API Routes
 - `/api/auth/*` — Authentication (login, callback, user, logout)
 - `/api/profile` — User profile (XP, level, streak)
 - `/api/dashboard` — Aggregated dashboard data
-- `/api/accounts` — CRUD for financial accounts
+- `/api/accounts` — CRUD for financial accounts (supports `color` and `note` fields)
 - `/api/transactions` — CRUD for transactions + auto balance updates
 - `/api/no-spending` — Record "no spending today"
 - `/api/goals` — CRUD for savings goals + deposit
@@ -158,7 +203,7 @@ Browser → Vite dev server (port 5000, /api proxy) → Express API (port 5001) 
 - `/api/finance-score` — Financial health score
 - `/api/streak/revive` — Use weekly revive
 - `/api/daily-focus` — Daily missions
-- `/api/custom-categories` — User-defined categories
+- `/api/custom-categories` — User-defined categories (Google auth only)
 - `/api/guest-login` — Create guest account
 - `/api/onboarding` — Save user preferences
 - `/api/admin/*` — Admin-only routes
