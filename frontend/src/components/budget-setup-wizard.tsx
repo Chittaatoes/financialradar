@@ -485,6 +485,7 @@ export function BudgetSetupWizard({ open, onClose, onComplete, defaultIncome }: 
       queryClient.invalidateQueries({ queryKey: ["/api/budget-plan"] });
       queryClient.invalidateQueries({ queryKey: ["/api/budget/summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/debt-health"] });
       playSound("transaction");
       onComplete();
     },
