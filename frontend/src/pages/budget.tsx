@@ -745,6 +745,8 @@ export default function BudgetPage() {
   const monthEnd = format(endOfMonth(new Date()), "dd MMM");
 
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState("");
 
   const { data: profile } = useQuery<UserProfile>({
     queryKey: ["/api/profile"],
@@ -790,6 +792,8 @@ export default function BudgetPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/budget-plan"] });
       queryClient.invalidateQueries({ queryKey: ["/api/budget/summary"] });
+      setResetConfirmOpen(false);
+      setResetConfirmText("");
       setWizardOpen(true);
     },
     onError: (error: Error) => {
@@ -967,14 +971,76 @@ export default function BudgetPage() {
           <button
             type="button"
             className="text-xs text-muted-foreground hover:text-destructive transition-colors underline underline-offset-2"
-            onClick={() => deletePlanMutation.mutate()}
-            disabled={deletePlanMutation.isPending}
+            onClick={() => { setResetConfirmText(""); setResetConfirmOpen(true); }}
             data-testid="button-reset-budget"
           >
             {t.budget.resetBudget}
           </button>
         </div>
       )}
+
+      <Dialog
+        open={resetConfirmOpen}
+        onOpenChange={(open) => {
+          if (!open) { setResetConfirmOpen(false); setResetConfirmText(""); }
+        }}
+      >
+        <DialogContentBottomSheet>
+          <div className="bg-gradient-to-br from-destructive/10 via-destructive/5 to-background px-6 pt-2 pb-4 shrink-0 md:-mx-6 md:-mt-6">
+            <DialogHeader className="text-center md:text-left space-y-1">
+              <DialogTitle className="font-serif flex items-center gap-2 justify-center md:justify-start">
+                <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
+                Reset Budget
+              </DialogTitle>
+              <DialogDescription>
+                Semua pengaturan anggaran bulan ini akan dihapus dan tidak bisa dikembalikan.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="overflow-y-auto px-6 pt-4 pb-6 md:px-0 md:pt-2 md:pb-0 space-y-4">
+            <div className="rounded-xl bg-destructive/8 border border-destructive/20 p-3 space-y-1">
+              <p className="text-xs font-medium text-destructive">Yang akan dihapus:</p>
+              <ul className="text-xs text-muted-foreground space-y-0.5 list-disc list-inside">
+                <li>Rencana anggaran {format(new Date(), "MMMM yyyy")}</li>
+                <li>Semua alokasi kategori bulan ini</li>
+                <li>Pengaturan strategi (50/30/20 dll)</li>
+              </ul>
+            </div>
+
+            <div className="space-y-1.5">
+              <p className="text-sm text-muted-foreground">
+                Ketik <span className="font-semibold text-foreground">Hapus</span> untuk konfirmasi
+              </p>
+              <Input
+                value={resetConfirmText}
+                onChange={(e) => setResetConfirmText(e.target.value)}
+                placeholder="Hapus"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => { setResetConfirmOpen(false); setResetConfirmText(""); }}
+              >
+                Batal
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                disabled={resetConfirmText !== "Hapus" || deletePlanMutation.isPending}
+                onClick={() => deletePlanMutation.mutate()}
+              >
+                {deletePlanMutation.isPending ? "Menghapus..." : "Reset Budget"}
+              </Button>
+            </div>
+          </div>
+        </DialogContentBottomSheet>
+      </Dialog>
     </div>
   );
 }
