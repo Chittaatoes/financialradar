@@ -5,14 +5,18 @@ import type {
   ToastProps,
 } from "@/components/ui/toast"
 
-const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_LIMIT = 3
+const TOAST_REMOVE_DELAY = 1000
+
+export type ToastType = "success" | "error" | "warning" | "radar" | "default"
 
 type ToasterToast = ToastProps & {
   id: string
   title?: React.ReactNode
   description?: React.ReactNode
   action?: ToastActionElement
+  toastType?: ToastType
+  duration?: number
 }
 
 const actionTypes = {
@@ -90,8 +94,6 @@ export const reducer = (state: State, action: Action): State => {
     case "DISMISS_TOAST": {
       const { toastId } = action
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
       if (toastId) {
         addToRemoveQueue(toastId)
       } else {
@@ -139,8 +141,21 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
-function toast({ ...props }: Toast) {
+function resolveToastType(props: Toast): ToastType {
+  if (props.toastType) return props.toastType
+  if (props.variant === "destructive") return "error"
+  return "default"
+}
+
+function getDuration(toastType: ToastType, override?: number): number {
+  if (override !== undefined) return override
+  return toastType === "error" ? 4000 : 3000
+}
+
+function toast(props: Toast) {
   const id = genId()
+  const resolvedType = resolveToastType(props)
+  const duration = getDuration(resolvedType, props.duration)
 
   const update = (props: ToasterToast) =>
     dispatch({
@@ -154,6 +169,8 @@ function toast({ ...props }: Toast) {
     toast: {
       ...props,
       id,
+      toastType: resolvedType,
+      duration,
       open: true,
       onOpenChange: (open) => {
         if (!open) dismiss()
@@ -167,6 +184,18 @@ function toast({ ...props }: Toast) {
     update,
   }
 }
+
+toast.success = (title: string, opts?: Partial<Toast>) =>
+  toast({ title, toastType: "success", ...opts })
+
+toast.error = (title: string, opts?: Partial<Toast>) =>
+  toast({ title, toastType: "error", variant: "destructive", ...opts })
+
+toast.warning = (title: string, opts?: Partial<Toast>) =>
+  toast({ title, toastType: "warning", ...opts })
+
+toast.radar = (title: string, opts?: Partial<Toast>) =>
+  toast({ title, toastType: "radar", ...opts })
 
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState)
@@ -189,3 +218,4 @@ function useToast() {
 }
 
 export { useToast, toast }
+export type { ToasterToast }

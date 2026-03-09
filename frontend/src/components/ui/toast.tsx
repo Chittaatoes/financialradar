@@ -14,9 +14,7 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      "fixed z-[100] flex flex-col gap-2 p-3",
-      "bottom-[76px] right-3 w-auto max-w-[calc(100vw-1.5rem)]",
-      "sm:bottom-4 sm:right-4 sm:max-w-[380px]",
+      "fixed z-[100] flex flex-col gap-2 p-3 w-auto max-w-[calc(100vw-1.5rem)] sm:max-w-[380px]",
       className
     )}
     {...props}
@@ -30,16 +28,21 @@ const toastVariants = cva(
     "w-full rounded-2xl px-4 py-3 pr-9 shadow-xl",
     "transition-all duration-300",
     "data-[state=open]:animate-in data-[state=closed]:animate-out",
-    "data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-4",
-    "data-[state=open]:slide-in-from-bottom-4 data-[state=open]:fade-in-0",
+    "data-[state=closed]:fade-out-80 data-[state=closed]:zoom-out-95",
   ].join(" "),
   {
     variants: {
       variant: {
         default:
-          "bg-card/95 dark:bg-card/95 border border-border/30 text-foreground backdrop-blur-md",
+          "bg-card/95 dark:bg-card/95 border border-border/30 text-foreground backdrop-blur-md data-[state=open]:slide-in-from-bottom-4 data-[state=open]:fade-in-0",
         destructive:
-          "bg-red-600 dark:bg-red-700 text-white border-0",
+          "bg-card/95 dark:bg-card/95 border border-border/30 text-foreground backdrop-blur-md data-[state=open]:slide-in-from-top-4 data-[state=open]:fade-in-0",
+        success:
+          "bg-card/95 dark:bg-card/95 border border-border/30 text-foreground backdrop-blur-md data-[state=open]:slide-in-from-bottom-4 data-[state=open]:fade-in-0",
+        warning:
+          "bg-card/95 dark:bg-card/95 border border-border/30 text-foreground backdrop-blur-md data-[state=open]:slide-in-from-bottom-4 data-[state=open]:fade-in-0",
+        radar:
+          "bg-card/95 dark:bg-card/95 border border-border/30 text-foreground backdrop-blur-md data-[state=open]:slide-in-from-bottom-4 data-[state=open]:fade-in-0",
       },
     },
     defaultVariants: {
@@ -70,7 +73,7 @@ const ToastAction = React.forwardRef<
   <ToastPrimitives.Action
     ref={ref}
     className={cn(
-      "inline-flex h-7 shrink-0 items-center justify-center rounded-lg border bg-transparent px-3 text-xs font-medium ring-offset-background transition-colors hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 group-[.destructive]:border-white/30 group-[.destructive]:hover:bg-white/20 group-[.destructive]:focus:ring-white",
+      "inline-flex h-7 shrink-0 items-center justify-center rounded-lg border bg-transparent px-3 text-xs font-medium ring-offset-background transition-colors hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
       className
     )}
     {...props}
@@ -85,7 +88,7 @@ const ToastClose = React.forwardRef<
   <ToastPrimitives.Close
     ref={ref}
     className={cn(
-      "absolute right-2.5 top-2.5 rounded-full p-0.5 opacity-60 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none group-[.destructive]:text-white group-[.destructive]:hover:text-white",
+      "absolute right-2.5 top-2.5 rounded-full p-0.5 opacity-60 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none",
       className
     )}
     toast-close=""
