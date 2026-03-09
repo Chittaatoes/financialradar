@@ -775,6 +775,7 @@ export default function BudgetPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/budget-plan"] });
       queryClient.invalidateQueries({ queryKey: ["/api/budget/summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/debt-health"] });
       setResetConfirmOpen(false);
       setResetConfirmText("");
       setWizardOpen(true);
@@ -825,34 +826,34 @@ export default function BudgetPage() {
         defaultIncome={profile?.monthlyIncome ? Number(profile.monthlyIncome) : undefined}
       />
 
-      <div
-        className="rounded-[20px] relative overflow-hidden"
-        style={{
-          background: "linear-gradient(145deg, #1E2F26 0%, #16221C 40%, #1a2a22 100%)",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)",
-        }}
-        data-testid="card-budget-summary"
-      >
-        <div className="absolute inset-0 rounded-[20px]" style={{ background: "radial-gradient(ellipse at 30% 20%, rgba(77,175,106,0.08) 0%, transparent 60%)" }} />
-        <div className="relative z-10 p-6 space-y-4">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">{t.budget.expectedIncome}</p>
-              <p className="text-3xl font-mono font-bold text-white/90" data-testid="text-budget-income">
-                {formatCurrency(income)}
-              </p>
+      {budgetPlan && (
+        <div
+          className="rounded-[20px] relative overflow-hidden"
+          style={{
+            background: "linear-gradient(145deg, #1E2F26 0%, #16221C 40%, #1a2a22 100%)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)",
+          }}
+          data-testid="card-budget-summary"
+        >
+          <div className="absolute inset-0 rounded-[20px]" style={{ background: "radial-gradient(ellipse at 30% 20%, rgba(77,175,106,0.08) 0%, transparent 60%)" }} />
+          <div className="relative z-10 p-6 space-y-4">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">{t.budget.expectedIncome}</p>
+                <p className="text-3xl font-mono font-bold text-white/90" data-testid="text-budget-income">
+                  {formatCurrency(income)}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="text-white/40 hover:text-white/70 transition-colors mt-1"
+                onClick={() => setWizardOpen(true)}
+                data-testid="button-edit-budget"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
             </div>
-            <button
-              type="button"
-              className="text-white/40 hover:text-white/70 transition-colors mt-1"
-              onClick={() => setWizardOpen(true)}
-              data-testid="button-edit-budget"
-            >
-              <Pencil className="w-4 h-4" />
-            </button>
-          </div>
 
-          {budgetPlan && (
             <div className="flex items-center gap-2 flex-wrap">
               <Badge
                 variant="outline"
@@ -864,32 +865,32 @@ export default function BudgetPage() {
                 {t.budget.periodMonthly}
               </Badge>
             </div>
-          )}
 
-          <div className="border-t border-white/10 pt-4">
-            <div className="flex items-center gap-1.5 text-white/40 text-[11px] mb-1">
-              <CalendarDays className="w-3.5 h-3.5" />
-              <span className="uppercase tracking-wider">{t.budget.activePeriod}</span>
+            <div className="border-t border-white/10 pt-4">
+              <div className="flex items-center gap-1.5 text-white/40 text-[11px] mb-1">
+                <CalendarDays className="w-3.5 h-3.5" />
+                <span className="uppercase tracking-wider">{t.budget.activePeriod}</span>
+              </div>
+              <p className="text-xl font-bold text-white/80">{monthStart} - {monthEnd}</p>
             </div>
-            <p className="text-xl font-bold text-white/80">{monthStart} - {monthEnd}</p>
-          </div>
 
-          <div className="grid grid-cols-3 gap-3 border-t border-white/10 pt-4">
-            <div>
-              <p className="text-[10px] text-white/40 uppercase tracking-wider">{t.budget.totalAllocated}</p>
-              <p className="font-mono font-semibold text-sm text-white/80 mt-0.5">{formatCurrency(needsLimit + wantsLimit + savingsLimit + investmentLimit)}</p>
-            </div>
-            <div>
-              <p className="text-[10px] text-white/40 uppercase tracking-wider">{t.budget.totalSpent}</p>
-              <p className="font-mono font-semibold text-sm text-white/80 mt-0.5">{formatCurrency(totalSpent)}</p>
-            </div>
-            <div>
-              <p className="text-[10px] text-white/40 uppercase tracking-wider">{t.budget.unallocated}</p>
-              <p className="font-mono font-semibold text-sm text-emerald-400 mt-0.5">{formatCurrency(Math.max(0, income - (needsLimit + wantsLimit + savingsLimit + investmentLimit)))}</p>
+            <div className="grid grid-cols-3 gap-3 border-t border-white/10 pt-4">
+              <div>
+                <p className="text-[10px] text-white/40 uppercase tracking-wider">{t.budget.totalAllocated}</p>
+                <p className="font-mono font-semibold text-sm text-white/80 mt-0.5">{formatCurrency(needsLimit + wantsLimit + savingsLimit + investmentLimit)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-white/40 uppercase tracking-wider">{t.budget.totalSpent}</p>
+                <p className="font-mono font-semibold text-sm text-white/80 mt-0.5">{formatCurrency(totalSpent)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-white/40 uppercase tracking-wider">{t.budget.unallocated}</p>
+                <p className="font-mono font-semibold text-sm text-emerald-400 mt-0.5">{formatCurrency(Math.max(0, income - (needsLimit + wantsLimit + savingsLimit + investmentLimit)))}</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {debtHealth && debtHealth.monthlyIncome > 0 && (
         <CashflowPressureSection health={debtHealth} />
