@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { playSound } from "@/hooks/use-sound";
 import { Dialog, DialogContentBottomSheet, DialogTitle } from "@/components/ui/dialog";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
@@ -484,6 +485,7 @@ export function BudgetSetupWizard({ open, onClose, onComplete, defaultIncome }: 
       queryClient.invalidateQueries({ queryKey: ["/api/budget-plan"] });
       queryClient.invalidateQueries({ queryKey: ["/api/budget/summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+      playSound("transaction");
       onComplete();
     },
     onError: (error: Error) => {
