@@ -271,6 +271,22 @@ export async function registerRoutes(
     });
   });
 
+  app.patch("/api/user/name", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { firstName } = req.body;
+      if (!firstName || typeof firstName !== "string" || !firstName.trim()) {
+        return res.status(400).json({ message: "firstName is required" });
+      }
+      const trimmed = firstName.trim().slice(0, 50);
+      await db.update(users).set({ firstName: trimmed }).where(eq(users.id, userId));
+      res.json({ success: true, firstName: trimmed });
+    } catch (error) {
+      console.error("Error updating user name:", error);
+      res.status(500).json({ message: "Failed to update name" });
+    }
+  });
+
 
   // ===== DASHBOARD DATA =====
   // Returns aggregated financial summary for the main dashboard card.

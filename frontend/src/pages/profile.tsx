@@ -1,7 +1,8 @@
 import { API_URL } from "@/lib/api";
 import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import {
   ChevronRight,
   Shield,
@@ -21,6 +22,9 @@ import {
   Bell,
   BellOff,
   Clock,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
@@ -354,6 +358,17 @@ export default function ProfilePage() {
   const pt = (t as any).profile;
   const nt = t.nav;
   const [soundOn, setSoundOn] = useState(() => getSoundEnabled());
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const queryClient = useQueryClient();
+
+  const updateNameMutation = useMutation({
+    mutationFn: (firstName: string) => apiRequest("PATCH", "/api/user/name", { firstName }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+      setEditingName(false);
+    },
+  });
 
   const { data: profile, isLoading } = useQuery<UserProfile>({
     queryKey: ["/api/profile"],
@@ -427,9 +442,46 @@ export default function ProfilePage() {
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold truncate" data-testid="text-profile-name">
-              {displayName}
-            </p>
+            {editingName ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  autoFocus
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && nameInput.trim()) updateNameMutation.mutate(nameInput.trim());
+                    if (e.key === "Escape") setEditingName(false);
+                  }}
+                  className="text-sm font-semibold bg-transparent border-b border-primary outline-none w-full max-w-[160px]"
+                  maxLength={50}
+                />
+                <button
+                  onClick={() => { if (nameInput.trim()) updateNameMutation.mutate(nameInput.trim()); }}
+                  disabled={updateNameMutation.isPending || !nameInput.trim()}
+                  className="text-primary hover:text-primary/80 disabled:opacity-40"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => setEditingName(false)} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-semibold truncate" data-testid="text-profile-name">
+                  {displayName}
+                </p>
+                {!user?.isGuest && (
+                  <button
+                    onClick={() => { setNameInput(user?.firstName || ""); setEditingName(true); }}
+                    className="text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0"
+                    data-testid="button-edit-name"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground" data-testid="text-profile-tier">
               {tierName} &middot; Lv {level}
             </p>
