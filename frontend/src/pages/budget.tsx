@@ -395,11 +395,8 @@ function CategoryGroup({
   const groupCustomCats = customCats.filter(c => c.type === groupKey);
 
   const addMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/custom-categories", {
-      name: newCatName.trim(),
-      emoji: newCatEmoji,
-      type: groupKey,
-    }),
+    mutationFn: (data: { name: string; emoji: string; type: string }) =>
+      apiRequest("POST", "/api/custom-categories", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/custom-categories"] });
       setAddCatOpen(false);
@@ -671,7 +668,7 @@ function CategoryGroup({
               </Button>
               <Button
                 className="flex-1"
-                onClick={() => addMutation.mutate()}
+                onClick={() => addMutation.mutate({ name: newCatName.trim(), emoji: newCatEmoji, type: groupKey })}
                 disabled={addMutation.isPending || !newCatName.trim()}
               >
                 {addMutation.isPending ? "Menyimpan..." : "Simpan"}
