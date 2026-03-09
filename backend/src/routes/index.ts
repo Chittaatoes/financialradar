@@ -1451,6 +1451,7 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
       const userId = getUserId(req);
       const month = (req.query.month as string) || format(new Date(), "yyyy-MM");
       await storage.deleteBudgetPlan(userId, month);
+      await storage.updateProfile(userId, { monthlyIncome: "0" });
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting budget plan:", error);

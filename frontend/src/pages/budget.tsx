@@ -774,6 +774,7 @@ export default function BudgetPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/budget-plan"] });
       queryClient.invalidateQueries({ queryKey: ["/api/budget/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
       setResetConfirmOpen(false);
       setResetConfirmText("");
       setWizardOpen(true);
