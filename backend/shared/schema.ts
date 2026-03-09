@@ -142,6 +142,7 @@ export const customCategories = pgTable("custom_categories", {
   userId: varchar("user_id").notNull().references(() => users.id),
   name: text("name").notNull(),
   type: text("type").notNull().default("expense"),
+  emoji: text("emoji").default("📌"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

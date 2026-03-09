@@ -1,0 +1,172 @@
+You are a senior full-stack engineer debugging a React + TanStack Query + Express backend app.
+
+Problem:
+
+When creating a new category, the user selects an emoji from the emoji grid correctly, but after pressing Simpan, the saved category always shows the default emoji:
+
+📌
+
+The preview shows the correct emoji, but the database always stores 📌.
+
+This means the selected emoji is not being correctly passed to the backend or stored.
+
+Your task is to trace the full flow and fix it.
+
+Do not change UI layout.
+
+Only fix the data flow.
+
+STEP 1 — Fix the Save Button Logic
+
+Ensure the Simpan button passes both name and emoji to mutate().
+
+The click handler must send the latest state values.
+
+Example correct implementation:
+
+const handleSave = () => {
+  mutate({
+    name: newCatName,
+    emoji: newCatEmoji
+  });
+};
+
+Do not call mutate() without arguments.
+
+STEP 2 — Fix TanStack Query Mutation
+
+Ensure the mutation function receives the emoji from mutate().
+
+Example correct mutation:
+
+const { mutate } = useMutation({
+  mutationFn: async (data: { name: string; emoji: string }) => {
+    return apiRequest("POST", "/api/categories", data);
+  }
+});
+
+Do not read emoji from stale state inside mutationFn.
+
+Always use the data passed from mutate().
+
+STEP 3 — Add Debug Logging
+
+Before calling mutate(), log values:
+
+console.log("Saving category:", newCatName, newCatEmoji);
+
+Verify that emoji is correct when clicking Simpan.
+
+STEP 4 — Verify API Request Payload
+
+Ensure the POST request sends:
+
+{
+  name: "shop",
+  emoji: "🛒"
+}
+
+Do NOT send only name.
+
+Fix apiRequest if needed.
+
+Correct implementation:
+
+export async function apiRequest(method, url, body) {
+  const res = await fetch(url, {
+    method,
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  return res.json();
+}
+STEP 5 — Fix Backend Route
+
+Ensure the backend reads emoji correctly.
+
+Example Express route:
+
+app.post("/api/categories", async (req, res) => {
+  const { name, emoji } = req.body;
+
+  const category = await db.insert(categories).values({
+    name,
+    emoji
+  });
+
+  res.json(category);
+});
+
+Make sure emoji is not ignored.
+
+STEP 6 — Fix Database Schema
+
+Ensure category table has emoji column.
+
+Example schema:
+
+emoji: text("emoji").notNull().default("📌")
+
+Important:
+
+If emoji is provided, the default must NOT override it.
+
+STEP 7 — Ensure Insert Uses Provided Emoji
+
+Correct insert:
+
+await db.insert(categories).values({
+  name,
+  emoji
+});
+
+Incorrect insert:
+
+emoji: "📌"
+STEP 8 — Ensure Frontend Displays Saved Emoji
+
+After category is saved, the UI should display:
+
+category.emoji
+
+Example:
+
+<span>{category.emoji}</span>
+
+Do not hardcode 📌 anywhere.
+
+EXPECTED RESULT
+
+User selects emoji:
+
+🛒
+
+User presses Simpan.
+
+Saved category shows:
+
+🛒 shop
+
+Instead of:
+
+📌 shop
+EXTRA SAFETY
+
+Add fallback only if emoji is missing:
+
+emoji || "📌"
+FINAL RULE
+
+Trace and fix the complete flow:
+
+emoji selection
+→ mutate payload
+→ API request
+→ backend route
+→ database insert
+→ UI display
+
+Ensure the selected emoji is always saved correctly.
