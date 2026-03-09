@@ -289,6 +289,8 @@ const translations = {
       filterByAccount: "Filter by Wallet",
       filterByType: "Filter by Type",
       typeAll: "All",
+      incomeOverview: "Income Overview",
+      transferOverview: "Transfer Overview",
     },
 
     categories: {
@@ -945,6 +947,8 @@ const translations = {
       filterByAccount: "Filter Dompet",
       filterByType: "Filter Tipe",
       typeAll: "Semua",
+      incomeOverview: "Ringkasan Pemasukan",
+      transferOverview: "Ringkasan Transfer",
     },
 
     categories: {

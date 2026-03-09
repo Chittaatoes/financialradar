@@ -103,12 +103,12 @@ interface SpendingInsightData {
 }
 
 // === AMOUNT FORMATTING ===
-// formatShort: Compact IDR display for small cards (e.g. "Rp 1.5M", "Rp 200K")
+// formatShort: Compact IDR display for small cards (e.g. "Rp 1.5M" / "Rp 1.5JT")
 // MASKED_LONG / MASKED_SHORT: Shown when eye toggle hides amounts
-function formatShort(amount: number): string {
-  if (amount >= 1_000_000_000) return `Rp ${(amount / 1_000_000_000).toFixed(1)}B`;
-  if (amount >= 1_000_000) return `Rp ${(amount / 1_000_000).toFixed(1)}M`;
-  if (amount >= 1_000) return `Rp ${(amount / 1_000).toFixed(0)}K`;
+function formatShort(amount: number, lang = "id"): string {
+  if (amount >= 1_000_000_000) return `Rp ${(amount / 1_000_000_000).toFixed(1)}${lang === "en" ? "B" : "T"}`;
+  if (amount >= 1_000_000) return `Rp ${(amount / 1_000_000).toFixed(1)}${lang === "en" ? "M" : "JT"}`;
+  if (amount >= 1_000) return `Rp ${(amount / 1_000).toFixed(0)}${lang === "en" ? "K" : "RB"}`;
   return `Rp ${amount}`;
 }
 
@@ -1500,7 +1500,7 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
 export default function Dashboard() {
   const { user, isGuest } = useAuth();
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { hidden, toggle, animating } = useAmountVisibility();
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [initialAction, setInitialAction] = useState<ActionType | null>(null);
@@ -1772,7 +1772,7 @@ export default function Dashboard() {
                   transform: animating ? "scale(0.98)" : "scale(1)",
                   transition: "opacity 180ms ease-in-out, transform 180ms ease-in-out",
                 }}
-              >{hidden ? MASKED_SHORT : formatShort(dashboard?.totalCash ?? 0)}</p>
+              >{hidden ? MASKED_SHORT : formatShort(dashboard?.totalCash ?? 0, language)}</p>
             </div>
             <div className="rounded-md bg-white/8 p-2.5" data-testid="card-bank">
               <div className="flex items-center gap-1.5 mb-1">
@@ -1787,7 +1787,7 @@ export default function Dashboard() {
                   transform: animating ? "scale(0.98)" : "scale(1)",
                   transition: "opacity 180ms ease-in-out, transform 180ms ease-in-out",
                 }}
-              >{hidden ? MASKED_SHORT : formatShort(dashboard?.totalBank ?? 0)}</p>
+              >{hidden ? MASKED_SHORT : formatShort(dashboard?.totalBank ?? 0, language)}</p>
             </div>
             <div className="rounded-md bg-white/8 p-2.5" data-testid="card-ewallet">
               <div className="flex items-center gap-1.5 mb-1">
@@ -1802,7 +1802,7 @@ export default function Dashboard() {
                   transform: animating ? "scale(0.98)" : "scale(1)",
                   transition: "opacity 180ms ease-in-out, transform 180ms ease-in-out",
                 }}
-              >{hidden ? MASKED_SHORT : formatShort(dashboard?.totalEwallet ?? 0)}</p>
+              >{hidden ? MASKED_SHORT : formatShort(dashboard?.totalEwallet ?? 0, language)}</p>
             </div>
           </div>
 

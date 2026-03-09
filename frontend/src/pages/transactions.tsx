@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { playSound } from "@/hooks/use-sound";
 import { Card, CardContent } from "@/components/ui/card";
@@ -696,9 +696,22 @@ function TransactionForm({ accounts, onClose }: { accounts: Account[]; onClose: 
 
 type DateFilter = "last7" | "thisMonth" | "custom";
 
-function SpendingChart({ transactions, t }: { transactions: { date: string; label: string; amount: number }[]; t: ReturnType<typeof useLanguage>["t"] }) {
-  const hasAnySpending = transactions.some((d) => d.amount > 0);
-  if (!transactions || transactions.length === 0 || !hasAnySpending) {
+const CHART_COLORS = {
+  expense: "hsl(145 48% 32%)",
+  income: "hsl(160 70% 38%)",
+  transfer: "hsl(213 80% 52%)",
+};
+
+function SpendingChart({
+  transactions, t, language, chartType,
+}: {
+  transactions: { date: string; label: string; amount: number }[];
+  t: ReturnType<typeof useLanguage>["t"];
+  language: string;
+  chartType: "expense" | "income" | "transfer";
+}) {
+  const hasAnyData = transactions.some((d) => d.amount > 0);
+  if (!transactions || transactions.length === 0 || !hasAnyData) {
     return (
       <div className="h-[240px] flex items-center justify-center text-sm text-muted-foreground">
         {t.transactions.noSpendingPeriod}
@@ -706,13 +719,21 @@ function SpendingChart({ transactions, t }: { transactions: { date: string; labe
     );
   }
 
+  const color = CHART_COLORS[chartType];
+  const gradientId = `colorChart_${chartType}`;
+  const tickFmt = (v: number) => {
+    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}${language === "en" ? "M" : "JT"}`;
+    if (v >= 1_000) return `${(v / 1_000).toFixed(0)}${language === "en" ? "K" : "RB"}`;
+    return String(v);
+  };
+
   return (
     <ResponsiveContainer width="100%" height={240}>
       <AreaChart data={transactions}>
         <defs>
-          <linearGradient id="colorSpending" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="hsl(145 48% 32%)" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="hsl(145 48% 32%)" stopOpacity={0} />
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+            <stop offset="95%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -724,7 +745,7 @@ function SpendingChart({ transactions, t }: { transactions: { date: string; labe
         <YAxis
           tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
           axisLine={{ stroke: "hsl(var(--border))" }}
-          tickFormatter={(v) => v >= 1000000 ? `${(v / 1000000).toFixed(0)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : String(v)}
+          tickFormatter={tickFmt}
           width={50}
         />
         <Tooltip
@@ -739,8 +760,8 @@ function SpendingChart({ transactions, t }: { transactions: { date: string; labe
         <Area
           type="monotone"
           dataKey="amount"
-          stroke="hsl(145 48% 32%)"
-          fill="url(#colorSpending)"
+          stroke={color}
+          fill={`url(#${gradientId})`}
           strokeWidth={2}
         />
       </AreaChart>
@@ -847,26 +868,28 @@ export default function Transactions() {
     return groups;
   }, [filteredTransactions, t.transactions.today, t.transactions.yesterday]);
 
+  const activeChartType: "expense" | "income" | "transfer" = typeFilter === "income" ? "income" : typeFilter === "transfer" ? "transfer" : "expense";
+
   const chartData = useMemo(() => {
     const days = eachDayOfInterval({
       start: parseISO(dateRange.start),
       end: parseISO(dateRange.end),
     });
-    const expenseMap: Record<string, number> = {};
+    const amountMap: Record<string, number> = {};
     filteredTransactions
-      .filter((tx) => tx.type === "expense")
+      .filter((tx) => tx.type === activeChartType)
       .forEach((tx) => {
-        expenseMap[tx.date] = (expenseMap[tx.date] || 0) + parseFloat(String(tx.amount));
+        amountMap[tx.date] = (amountMap[tx.date] || 0) + parseFloat(String(tx.amount));
       });
     return days.map((day) => {
       const dateStr = format(day, "yyyy-MM-dd");
       return {
         date: dateStr,
         label: format(day, "dd MMM"),
-        amount: expenseMap[dateStr] || 0,
+        amount: amountMap[dateStr] || 0,
       };
     });
-  }, [filteredTransactions, dateRange]);
+  }, [filteredTransactions, dateRange, activeChartType]);
 
   const filterLabel = useMemo(() => {
     if (dateFilter === "last7") return t.transactions.last7Days;
@@ -911,6 +934,24 @@ export default function Transactions() {
     setTypeFilter(pendingTypeFilter);
     setTypeSheetOpen(false);
   };
+
+  useEffect(() => {
+    const handler = () => {
+      if (!accounts || accounts.length === 0) {
+        setSetupOpen(true);
+      } else {
+        setDialogOpen(true);
+      }
+    };
+    window.addEventListener("fr-open-add-tx", handler);
+    return () => window.removeEventListener("fr-open-add-tx", handler);
+  }, [accounts]);
+
+  const chartTitle = activeChartType === "income"
+    ? t.transactions.incomeOverview
+    : activeChartType === "transfer"
+      ? t.transactions.transferOverview
+      : t.transactions.spendingOverview;
 
   if (isLoading) {
     return (
@@ -1145,8 +1186,8 @@ export default function Transactions() {
 
       <Card data-testid="card-spending-chart">
         <CardContent className="p-5">
-          <h3 className="font-semibold mb-4">{t.transactions.spendingOverview}</h3>
-          <SpendingChart transactions={chartData} t={t} />
+          <h3 className="font-semibold mb-4">{chartTitle}</h3>
+          <SpendingChart transactions={chartData} t={t} language={language} chartType={activeChartType} />
         </CardContent>
       </Card>
 

@@ -30,7 +30,9 @@ function useNavPlusHandler() {
   const [location, setLocation] = useLocation();
 
   const handlePlusClick = useCallback(() => {
-    if (location !== "/") {
+    if (location === "/transactions") {
+      window.dispatchEvent(new CustomEvent("fr-open-add-tx"));
+    } else if (location !== "/") {
       setLocation("/");
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent("fr-open-action", { detail: "expense" }));
