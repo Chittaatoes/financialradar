@@ -35,6 +35,9 @@ export default defineConfig({
           {
             urlPattern: /\/api\/(auth|profile|session).*/i,
             handler: "NetworkOnly",
+            options: {
+              fetchOptions: { credentials: "include" },
+            },
           },
           {
             urlPattern: /\/api\/.*/i,
@@ -44,6 +47,7 @@ export default defineConfig({
               expiration: { maxEntries: 50, maxAgeSeconds: 60 * 5 },
               cacheableResponse: { statuses: [0, 200] },
               networkTimeoutSeconds: 10,
+              fetchOptions: { credentials: "include" },
             },
           },
         ],
