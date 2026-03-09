@@ -28,7 +28,9 @@ app.use(
       const isAllowed =
         allowedOrigins.some((o) => origin === o) ||
         /\.replit\.dev$/.test(origin) ||
-        /\.repl\.co$/.test(origin);
+        /\.repl\.co$/.test(origin) ||
+        /\.replit\.app$/.test(origin) ||
+        /^https?:\/\/localhost(:\d+)?$/.test(origin);
       if (isAllowed) return callback(null, true);
       return callback(new Error("Not allowed by CORS"));
     },

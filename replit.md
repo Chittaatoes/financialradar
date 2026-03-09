@@ -28,6 +28,7 @@ Browser → Vite dev server (port 5000, /api proxy) → Express API (port 5001) 
 ### Replit Environment
 - **Frontend:** Vite dev server on `0.0.0.0:5000`, proxies `/api` to `localhost:5001`
 - **Backend:** Express on `localhost:5001`, `PORT=5001` (env var)
+- **Migrated from Vercel/Render:** Now runs fully on Replit with built-in PostgreSQL
 - **Database:** Replit built-in PostgreSQL via `DATABASE_URL` secret
 - **Workflow:** `npm run dev` (concurrently runs backend + frontend)
 - **CORS:** Allows `*.replit.dev` and `*.repl.co` domains automatically
