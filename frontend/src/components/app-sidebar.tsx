@@ -53,7 +53,7 @@ import { getTierKey } from "@/lib/constants";
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { user, isGuest, isAuthenticated } = useAuth();
+  const { user, isGuest, isAuthenticated, logout } = useAuth();
   const { data: profile } = useQuery<UserProfile>({
     queryKey: ["/api/profile"],
   });
@@ -193,11 +193,14 @@ export function AppSidebar() {
             </p>
           </div>
           {isAuthenticated && (
-            <a href="/api/logout">
-              <Button size="icon" variant="ghost" data-testid="button-logout">
-                <LogOut className="w-4 h-4" />
-              </Button>
-            </a>
+            <Button
+              size="icon"
+              variant="ghost"
+              data-testid="button-logout"
+              onClick={() => logout()}
+            >
+              <LogOut className="w-4 h-4" />
+            </Button>
           )}
         </div>
       </SidebarFooter>
