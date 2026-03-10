@@ -14,7 +14,7 @@
  * - Eye toggle has 180ms fade+scale animation with subtle icon rotation
  * - Monthly chart aggregates daily data into ~4 weekly groups
  */
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, memo, useMemo } from "react";
 import { playSound } from "@/hooks/use-sound";
 import { API_URL } from "@/lib/api";
 import { Link } from "wouter";
@@ -147,7 +147,7 @@ function useAmountVisibility() {
 // Shows daily savings suggestion based on active goals + spending patterns.
 // Dismissed state stored in localStorage with date-based key.
 // Data from /api/smart-save endpoint.
-function SmartSaveAlert({ t }: { t: any }) {
+const SmartSaveAlert = memo(function SmartSaveAlert({ t }: { t: any }) {
   const today = new Date().toISOString().slice(0, 10);
   const storageKey = `fr_smart_save_dismissed_${today}`;
 
@@ -195,7 +195,7 @@ function SmartSaveAlert({ t }: { t: any }) {
       </Button>
     </div>
   );
-}
+});
 
 // === MONTHLY→WEEKLY AGGREGATION ===
 // When period=monthly, the API returns daily breakdown (30 bars).
@@ -221,7 +221,7 @@ function aggregateMonthlyToWeeks(breakdown: { label: string; amount: number }[])
 // Shows: total expense, % change vs previous period, bar chart, top categories.
 // Data from /api/spending-insight?period=weekly|monthly
 // Chart: 200px height, green gradient bars, hover tooltip with exact amount.
-function SpendingInsightSection({ t }: { t: any }) {
+const SpendingInsightSection = memo(function SpendingInsightSection({ t }: { t: any }) {
   const [period, setPeriod] = useState<"weekly" | "monthly">("weekly");
 
   const { data: insight, isLoading, isError } = useQuery<SpendingInsightData>({
@@ -385,7 +385,7 @@ function SpendingInsightSection({ t }: { t: any }) {
       </CardContent>
     </Card>
   );
-}
+});
 
 type ActionType = "income" | "expense" | "transfer" | "savings" | "debt_payment" | "no_spend";
 export type { ActionType };
@@ -1607,6 +1607,20 @@ export default function Dashboard() {
     },
   });
 
+  const xpInfo = useMemo(() => getXpForNextLevel(profile?.xp ?? 0), [profile?.xp]);
+  const streak = profile?.streakCount ?? 0;
+  const level = profile?.level ?? 1;
+  const goalPct = useMemo(() => Math.min(Math.round(dashboard?.goalProgress ?? 0), 100), [dashboard?.goalProgress]);
+
+  const focusLabels: Record<string, string> = useMemo(() => ({
+    log_transaction: t.dashboard.focusLogTransaction,
+    save_money: t.dashboard.focusSaveMoney,
+    check_debt_health: t.dashboard.focusCheckDebtHealth,
+    review_goals: t.dashboard.focusReviewGoals,
+  }), [t]);
+  const completedCount = useMemo(() => focusList.filter(f => f.completed).length, [focusList]);
+  const totalXp = useMemo(() => focusList.reduce((s, f) => s + f.rewardXp, 0), [focusList]);
+
   const isLoading = profileLoading || dashLoading;
 
   if (isLoading) {
@@ -1622,20 +1636,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  const xpInfo = getXpForNextLevel(profile?.xp ?? 0);
-  const streak = profile?.streakCount ?? 0;
-  const level = profile?.level ?? 1;
-  const goalPct = Math.min(Math.round(dashboard?.goalProgress ?? 0), 100);
-
-  const focusLabels: Record<string, string> = {
-    log_transaction: t.dashboard.focusLogTransaction,
-    save_money: t.dashboard.focusSaveMoney,
-    check_debt_health: t.dashboard.focusCheckDebtHealth,
-    review_goals: t.dashboard.focusReviewGoals,
-  };
-  const completedCount = focusList.filter(f => f.completed).length;
-  const totalXp = focusList.reduce((s, f) => s + f.rewardXp, 0);
 
   return (
     <div className="p-4 sm:p-6 space-y-3 max-w-3xl mx-auto pb-2">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,21 +10,22 @@ import { LanguageProvider } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import Dashboard from "@/pages/dashboard";
-import Accounts from "@/pages/accounts";
-import Transactions from "@/pages/transactions";
-import Goals from "@/pages/goals";
-import DebtHealth from "@/pages/debt-health";
-import BudgetPage from "@/pages/budget";
-import NetWorth from "@/pages/net-worth";
-import Achievements from "@/pages/achievements";
-import ScorePage from "@/features/score/score-page";
-import Admin from "@/pages/admin";
-import ProfilePage from "@/pages/profile";
 import NotFound from "@/pages/not-found";
 import { MobileBottomNav } from "@/components/mobile-nav";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+
+const Accounts = lazy(() => import("@/pages/accounts"));
+const Transactions = lazy(() => import("@/pages/transactions"));
+const Goals = lazy(() => import("@/pages/goals"));
+const DebtHealth = lazy(() => import("@/pages/debt-health"));
+const BudgetPage = lazy(() => import("@/pages/budget"));
+const NetWorth = lazy(() => import("@/pages/net-worth"));
+const Achievements = lazy(() => import("@/pages/achievements"));
+const ScorePage = lazy(() => import("@/features/score/score-page"));
+const Admin = lazy(() => import("@/pages/admin"));
+const ProfilePage = lazy(() => import("@/pages/profile"));
 
 function useNavPlusHandler() {
   const [location, setLocation] = useLocation();
@@ -65,20 +66,22 @@ function AuthenticatedLayout() {
             <ThemeToggle />
           </header>
           <main className="flex-1 overflow-auto pb-20 md:pb-0">
-            <Switch>
-              <Route path="/" component={Dashboard} />
-              <Route path="/accounts" component={Accounts} />
-              <Route path="/transactions" component={Transactions} />
-              <Route path="/goals" component={Goals} />
-              <Route path="/budget" component={BudgetPage} />
-              <Route path="/debt" component={DebtHealth} />
-              <Route path="/networth" component={NetWorth} />
-              <Route path="/achievements" component={Achievements} />
-              <Route path="/score" component={ScorePage} />
-              <Route path="/admin" component={Admin} />
-              <Route path="/profile" component={ProfilePage} />
-              <Route component={NotFound} />
-            </Switch>
+            <Suspense fallback={<div className="flex items-center justify-center p-8"><Skeleton className="h-8 w-32" /></div>}>
+              <Switch>
+                <Route path="/" component={Dashboard} />
+                <Route path="/accounts" component={Accounts} />
+                <Route path="/transactions" component={Transactions} />
+                <Route path="/goals" component={Goals} />
+                <Route path="/budget" component={BudgetPage} />
+                <Route path="/debt" component={DebtHealth} />
+                <Route path="/networth" component={NetWorth} />
+                <Route path="/achievements" component={Achievements} />
+                <Route path="/score" component={ScorePage} />
+                <Route path="/admin" component={Admin} />
+                <Route path="/profile" component={ProfilePage} />
+                <Route component={NotFound} />
+              </Switch>
+            </Suspense>
           </main>
         </div>
         <MobileBottomNav onPlusClick={handlePlusClick} />

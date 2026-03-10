@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { log, requestLogger } from "./middleware/logger";
 
@@ -40,12 +41,17 @@ app.use(
   })
 );
 
+app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(requestLogger);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
+});
+
+app.get("/api/health", (_req, res) => {
+  res.json({ status: "ok", service: "financialradar-api" });
 });
 
 (async () => {
