@@ -1,5 +1,6 @@
 import * as React from "react"
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog"
+import { useKeyboardOffset } from "@/hooks/use-keyboard-offset"
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
@@ -61,26 +62,36 @@ AlertDialogOverlayBlur.displayName = "AlertDialogOverlayBlur"
 const AlertDialogContentBottomSheet = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content>
->(({ className, ...props }, ref) => (
-  <AlertDialogPortal>
-    <AlertDialogOverlayBlur />
-    <AlertDialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed z-50 bg-background shadow-lg duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out",
-        "md:left-[50%] md:top-[50%] md:max-w-sm md:translate-x-[-50%] md:translate-y-[-50%] md:rounded-xl md:border md:w-full md:p-6",
-        "md:data-[state=closed]:fade-out-0 md:data-[state=open]:fade-in-0 md:data-[state=closed]:zoom-out-95 md:data-[state=open]:zoom-in-95 md:data-[state=closed]:slide-out-to-left-1/2 md:data-[state=closed]:slide-out-to-top-[48%] md:data-[state=open]:slide-in-from-left-1/2 md:data-[state=open]:slide-in-from-top-[48%]",
-        "max-md:bottom-0 max-md:left-0 max-md:right-0 max-md:w-full max-md:rounded-t-[24px] max-md:p-6 max-md:pb-8",
-        "max-md:data-[state=closed]:fade-out-0 max-md:data-[state=open]:fade-in-0 max-md:data-[state=closed]:slide-out-to-bottom max-md:data-[state=open]:slide-in-from-bottom",
-        className
-      )}
-      {...props}
-    >
-      <div className="md:hidden w-10 h-1 rounded-full bg-muted-foreground/25 mx-auto -mt-1 mb-4" />
-      {props.children}
-    </AlertDialogPrimitive.Content>
-  </AlertDialogPortal>
-))
+>(({ className, style, ...props }, ref) => {
+  const keyboardOffset = useKeyboardOffset();
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+  const kbStyle = isMobile && keyboardOffset > 0
+    ? { ...style, bottom: `${keyboardOffset}px` }
+    : style;
+
+  return (
+    <AlertDialogPortal>
+      <AlertDialogOverlayBlur />
+      <AlertDialogPrimitive.Content
+        ref={ref}
+        style={kbStyle}
+        className={cn(
+          "fixed z-50 bg-background shadow-lg duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "md:left-[50%] md:top-[50%] md:max-w-sm md:translate-x-[-50%] md:translate-y-[-50%] md:rounded-xl md:border md:w-full md:p-6",
+          "md:data-[state=closed]:fade-out-0 md:data-[state=open]:fade-in-0 md:data-[state=closed]:zoom-out-95 md:data-[state=open]:zoom-in-95 md:data-[state=closed]:slide-out-to-left-1/2 md:data-[state=closed]:slide-out-to-top-[48%] md:data-[state=open]:slide-in-from-left-1/2 md:data-[state=open]:slide-in-from-top-[48%]",
+          "max-md:bottom-0 max-md:left-0 max-md:right-0 max-md:w-full max-md:rounded-t-[24px] max-md:p-6 max-md:pb-8",
+          "max-md:data-[state=closed]:fade-out-0 max-md:data-[state=open]:fade-in-0 max-md:data-[state=closed]:slide-out-to-bottom max-md:data-[state=open]:slide-in-from-bottom",
+          "max-md:transition-[bottom] max-md:duration-200",
+          className
+        )}
+        {...props}
+      >
+        <div className="md:hidden w-10 h-1 rounded-full bg-muted-foreground/25 mx-auto -mt-1 mb-4" />
+        {props.children}
+      </AlertDialogPrimitive.Content>
+    </AlertDialogPortal>
+  );
+})
 AlertDialogContentBottomSheet.displayName = "AlertDialogContentBottomSheet"
 
 const AlertDialogHeader = ({

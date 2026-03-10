@@ -3,6 +3,7 @@
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
+import { useKeyboardOffset } from "@/hooks/use-keyboard-offset"
 
 import { cn } from "@/lib/utils"
 
@@ -71,30 +72,40 @@ DialogContent.displayName = DialogPrimitive.Content.displayName
 const DialogContentBottomSheet = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlayBlur />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed z-50 bg-background shadow-lg duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out",
-        "md:left-[50%] md:top-[50%] md:max-w-lg md:translate-x-[-50%] md:translate-y-[-50%] md:rounded-lg md:border md:w-full md:max-h-[90vh] md:overflow-hidden md:grid md:gap-4 md:p-6",
-        "md:data-[state=closed]:fade-out-0 md:data-[state=open]:fade-in-0 md:data-[state=closed]:zoom-out-95 md:data-[state=open]:zoom-in-95 md:data-[state=closed]:slide-out-to-left-1/2 md:data-[state=closed]:slide-out-to-top-[48%] md:data-[state=open]:slide-in-from-left-1/2 md:data-[state=open]:slide-in-from-top-[48%]",
-        "max-md:bottom-0 max-md:left-0 max-md:right-0 max-md:w-full max-md:rounded-t-[24px] max-md:max-h-[80vh] max-md:flex max-md:flex-col max-md:overflow-hidden",
-        "max-md:data-[state=closed]:fade-out-0 max-md:data-[state=open]:fade-in-0 max-md:data-[state=closed]:slide-out-to-bottom max-md:data-[state=open]:slide-in-from-bottom",
-        className
-      )}
-      {...props}
-    >
-      <div className="md:hidden w-10 h-1 rounded-full bg-muted-foreground/25 mx-auto mt-2 mb-0.5 shrink-0" />
-      {children}
-      <DialogPrimitive.Close className="max-md:hidden absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </DialogPortal>
-))
+>(({ className, children, style, ...props }, ref) => {
+  const keyboardOffset = useKeyboardOffset();
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+  const kbStyle = isMobile && keyboardOffset > 0
+    ? { ...style, bottom: `${keyboardOffset}px` }
+    : style;
+
+  return (
+    <DialogPortal>
+      <DialogOverlayBlur />
+      <DialogPrimitive.Content
+        ref={ref}
+        style={kbStyle}
+        className={cn(
+          "fixed z-50 bg-background shadow-lg duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "md:left-[50%] md:top-[50%] md:max-w-lg md:translate-x-[-50%] md:translate-y-[-50%] md:rounded-lg md:border md:w-full md:max-h-[90vh] md:overflow-hidden md:grid md:gap-4 md:p-6",
+          "md:data-[state=closed]:fade-out-0 md:data-[state=open]:fade-in-0 md:data-[state=closed]:zoom-out-95 md:data-[state=open]:zoom-in-95 md:data-[state=closed]:slide-out-to-left-1/2 md:data-[state=closed]:slide-out-to-top-[48%] md:data-[state=open]:slide-in-from-left-1/2 md:data-[state=open]:slide-in-from-top-[48%]",
+          "max-md:bottom-0 max-md:left-0 max-md:right-0 max-md:w-full max-md:rounded-t-[24px] max-md:max-h-[80vh] max-md:flex max-md:flex-col max-md:overflow-hidden",
+          "max-md:data-[state=closed]:fade-out-0 max-md:data-[state=open]:fade-in-0 max-md:data-[state=closed]:slide-out-to-bottom max-md:data-[state=open]:slide-in-from-bottom",
+          "max-md:transition-[bottom] max-md:duration-200",
+          className
+        )}
+        {...props}
+      >
+        <div className="md:hidden w-10 h-1 rounded-full bg-muted-foreground/25 mx-auto mt-2 mb-0.5 shrink-0" />
+        {children}
+        <DialogPrimitive.Close className="max-md:hidden absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  );
+})
 DialogContentBottomSheet.displayName = "DialogContentBottomSheet"
 
 const DialogHeader = ({
