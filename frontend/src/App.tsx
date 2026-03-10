@@ -120,6 +120,11 @@ function AppContent() {
       return;
     }
 
+    if (!navigator.onLine) {
+      setReady(true);
+      return;
+    }
+
     if (!guestLoginCalled.current) {
       guestLoginCalled.current = true;
       apiRequest("POST", "/api/guest-login", {})

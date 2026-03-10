@@ -1,4 +1,4 @@
-import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { QueryClient, QueryFunction, onlineManager } from "@tanstack/react-query";
 
 const API_BASE = (import.meta.env.VITE_API_URL as string) ?? "";
 
@@ -47,13 +47,25 @@ export const getQueryFn: <T>(options: {
     return await res.json();
   };
 
+onlineManager.setEventListener((setOnline) => {
+  const onlineHandler = () => setOnline(true);
+  const offlineHandler = () => setOnline(false);
+  window.addEventListener("online", onlineHandler);
+  window.addEventListener("offline", offlineHandler);
+  return () => {
+    window.removeEventListener("online", onlineHandler);
+    window.removeEventListener("offline", offlineHandler);
+  };
+});
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      staleTime: 60000,
+      gcTime: 300000,
       retry: false,
     },
     mutations: {

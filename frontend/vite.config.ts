@@ -33,9 +33,29 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /\/api\/(auth|profile|session).*/i,
+            urlPattern: /\.(?:js|css|png|jpg|jpeg|svg|woff2|ico)$/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "static-assets-cache",
+              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            urlPattern: /\/api\/(auth|profile|session|login|guest-login|logout).*/i,
             handler: "NetworkOnly",
             options: {
+              fetchOptions: { credentials: "include" },
+            },
+          },
+          {
+            urlPattern: /\/api\/(dashboard|transactions|goals|budget|accounts|daily-focus|badges|finance-score|spending-insight|smart-save|debt-health|net-worth).*/i,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "api-data-cache",
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+              networkTimeoutSeconds: 5,
               fetchOptions: { credentials: "include" },
             },
           },
@@ -43,10 +63,10 @@ export default defineConfig({
             urlPattern: /\/api\/.*/i,
             handler: "NetworkFirst",
             options: {
-              cacheName: "api-cache",
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 5 },
+              cacheName: "api-other-cache",
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 30 },
               cacheableResponse: { statuses: [0, 200] },
-              networkTimeoutSeconds: 10,
+              networkTimeoutSeconds: 5,
               fetchOptions: { credentials: "include" },
             },
           },
