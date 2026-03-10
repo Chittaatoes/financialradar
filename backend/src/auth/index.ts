@@ -116,7 +116,6 @@ export async function setupAuth(app: Express) {
 
   const isProduction = process.env.NODE_ENV === "production";
   const isHttps = isProduction || !!process.env.REPLIT_DEV_DOMAIN;
-  const isCrossOrigin = isProduction && !!process.env.FRONTEND_URL;
 
   app.use(
     session({
@@ -129,7 +128,7 @@ export async function setupAuth(app: Express) {
       cookie: {
         secure: isHttps,
         httpOnly: true,
-        sameSite: isCrossOrigin ? "none" : "lax",
+        sameSite: "lax",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       },
     })
