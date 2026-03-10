@@ -24,25 +24,30 @@ ToastViewport.displayName = ToastPrimitives.Viewport.displayName
 
 const toastVariants = cva(
   [
-    "group pointer-events-auto relative flex items-start gap-3 overflow-hidden",
-    "w-full rounded-2xl px-4 py-3 pr-9 shadow-xl",
+    "group pointer-events-auto relative flex items-center gap-3 overflow-hidden",
+    "w-full rounded-2xl px-4 py-3 pr-10 shadow-xl",
     "transition-all duration-300",
     "data-[state=open]:animate-in data-[state=closed]:animate-out",
     "data-[state=closed]:fade-out-80 data-[state=closed]:zoom-out-95",
+    "data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)]",
+    "data-[swipe=cancel]:translate-x-0 data-[swipe=cancel]:transition-transform",
+    "data-[swipe=end]:animate-out data-[swipe=end]:fade-out-80",
+    "data-[swipe-direction=right]:data-[swipe=end]:slide-out-to-right-full",
+    "data-[swipe-direction=left]:data-[swipe=end]:slide-out-to-left-full",
   ].join(" "),
   {
     variants: {
       variant: {
         default:
-          "bg-card/95 dark:bg-card/95 border border-border/30 text-foreground backdrop-blur-md data-[state=open]:slide-in-from-bottom-4 data-[state=open]:fade-in-0",
+          "bg-card/95 dark:bg-card/95 border border-border/30 text-foreground backdrop-blur-md data-[state=open]:slide-in-from-top-4 data-[state=open]:fade-in-0",
         destructive:
           "bg-card/95 dark:bg-card/95 border border-border/30 text-foreground backdrop-blur-md data-[state=open]:slide-in-from-top-4 data-[state=open]:fade-in-0",
         success:
-          "bg-card/95 dark:bg-card/95 border border-border/30 text-foreground backdrop-blur-md data-[state=open]:slide-in-from-bottom-4 data-[state=open]:fade-in-0",
+          "bg-card/95 dark:bg-card/95 border border-border/30 text-foreground backdrop-blur-md data-[state=open]:slide-in-from-top-4 data-[state=open]:fade-in-0",
         warning:
-          "bg-card/95 dark:bg-card/95 border border-border/30 text-foreground backdrop-blur-md data-[state=open]:slide-in-from-bottom-4 data-[state=open]:fade-in-0",
+          "bg-card/95 dark:bg-card/95 border border-border/30 text-foreground backdrop-blur-md data-[state=open]:slide-in-from-top-4 data-[state=open]:fade-in-0",
         radar:
-          "bg-card/95 dark:bg-card/95 border border-border/30 text-foreground backdrop-blur-md data-[state=open]:slide-in-from-bottom-4 data-[state=open]:fade-in-0",
+          "bg-card/95 dark:bg-card/95 border border-border/30 text-foreground backdrop-blur-md data-[state=open]:slide-in-from-top-4 data-[state=open]:fade-in-0",
       },
     },
     defaultVariants: {
@@ -88,13 +93,13 @@ const ToastClose = React.forwardRef<
   <ToastPrimitives.Close
     ref={ref}
     className={cn(
-      "absolute right-2.5 top-2.5 rounded-full p-0.5 opacity-60 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none",
+      "absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1.5 opacity-70 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none active:opacity-100",
       className
     )}
     toast-close=""
     {...props}
   >
-    <X className="h-3.5 w-3.5" />
+    <X className="h-4 w-4" strokeWidth={2.5} />
   </ToastPrimitives.Close>
 ))
 ToastClose.displayName = ToastPrimitives.Close.displayName
@@ -105,7 +110,7 @@ const ToastTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Title
     ref={ref}
-    className={cn("text-sm font-semibold leading-snug", className)}
+    className={cn("text-sm font-semibold leading-snug whitespace-nowrap", className)}
     {...props}
   />
 ))
