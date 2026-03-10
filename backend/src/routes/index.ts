@@ -190,12 +190,14 @@ export async function registerRoutes(
         } else if (val === "positive_net_worth") {
           const accts = await storage.getAccountsByUser(userId);
           const libs = await storage.getLiabilitiesByUser(userId);
-          const totalAssets = accts.reduce((s: number, a: any) => s + Number(a.balance), 0);
+          const goals = await storage.getGoalsByUser(userId);
+          const totalAssets = accts.reduce((s: number, a: any) => s + Number(a.balance), 0) + goals.reduce((s: number, g: any) => s + Number(g.currentAmount), 0);
           const totalLiab = libs.reduce((s: number, l: any) => s + Number(l.amount || 0), 0);
           shouldAward = totalAssets > totalLiab && totalAssets > 0;
         } else if (val === "assets_10m") {
           const accts = await storage.getAccountsByUser(userId);
-          const totalAssets = accts.reduce((s: number, a: any) => s + Number(a.balance), 0);
+          const goals = await storage.getGoalsByUser(userId);
+          const totalAssets = accts.reduce((s: number, a: any) => s + Number(a.balance), 0) + goals.reduce((s: number, g: any) => s + Number(g.currentAmount), 0);
           shouldAward = totalAssets >= 10000000;
         } else if (val === "no_spend_5") {
           const streakHistory = await storage.getStreakLogs(userId);
@@ -300,10 +302,10 @@ export async function registerRoutes(
       const totalCash = accts.filter(a => a.type === "cash").reduce((s, a) => s + parseFloat(String(a.balance)), 0);
       const totalBank = accts.filter(a => a.type === "bank").reduce((s, a) => s + parseFloat(String(a.balance)), 0);
       const totalEwallet = accts.filter(a => a.type === "ewallet").reduce((s, a) => s + parseFloat(String(a.balance)), 0);
-      const totalAssets = totalCash + totalBank + totalEwallet;
 
       const activeGoals = allGoals.filter(g => parseFloat(String(g.currentAmount)) < parseFloat(String(g.targetAmount)));
       const totalSaving = allGoals.reduce((s, g) => s + parseFloat(String(g.currentAmount)), 0);
+      const totalAssets = totalCash + totalBank + totalEwallet + totalSaving;
       const totalTarget = allGoals.reduce((s, g) => s + parseFloat(String(g.targetAmount)), 0);
       const goalProgress = totalTarget > 0 ? Math.min((totalSaving / totalTarget) * 100, 100) : 0;
 
@@ -848,8 +850,11 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
       const accts = await storage.getAccountsByUser(userId);
       const liabs = await storage.getLiabilitiesByUser(userId);
       const profile = await storage.getProfile(userId);
+      const goals = await storage.getGoalsByUser(userId);
 
-      const totalAssets = accts.reduce((s, a) => s + parseFloat(String(a.balance)), 0);
+      const accountsTotal = accts.reduce((s, a) => s + parseFloat(String(a.balance)), 0);
+      const savingsTotal = goals.reduce((s, g) => s + parseFloat(String(g.currentAmount)), 0);
+      const totalAssets = accountsTotal + savingsTotal;
       const totalLiabilities = liabs.reduce((s, l) => {
         if (l.monthlyPayment && l.remainingMonths) {
           return s + parseFloat(String(l.monthlyPayment)) * l.remainingMonths;
@@ -909,8 +914,11 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
       const userId = getUserId(req);
       const accts = await storage.getAccountsByUser(userId);
       const liabs = await storage.getLiabilitiesByUser(userId);
+      const goals = await storage.getGoalsByUser(userId);
 
-      const currentTotalAssets = accts.reduce((s, a) => s + parseFloat(String(a.balance)), 0);
+      const accountsTotal = accts.reduce((s, a) => s + parseFloat(String(a.balance)), 0);
+      const savingsTotal = goals.reduce((s, g) => s + parseFloat(String(g.currentAmount)), 0);
+      const currentTotalAssets = accountsTotal + savingsTotal;
       const totalLiabilities = liabs.reduce((s, l) => {
         if (l.monthlyPayment && l.remainingMonths) {
           return s + parseFloat(String(l.monthlyPayment)) * l.remainingMonths;
