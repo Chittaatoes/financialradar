@@ -30,6 +30,8 @@ app.use(
         /\.replit\.dev$/.test(origin) ||
         /\.repl\.co$/.test(origin) ||
         /\.replit\.app$/.test(origin) ||
+        /\.vercel\.app$/.test(origin) ||
+        /\.onrender\.com$/.test(origin) ||
         /^https?:\/\/localhost(:\d+)?$/.test(origin);
       if (isAllowed) return callback(null, true);
       return callback(new Error("Not allowed by CORS"));

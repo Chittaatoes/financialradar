@@ -18,13 +18,13 @@ function getBaseUrl(req: Request): string {
 }
 
 function getFrontendUrl(req: Request): string {
+  if (process.env.FRONTEND_URL) return process.env.FRONTEND_URL;
   const forwardedHost = req.get("x-forwarded-host");
   if (forwardedHost) {
     const host = forwardedHost.split(",")[0].trim();
     const proto = (req.get("x-forwarded-proto") || "https").split(",")[0].trim();
     return `${proto}://${host}`;
   }
-  if (process.env.FRONTEND_URL) return process.env.FRONTEND_URL;
   if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
   return "http://localhost:5000";
 }
@@ -116,6 +116,7 @@ export async function setupAuth(app: Express) {
 
   const isProduction = process.env.NODE_ENV === "production";
   const isHttps = isProduction || !!process.env.REPLIT_DEV_DOMAIN;
+  const isCrossOrigin = isProduction && !!process.env.FRONTEND_URL;
 
   app.use(
     session({
@@ -128,7 +129,7 @@ export async function setupAuth(app: Express) {
       cookie: {
         secure: isHttps,
         httpOnly: true,
-        sameSite: "lax",
+        sameSite: isCrossOrigin ? "none" : "lax",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       },
     })
