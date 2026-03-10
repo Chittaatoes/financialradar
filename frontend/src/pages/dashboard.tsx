@@ -16,6 +16,7 @@
  */
 import { useState, useCallback, useRef, useEffect } from "react";
 import { playSound } from "@/hooks/use-sound";
+import { API_URL } from "@/lib/api";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -570,7 +571,7 @@ function TransactionForm({
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
         toast({ title: "Unauthorized", description: "Logging in again...", variant: "destructive" });
-        setTimeout(() => { window.location.href = "https://financialradars-api.onrender.com/api/login"; }, 500);
+        setTimeout(() => { window.location.href = `${API_URL}/api/login`; }, 500);
         return;
       }
       toast({ title: t.common.error, description: error.message, variant: "destructive" });
@@ -843,7 +844,7 @@ function SavingsForm({ onClose, t }: { onClose: () => void; t: any }) {
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
         toast({ title: "Unauthorized", description: "Logging in again...", variant: "destructive" });
-        setTimeout(() => { window.location.href = "https://financialradars-api.onrender.com/api/login"; }, 500);
+        setTimeout(() => { window.location.href = `${API_URL}/api/login`; }, 500);
         return;
       }
       toast({ title: t.common.error, description: error.message, variant: "destructive" });
@@ -1030,7 +1031,7 @@ function DebtPaymentForm({ onClose, t }: { onClose: () => void; t: any }) {
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
         toast({ title: "Unauthorized", description: "Logging in again...", variant: "destructive" });
-        setTimeout(() => { window.location.href = "https://financialradars-api.onrender.com/api/login"; }, 500);
+        setTimeout(() => { window.location.href = `${API_URL}/api/login`; }, 500);
         return;
       }
       toast({ title: t.common.error, description: error.message, variant: "destructive" });
@@ -1599,7 +1600,7 @@ export default function Dashboard() {
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
         toast({ title: "Unauthorized", description: "Logging in again...", variant: "destructive" });
-        setTimeout(() => { window.location.href = "https://financialradars-api.onrender.com/api/login"; }, 500);
+        setTimeout(() => { window.location.href = `${API_URL}/api/login`; }, 500);
         return;
       }
       toast({ title: t.common.error, description: error.message, variant: "destructive" });
