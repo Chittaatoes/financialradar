@@ -269,6 +269,19 @@ export default function Accounts() {
 
   const hasAccounts = !isLoading && accounts && accounts.length > 0;
 
+  // Helper to group accounts by type
+  const groupedAccounts = accounts ? {
+    bank: accounts.filter(a => a.type === "bank"),
+    ewallet: accounts.filter(a => a.type === "ewallet"),
+    cash: accounts.filter(a => a.type === "cash"),
+  } : { bank: [], ewallet: [], cash: [] };
+
+  const accountTypeLabels = {
+    bank: "Rekening",
+    ewallet: "E-Wallet",
+    cash: "Tunai",
+  };
+
   if (isLoading) {
     return (
       <div className="p-4 sm:p-6 space-y-4 max-w-4xl mx-auto">
@@ -338,78 +351,91 @@ export default function Accounts() {
             </Button>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {accounts!.map((account) => {
-              const Icon = typeIcons[account.type as keyof typeof typeIcons] || Wallet;
-              const { bg, text } = getColorClasses((account as any).color);
-              return (
-                <Card key={account.id} className="hover-elevate transition-all duration-200" data-testid={`card-account-${account.id}`}>
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${bg} ${text}`}>
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        <div className="min-w-0 flex items-center gap-1.5">
-                          <p className="text-sm font-semibold truncate">{account.name}</p>
-                          <button
-                            type="button"
-                            onClick={() => setSettingsAccount(account)}
-                            className="shrink-0 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-                            title={t.accounts.settingsTitle}
-                          >
-                            <SlidersHorizontal className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-0.5 shrink-0">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => { setEditAccount(account); setDialogOpen(true); }}
-                          data-testid={`button-edit-account-${account.id}`}
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="icon" variant="ghost" data-testid={`button-delete-account-${account.id}`}>
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContentBottomSheet>
-                            <AlertDialogHeader className="text-center md:text-left mb-4">
-                              <AlertDialogTitle>{t.accounts.deleteTitle}</AlertDialogTitle>
-                              <AlertDialogDescription>{t.accounts.deleteDesc}</AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter className="flex-col gap-2 sm:flex-col sm:gap-2 sm:space-x-0">
-                              <AlertDialogAction
-                                className="w-full"
-                                onClick={() => deleteMutation.mutate(account.id)}
+          {/* Grouped accounts by type */}
+          {(["bank", "ewallet", "cash"] as const).map((typeKey) => {
+            const typeAccounts = groupedAccounts[typeKey];
+            if (typeAccounts.length === 0) return null;
+
+            return (
+              <div key={typeKey}>
+                <h3 className="text-sm font-semibold mb-2 opacity-75">
+                  {accountTypeLabels[typeKey]}
+                </h3>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {typeAccounts.map((account) => {
+                    const Icon = typeIcons[account.type as keyof typeof typeIcons] || Wallet;
+                    const { bg, text } = getColorClasses((account as any).color);
+                    return (
+                      <Card key={account.id} className="hover-elevate transition-all duration-200" data-testid={`card-account-${account.id}`}>
+                        <CardContent className="p-4 space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${bg} ${text}`}>
+                                <Icon className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0 flex items-center gap-1.5">
+                                <p className="text-sm font-semibold truncate">{account.name}</p>
+                                <button
+                                  type="button"
+                                  onClick={() => setSettingsAccount(account)}
+                                  className="shrink-0 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                                  title={t.accounts.settingsTitle}
+                                >
+                                  <SlidersHorizontal className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => { setEditAccount(account); setDialogOpen(true); }}
+                                data-testid={`button-edit-account-${account.id}`}
                               >
-                                {t.accounts.delete}
-                              </AlertDialogAction>
-                              <AlertDialogCancel className="w-full mt-0 border-0 bg-muted/50 hover:bg-muted">
-                                {t.accounts.cancel}
-                              </AlertDialogCancel>
-                            </AlertDialogFooter>
-                          </AlertDialogContentBottomSheet>
-                        </AlertDialog>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-lg font-bold font-mono" data-testid={`text-balance-${account.id}`}>
-                        {formatCurrency(account.balance)}
-                      </p>
-                      {(account as any).note && (
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{(account as any).note}</p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button size="icon" variant="ghost" data-testid={`button-delete-account-${account.id}`}>
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContentBottomSheet>
+                                  <AlertDialogHeader className="text-center md:text-left mb-4">
+                                    <AlertDialogTitle>{t.accounts.deleteTitle}</AlertDialogTitle>
+                                    <AlertDialogDescription>{t.accounts.deleteDesc}</AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter className="flex-col gap-2 sm:flex-col sm:gap-2 sm:space-x-0">
+                                    <AlertDialogAction
+                                      className="w-full"
+                                      onClick={() => deleteMutation.mutate(account.id)}
+                                    >
+                                      {t.accounts.delete}
+                                    </AlertDialogAction>
+                                    <AlertDialogCancel className="w-full mt-0 border-0 bg-muted/50 hover:bg-muted">
+                                      {t.accounts.cancel}
+                                    </AlertDialogCancel>
+                                  </AlertDialogFooter>
+                                </AlertDialogContentBottomSheet>
+                              </AlertDialog>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-lg font-bold font-mono" data-testid={`text-balance-${account.id}`}>
+                              {formatCurrency(account.balance)}
+                            </p>
+                            {(account as any).note && (
+                              <p className="text-xs text-muted-foreground mt-0.5 truncate">{(account as any).note}</p>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
       ) : (
         /* ── EMPTY STATE ── */
