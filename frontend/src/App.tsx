@@ -1,4 +1,11 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  lazy,
+  Suspense,
+} from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -37,10 +44,14 @@ function useNavPlusHandler() {
     } else if (location !== "/") {
       setLocation("/");
       setTimeout(() => {
-        window.dispatchEvent(new CustomEvent("fr-open-action", { detail: "expense" }));
+        window.dispatchEvent(
+          new CustomEvent("fr-open-action", { detail: "expense" }),
+        );
       }, 300);
     } else {
-      window.dispatchEvent(new CustomEvent("fr-open-action", { detail: "expense" }));
+      window.dispatchEvent(
+        new CustomEvent("fr-open-action", { detail: "expense" }),
+      );
     }
   }, [location, setLocation]);
 
@@ -67,7 +78,13 @@ function AuthenticatedLayout() {
             <ThemeToggle />
           </header>
           <main className="flex-1 overflow-auto pb-20 md:pb-0">
-            <Suspense fallback={<div className="flex items-center justify-center p-8"><Skeleton className="h-8 w-32" /></div>}>
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center p-8">
+                  <Skeleton className="h-8 w-32" />
+                </div>
+              }
+            >
               <Switch>
                 <Route path="/" component={Dashboard} />
                 <Route path="/accounts" component={Accounts} />
@@ -107,9 +124,16 @@ function AppContent() {
       window.history.replaceState({}, "", clean);
       if (loginResult === "success") {
         queryClient.invalidateQueries();
-        toast({ title: "Login berhasil!", description: "Akun Google kamu sudah terhubung." });
+        toast({
+          title: "Login berhasil!",
+          description: "Akun Google kamu sudah terhubung.",
+        });
       } else if (errorResult === "auth_failed") {
-        toast({ title: "Login gagal", description: "Autentikasi Google gagal. Coba lagi.", variant: "destructive" });
+        toast({
+          title: "Login gagal",
+          description: "Autentikasi Google gagal. Coba lagi.",
+          variant: "destructive",
+        });
       }
     }
   }, []);

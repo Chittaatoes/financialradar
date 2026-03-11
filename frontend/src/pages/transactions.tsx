@@ -105,11 +105,11 @@ function AddCategoryDialog({ categoryType, onClose }: { categoryType: string; on
   );
 }
 
-function TransactionForm({ accounts, onClose }: { accounts: Account[]; onClose: () => void }) {
+function TransactionForm({ accounts, onClose, initialTab }: { accounts: Account[]; onClose: () => void; initialTab?: TxTabType }) {
   const { toast } = useToast();
   const { t } = useLanguage();
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
-  const [tabType, setTabType] = useState<TxTabType>("expense");
+  const [tabType, setTabType] = useState<TxTabType>(initialTab || "expense");
 
   const [savGoalId, setSavGoalId] = useState("");
   const [savAmount, setSavAmount] = useState("");
@@ -773,6 +773,8 @@ type TypeFilter = "all" | "income" | "expense" | "transfer";
 
 export default function Transactions() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [actionPickerOpen, setActionPickerOpen] = useState(false);
+  const [selectedAction, setSelectedAction] = useState<TxTabType | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [dateFilter, setDateFilter] = useState<DateFilter>("thisMonth");
@@ -1038,12 +1040,47 @@ export default function Transactions() {
             if (!accounts || accounts.length === 0) {
               setSetupOpen(true);
             } else {
-              setDialogOpen(true);
+              setActionPickerOpen(true);
             }
           }}
         >
           <Plus className="w-4 h-4 mr-2" /> {t.transactions.addTx}
         </Button>
+
+        <Dialog open={actionPickerOpen} onOpenChange={(open) => { if (!open) { setActionPickerOpen(false); setSelectedAction(null); } }}>
+          <DialogContentBottomSheet>
+            <div className="w-10 h-1 rounded-full bg-muted-foreground/20 mx-auto mt-3" />
+            <div className="px-5 pt-4 pb-2">
+              <h3 className="text-base font-serif font-bold">{(t.dashboard as any).addActionTitle}</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">{(t.dashboard as any).addActionDesc}</p>
+            </div>
+            <div className="px-5 pb-6 space-y-1">
+              {TX_TAB_CONFIG.slice(0, 5).map((cfg) => {
+                const Icon = cfg.icon;
+                return (
+                  <button
+                    key={cfg.type}
+                    type="button"
+                    onClick={() => {
+                      setSelectedAction(cfg.type as TxTabType);
+                      setActionPickerOpen(false);
+                      setDialogOpen(true);
+                    }}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors text-left"
+                    data-testid={`tx-action-${cfg.type}`}
+                  >
+                    <div className={cn("w-10 h-10 rounded-full flex items-center justify-center shrink-0", cfg.color)}>
+                      <Icon className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">{(t.dashboard as any)[cfg.labelKey]}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </DialogContentBottomSheet>
+        </Dialog>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContentBottomSheet>
@@ -1051,7 +1088,7 @@ export default function Transactions() {
               <DialogTitle className="text-lg">{t.transactions.dialogTitle}</DialogTitle>
               <DialogDescription>{t.transactions.dialogDesc}</DialogDescription>
             </DialogHeader>
-            <TransactionForm accounts={accounts ?? []} onClose={() => setDialogOpen(false)} />
+            <TransactionForm accounts={accounts ?? []} onClose={() => { setDialogOpen(false); setSelectedAction(null); }} initialTab={selectedAction || undefined} />
           </DialogContentBottomSheet>
         </Dialog>
       </div>

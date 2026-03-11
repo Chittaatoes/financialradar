@@ -94,7 +94,7 @@ export function useAuth() {
         await Promise.all(
           names
             .filter((n) => n.startsWith("api-"))
-            .map((n) => caches.delete(n))
+            .map((n) => caches.delete(n)),
         );
       }
       window.location.href = "/";
