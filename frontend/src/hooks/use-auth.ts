@@ -59,14 +59,15 @@ export function useAuth() {
     queryKey: ["user"],
     queryFn: fetchUser,
     retry: false,
-    staleTime: 0,
+    // staleTime: 0,
+    staleTime: 5 * 60 * 1000,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
 
-  useEffect(() => {
-    refetch();
-  }, []);
+  // useEffect(() => {
+  //   refetch();
+  // }, []);
 
   useEffect(() => {
     if (!user) {

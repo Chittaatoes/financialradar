@@ -1,4 +1,6 @@
 import { QueryClient, QueryFunction, onlineManager } from "@tanstack/react-query";
+import { persistQueryClient } from "@tanstack/react-query-persist-client";
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 
 const API_BASE = (import.meta.env.VITE_API_URL as string) ?? "";
 
@@ -73,3 +75,16 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+if (typeof window !== "undefined") {
+  const persister = createSyncStoragePersister({
+    storage: window.localStorage,
+  });
+
+  persistQueryClient({
+    queryClient,
+    persister,
+    maxAge: 1000 * 60 * 60 * 24,
+  });
+}
+
