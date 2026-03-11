@@ -1889,7 +1889,7 @@ export default function Dashboard() {
               { key: "goals", icon: Target, path: "/goals", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10 dark:bg-amber-500/15" },
               { key: "debt", icon: CreditCard, path: "/debt", color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10 dark:bg-rose-500/15" },
               { key: "asset", icon: TrendingUp, path: "/networth", color: "text-sky-600 dark:text-sky-400", bg: "bg-sky-500/10 dark:bg-sky-500/15" },
-              { key: "reports", icon: LineChart, path: "/score", color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-500/10 dark:bg-violet-500/15" },
+              { key: "reports", icon: LineChart, path: "/reports", color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-500/10 dark:bg-violet-500/15" },
             ].map((item) => {
               const Icon = item.icon;
               const label = (t as any).mainMenu?.[item.key] || item.key;

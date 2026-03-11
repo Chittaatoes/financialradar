@@ -26,6 +26,7 @@ const Achievements = lazy(() => import("@/pages/achievements"));
 const ScorePage = lazy(() => import("@/features/score/score-page"));
 const Admin = lazy(() => import("@/pages/admin"));
 const ProfilePage = lazy(() => import("@/pages/profile"));
+const ReportsPage = lazy(() => import("@/pages/reports"));
 
 function useNavPlusHandler() {
   const [location, setLocation] = useLocation();
@@ -76,6 +77,7 @@ function AuthenticatedLayout() {
                 <Route path="/debt" component={DebtHealth} />
                 <Route path="/networth" component={NetWorth} />
                 <Route path="/achievements" component={Achievements} />
+                <Route path="/reports" component={ReportsPage} />
                 <Route path="/score" component={ScorePage} />
                 <Route path="/admin" component={Admin} />
                 <Route path="/profile" component={ProfilePage} />

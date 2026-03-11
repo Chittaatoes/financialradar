@@ -385,27 +385,6 @@ export default function ProfilePage() {
 
   const insightLinks = [
     {
-      key: "score",
-      icon: BarChart3,
-      title: nt.score,
-      desc: pt.financeScoreDesc,
-      path: "/score",
-    },
-    {
-      key: "debt",
-      icon: Shield,
-      title: nt.debtHealth,
-      desc: pt.debtHealthDesc,
-      path: "/debt",
-    },
-    {
-      key: "networth",
-      icon: TrendingUp,
-      title: nt.netWorth,
-      desc: pt.netWorthDesc,
-      path: "/networth",
-    },
-    {
       key: "achievements",
       icon: Award,
       title: nt.achievements,
