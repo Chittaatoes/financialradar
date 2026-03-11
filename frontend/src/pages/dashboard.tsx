@@ -18,6 +18,43 @@ import { useState, useCallback, useRef, useEffect, memo, useMemo } from "react";
 import { playSound } from "@/hooks/use-sound";
 import { API_URL } from "@/lib/api";
 import { Link } from "wouter";
+
+function getCacheKey(base: string): string | null {
+  try {
+    const uid = sessionStorage.getItem("fr_uid");
+    if (uid) return `${base}_${uid}`;
+  } catch {}
+  return null;
+}
+
+function readCache<T>(base: string): T | undefined {
+  const key = getCacheKey(base);
+  if (!key) return undefined;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) return JSON.parse(raw) as T;
+  } catch {}
+  return undefined;
+}
+
+function writeCache(base: string, data: unknown) {
+  const key = getCacheKey(base);
+  if (!key) return;
+  try { localStorage.setItem(key, JSON.stringify(data)); } catch {}
+}
+
+function useDeferredRender() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if ("requestIdleCallback" in window) {
+      const id = requestIdleCallback(() => setReady(true));
+      return () => cancelIdleCallback(id);
+    }
+    const id = setTimeout(() => setReady(true), 50);
+    return () => clearTimeout(id);
+  }, []);
+  return ready;
+}
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1534,7 +1571,13 @@ export default function Dashboard() {
 
   const { data: profile, isLoading: profileLoading } = useQuery<UserProfile>({
     queryKey: ["/api/profile"],
+    initialData: () => readCache<UserProfile>(PROFILE_CACHE_KEY),
+    initialDataUpdatedAt: 0,
   });
+
+  useEffect(() => {
+    if (profile && !profileLoading) writeCache(PROFILE_CACHE_KEY, profile);
+  }, [profile, profileLoading]);
 
   useEffect(() => {
     if (!profile) return;
@@ -1566,7 +1609,13 @@ export default function Dashboard() {
 
   const { data: dashboard, isLoading: dashLoading } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
+    initialData: () => readCache<DashboardData>(DASH_CACHE_KEY),
+    initialDataUpdatedAt: 0,
   });
+
+  useEffect(() => {
+    if (dashboard && !dashLoading) writeCache(DASH_CACHE_KEY, dashboard);
+  }, [dashboard, dashLoading]);
 
   const { data: rawFocus } = useQuery<DailyFocus[] | DailyFocus>({
     queryKey: ["/api/daily-focus"],
@@ -1620,6 +1669,8 @@ export default function Dashboard() {
   }), [t]);
   const completedCount = useMemo(() => focusList.filter(f => f.completed).length, [focusList]);
   const totalXp = useMemo(() => focusList.reduce((s, f) => s + f.rewardXp, 0), [focusList]);
+
+  const chartsReady = useDeferredRender();
 
   const isLoading = profileLoading || dashLoading;
 
@@ -1902,11 +1953,15 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* 6. Spending Insight */}
-      <SpendingInsightSection t={t} />
+      {/* 6. Spending Insight — deferred to avoid blocking initial paint */}
+      {chartsReady ? <SpendingInsightSection t={t} /> : (
+        <Card><CardContent className="p-5"><Skeleton className="h-[280px]" /></CardContent></Card>
+      )}
 
-      {/* 7. Monthly Activity Calendar */}
-      <MonthlyActivityCalendar />
+      {/* 7. Monthly Activity Calendar — deferred */}
+      {chartsReady ? <MonthlyActivityCalendar /> : (
+        <Card><CardContent className="p-5"><Skeleton className="h-[200px]" /></CardContent></Card>
+      )}
 
       <SetupFirstAccountModal
         open={setupAccountOpen}

@@ -1,6 +1,7 @@
 import { useLocation, Link } from "wouter";
 import { Home, Wallet, Plus, User, ArrowLeftRight } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
+import { prefetchRouteData } from "@/lib/prefetch";
 
 interface MobileBottomNavProps {
   onPlusClick?: () => void;
@@ -28,6 +29,7 @@ export function MobileBottomNav({ onPlusClick }: MobileBottomNavProps) {
         key={item.key}
         href={item.path}
         data-testid={`mobile-nav-${item.key}`}
+        onTouchStart={() => prefetchRouteData(item.path)}
         className={`flex flex-col items-center justify-center gap-0.5 min-w-[64px] py-1.5 transition-colors ${
           isActive ? "text-primary" : "text-muted-foreground"
         }`}

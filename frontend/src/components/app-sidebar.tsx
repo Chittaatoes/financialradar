@@ -50,6 +50,7 @@ import type { UserProfile } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/lib/i18n";
 import { getTierKey } from "@/lib/constants";
+import { prefetchRouteData } from "@/lib/prefetch";
 
 export function AppSidebar() {
   const [location] = useLocation();
@@ -99,7 +100,11 @@ export function AppSidebar() {
                     isActive={location === item.url}
                     data-testid={`link-nav-${item.url.replace("/", "") || "dashboard"}`}
                   >
-                    <Link href={item.url}>
+                    <Link
+                      href={item.url}
+                      onMouseEnter={() => prefetchRouteData(item.url)}
+                      onTouchStart={() => prefetchRouteData(item.url)}
+                    >
                       <item.icon className="w-4 h-4" />
                       <span>{item.title}</span>
                     </Link>
@@ -121,7 +126,11 @@ export function AppSidebar() {
                     isActive={location === item.url}
                     data-testid={`link-nav-${item.url.replace("/", "")}`}
                   >
-                    <Link href={item.url}>
+                    <Link
+                      href={item.url}
+                      onMouseEnter={() => prefetchRouteData(item.url)}
+                      onTouchStart={() => prefetchRouteData(item.url)}
+                    >
                       <item.icon className="w-4 h-4" />
                       <span>{item.title}</span>
                     </Link>

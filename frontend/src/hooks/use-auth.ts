@@ -69,7 +69,11 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
+    if (user && (user as any).id) {
+      try { sessionStorage.setItem("fr_uid", (user as any).id); } catch {}
+    }
     if (!user) {
+      try { sessionStorage.removeItem("fr_uid"); } catch {}
       const staleKeys = ["auth-user", "fr-user", "user"];
       staleKeys.forEach((k) => {
         if (localStorage.getItem(k)) localStorage.removeItem(k);

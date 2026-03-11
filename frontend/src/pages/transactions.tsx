@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { playSound } from "@/hooks/use-sound";
 import { Card, CardContent } from "@/components/ui/card";
@@ -790,6 +790,16 @@ export default function Transactions() {
   const { toast } = useToast();
   const { t, language } = useLanguage();
 
+  const [chartReady, setChartReady] = useState(false);
+  useEffect(() => {
+    if ("requestIdleCallback" in window) {
+      const id = requestIdleCallback(() => setChartReady(true));
+      return () => cancelIdleCallback(id);
+    }
+    const t2 = setTimeout(() => setChartReady(true), 80);
+    return () => clearTimeout(t2);
+  }, []);
+
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
   });
@@ -867,6 +877,45 @@ export default function Transactions() {
     }
     return groups;
   }, [filteredTransactions, t.transactions.today, t.transactions.yesterday]);
+
+  const INITIAL_VISIBLE = 30;
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
+
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE);
+  }, [dateFilter, accountFilter, typeFilter, customStart, customEnd]);
+
+  const visibleTransactions = useMemo(() => {
+    return filteredTransactions.slice(0, visibleCount);
+  }, [filteredTransactions, visibleCount]);
+
+  const visibleGrouped = useMemo(() => {
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    const yesterdayStr = format(subDays(new Date(), 1), "yyyy-MM-dd");
+    const groups: { dateKey: string; label: string; totalExpense: number; transactions: Transaction[] }[] = [];
+    const seen: Record<string, number> = {};
+    for (const tx of visibleTransactions) {
+      if (seen[tx.date] === undefined) {
+        seen[tx.date] = groups.length;
+        let label = tx.date;
+        if (tx.date === todayStr) label = t.transactions.today.toUpperCase();
+        else if (tx.date === yesterdayStr) label = t.transactions.yesterday.toUpperCase();
+        else {
+          try { label = format(parseISO(tx.date), "d MMM yyyy"); } catch { label = tx.date; }
+        }
+        groups.push({ dateKey: tx.date, label, totalExpense: 0, transactions: [] });
+      }
+      const g = groups[seen[tx.date]];
+      if (tx.type === "expense") g.totalExpense += parseFloat(String(tx.amount));
+      g.transactions.push(tx);
+    }
+    return groups;
+  }, [visibleTransactions, t.transactions.today, t.transactions.yesterday]);
+
+  const hasMore = filteredTransactions.length > visibleCount;
+  const loadMore = useCallback(() => {
+    setVisibleCount((prev) => prev + INITIAL_VISIBLE);
+  }, []);
 
   const activeChartType: "expense" | "income" | "transfer" = typeFilter === "income" ? "income" : typeFilter === "transfer" ? "transfer" : "expense";
 
@@ -1187,7 +1236,11 @@ export default function Transactions() {
       <Card data-testid="card-spending-chart">
         <CardContent className="p-5">
           <h3 className="font-semibold mb-4">{chartTitle}</h3>
-          <SpendingChart transactions={chartData} t={t} language={language} chartType={activeChartType} />
+          {chartReady ? (
+            <SpendingChart transactions={chartData} t={t} language={language} chartType={activeChartType} />
+          ) : (
+            <Skeleton className="h-[200px]" />
+          )}
         </CardContent>
       </Card>
 
@@ -1201,7 +1254,7 @@ export default function Transactions() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {groupedTransactions.map((group) => (
+          {visibleGrouped.map((group) => (
             <div key={group.dateKey}>
               <div className="flex items-center justify-between px-1 mb-2">
                 <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{group.label}</span>
@@ -1274,6 +1327,15 @@ export default function Transactions() {
               </div>
             </div>
           ))}
+          {hasMore && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={loadMore}
+            >
+              {language === "en" ? `Show more (${filteredTransactions.length - visibleCount} remaining)` : `Tampilkan lagi (${filteredTransactions.length - visibleCount} sisa)`}
+            </Button>
+          )}
         </div>
       )}
     </div>
