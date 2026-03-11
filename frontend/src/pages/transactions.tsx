@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { playSound } from "@/hooks/use-sound";
-import { ActionSelectorSheet } from "@/components/action-selector-sheet";
+import { AddActionDialog } from "@/components/add-action-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -773,9 +773,7 @@ function SpendingChart({
 type TypeFilter = "all" | "income" | "expense" | "transfer";
 
 export default function Transactions() {
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [actionPickerOpen, setActionPickerOpen] = useState(false);
-  const [selectedAction, setSelectedAction] = useState<TxTabType | null>(null);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [dateFilter, setDateFilter] = useState<DateFilter>("thisMonth");
@@ -992,7 +990,7 @@ export default function Transactions() {
       if (!accounts || accounts.length === 0) {
         setSetupOpen(true);
       } else {
-        setActionPickerOpen(true);
+        setQuickAddOpen(true);
       }
     };
     window.addEventListener("fr-open-add-tx", handler);
@@ -1032,7 +1030,7 @@ export default function Transactions() {
         <SetupFirstAccountModal
           open={setupOpen}
           onClose={() => setSetupOpen(false)}
-          onSuccess={() => { setSetupOpen(false); setDialogOpen(true); }}
+          onSuccess={() => { setSetupOpen(false); setQuickAddOpen(true); }}
         />
 
         <Button
@@ -1041,31 +1039,18 @@ export default function Transactions() {
             if (!accounts || accounts.length === 0) {
               setSetupOpen(true);
             } else {
-              setActionPickerOpen(true);
+              setQuickAddOpen(true);
             }
           }}
         >
           <Plus className="w-4 h-4 mr-2" /> {t.transactions.addTx}
         </Button>
 
-        <ActionSelectorSheet
-          open={actionPickerOpen}
-          onClose={() => { setActionPickerOpen(false); setSelectedAction(null); }}
-          onSelectAction={(type) => {
-            setSelectedAction(type as TxTabType);
-            setDialogOpen(true);
-          }}
+        <AddActionDialog
+          open={quickAddOpen}
+          onClose={() => setQuickAddOpen(false)}
+          t={t}
         />
-
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContentBottomSheet>
-            <DialogHeader className="px-6 max-md:px-6 md:px-0 pt-1 md:pt-0">
-              <DialogTitle className="text-lg">{t.transactions.dialogTitle}</DialogTitle>
-              <DialogDescription>{t.transactions.dialogDesc}</DialogDescription>
-            </DialogHeader>
-            <TransactionForm accounts={accounts ?? []} onClose={() => { setDialogOpen(false); setSelectedAction(null); }} initialTab={selectedAction || undefined} />
-          </DialogContentBottomSheet>
-        </Dialog>
       </div>
 
       <div className="grid grid-cols-3 gap-2" data-testid="filter-date-range">
