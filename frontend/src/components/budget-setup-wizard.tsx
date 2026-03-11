@@ -10,14 +10,17 @@ import { formatCurrency } from "@/lib/constants";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CheckCircle, Sparkles, Percent, DollarSign, ChevronLeft } from "lucide-react";
-import { format } from "date-fns";
+import { CheckCircle, Sparkles, Percent, DollarSign, ChevronLeft, CalendarRange, CalendarDays } from "lucide-react";
+import { format, addMonths, parseISO } from "date-fns";
 
 type Strategy = "percentage" | "fixed";
+type CycleType = "monthly" | "custom";
 
 interface WizardState {
   income: string;
   strategy: Strategy;
+  cycleType: CycleType;
+  cycleStartDate: string;
   needsPct: number;
   wantsPct: number;
   savingsPct: number;
@@ -28,7 +31,7 @@ interface WizardState {
   investmentAmt: string;
 }
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 function StepDots({ current, total }: { current: number; total: number }) {
   return (
@@ -337,6 +340,127 @@ function Step3Fixed({
   );
 }
 
+function computeCycleLabel(startDateStr: string): string {
+  try {
+    const start = parseISO(startDateStr);
+    const end = new Date(start.getFullYear(), start.getMonth() + 1, start.getDate() - 1);
+    return `${format(start, "d MMM")} - ${format(end, "d MMM")}`;
+  } catch {
+    return "";
+  }
+}
+
+function Step4Period({
+  state,
+  onChange,
+  onNext,
+  onBack,
+  t,
+}: {
+  state: WizardState;
+  onChange: (v: Partial<WizardState>) => void;
+  onNext: () => void;
+  onBack: () => void;
+  t: any;
+}) {
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const startDate = state.cycleStartDate || todayStr;
+  const cycleLabel = state.cycleType === "custom" ? computeCycleLabel(startDate) : "";
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="text-center">
+        <h2 className="text-xl font-bold">{t.budget.wizardPeriodTitle}</h2>
+        <p className="text-sm text-muted-foreground mt-1">{t.budget.wizardPeriodSubtitle}</p>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={() => onChange({ cycleType: "monthly" })}
+          className={cn(
+            "w-full text-left rounded-2xl border-2 p-4 flex items-center gap-4 transition-all duration-200",
+            state.cycleType === "monthly"
+              ? "border-primary bg-primary/5"
+              : "border-border hover:border-border/80"
+          )}
+          data-testid="wizard-cycle-monthly"
+        >
+          <div className={cn(
+            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+            state.cycleType === "monthly" ? "bg-primary/15" : "bg-muted"
+          )}>
+            <CalendarDays className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t.budget.periodTypeMonthly}</p>
+            <p className="text-sm font-medium mt-0.5">{t.budget.periodTypeMonthlyDesc}</p>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onChange({ cycleType: "custom", cycleStartDate: state.cycleStartDate || todayStr })}
+          className={cn(
+            "w-full text-left rounded-2xl border-2 p-4 flex items-center gap-4 transition-all duration-200",
+            state.cycleType === "custom"
+              ? "border-primary bg-primary/5"
+              : "border-border hover:border-border/80"
+          )}
+          data-testid="wizard-cycle-custom"
+        >
+          <div className={cn(
+            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+            state.cycleType === "custom" ? "bg-primary/15" : "bg-muted"
+          )}>
+            <CalendarRange className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t.budget.periodTypeCustom}</p>
+            <p className="text-sm font-medium mt-0.5">{t.budget.periodTypeCustomDesc}</p>
+          </div>
+        </button>
+      </div>
+
+      {state.cycleType === "custom" && (
+        <div className="flex flex-col gap-3">
+          <div className="rounded-xl border border-border p-4 flex flex-col gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t.budget.periodStartDateLabel}</p>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => onChange({ cycleStartDate: e.target.value })}
+              className="w-full bg-transparent text-sm font-medium text-foreground focus:outline-none"
+              data-testid="wizard-cycle-start-date"
+            />
+          </div>
+
+          {cycleLabel && (
+            <div className="rounded-xl bg-primary/8 border border-primary/20 p-4 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+                <CalendarRange className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t.budget.periodCycleLabel}</p>
+                <p className="text-sm font-bold text-primary mt-0.5">{cycleLabel}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex gap-3">
+        <Button variant="ghost" onClick={onBack} className="flex-1 min-h-[48px]">
+          <ChevronLeft className="w-4 h-4 mr-1" /> {t.budget.back}
+        </Button>
+        <Button onClick={onNext} className="flex-1 min-h-[48px] font-semibold" data-testid="wizard-next-4">
+          {t.budget.nextSummary}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function Step4Confirm({
   state,
   onConfirm,
@@ -398,7 +522,11 @@ function Step4Confirm({
         </div>
         <div className="flex items-center justify-between px-4 py-3">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t.budget.confirmPeriod}</span>
-          <span className="font-medium text-sm">{t.budget.periodMonthly}</span>
+          <span className="font-medium text-sm">
+            {state.cycleType === "custom" && state.cycleStartDate
+              ? computeCycleLabel(state.cycleStartDate)
+              : t.budget.periodMonthly}
+          </span>
         </div>
         {groups.map((g) => (
           <div key={g.key} className="flex items-center justify-between px-4 py-3">
@@ -444,6 +572,8 @@ export function BudgetSetupWizard({ open, onClose, onComplete, defaultIncome }: 
   const [state, setState] = useState<WizardState>({
     income: defaultIncome ? String(defaultIncome) : "",
     strategy: "percentage",
+    cycleType: "monthly",
+    cycleStartDate: format(new Date(), "yyyy-MM-dd"),
     needsPct: 50,
     wantsPct: 25,
     savingsPct: 15,
@@ -471,6 +601,9 @@ export function BudgetSetupWizard({ open, onClose, onComplete, defaultIncome }: 
         savingsAmount = parseFloat(state.savingsAmt) || 0;
         investmentAmount = parseFloat(state.investmentAmt) || 0;
       }
+      const cycleStartDay = state.cycleType === "custom" && state.cycleStartDate
+        ? new Date(state.cycleStartDate).getDate()
+        : 1;
       return apiRequest("POST", "/api/budget-plan", {
         month: currentMonth,
         income,
@@ -479,6 +612,8 @@ export function BudgetSetupWizard({ open, onClose, onComplete, defaultIncome }: 
         wantsAmount,
         savingsAmount,
         investmentAmount,
+        cycleType: state.cycleType,
+        cycleStartDay,
       });
     },
     onSuccess: () => {
@@ -522,10 +657,13 @@ export function BudgetSetupWizard({ open, onClose, onComplete, defaultIncome }: 
             <Step3Fixed state={state} onChange={update} onNext={() => setStep(3)} onBack={() => setStep(1)} t={t} />
           )}
           {step === 3 && (
+            <Step4Period state={state} onChange={update} onNext={() => setStep(4)} onBack={() => setStep(2)} t={t} />
+          )}
+          {step === 4 && (
             <Step4Confirm
               state={state}
               onConfirm={() => confirmMutation.mutate()}
-              onBack={() => setStep(2)}
+              onBack={() => setStep(3)}
               isPending={confirmMutation.isPending}
               t={t}
             />

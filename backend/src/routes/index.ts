@@ -1341,10 +1341,30 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
       const allocations = await storage.getBudgetAllocationsByMonth(userId, month);
       const totalAllocated = allocations.reduce((s, a) => s + Number(a.budgetLimit), 0);
 
-      const monthStart = `${month}-01`;
-      const [year, mon] = month.split("-").map(Number);
-      const lastDay = new Date(year, mon, 0).getDate();
-      const monthEnd = `${month}-${String(lastDay).padStart(2, "0")}`;
+      // Compute date range based on cycle settings
+      const budgetPlan = await storage.getBudgetPlan(userId, month);
+      const cycleType = budgetPlan?.cycleType || "monthly";
+      const cycleStartDay = Number(budgetPlan?.cycleStartDay || 1);
+      let monthStart: string;
+      let monthEnd: string;
+      if (cycleType === "custom" && cycleStartDay > 1) {
+        const today = new Date();
+        const todayDay = today.getDate();
+        let cycleStartDate: Date;
+        if (todayDay >= cycleStartDay) {
+          cycleStartDate = new Date(today.getFullYear(), today.getMonth(), cycleStartDay);
+        } else {
+          cycleStartDate = new Date(today.getFullYear(), today.getMonth() - 1, cycleStartDay);
+        }
+        const cycleEndDate = new Date(cycleStartDate.getFullYear(), cycleStartDate.getMonth() + 1, cycleStartDay - 1);
+        monthStart = format(cycleStartDate, "yyyy-MM-dd");
+        monthEnd = format(cycleEndDate, "yyyy-MM-dd");
+      } else {
+        const [year, mon] = month.split("-").map(Number);
+        const lastDay = new Date(year, mon, 0).getDate();
+        monthStart = `${month}-01`;
+        monthEnd = `${month}-${String(lastDay).padStart(2, "0")}`;
+      }
 
       const txs = await storage.getTransactionsByDateRange(userId, monthStart, monthEnd);
       const expenses = txs.filter(t => t.type === "expense");
@@ -1427,6 +1447,10 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
         categories: categoryDetails,
         spentByCategory: spentByBudgetKey,
         depositsByGoal,
+        cycleType,
+        cycleStartDay,
+        periodStart: monthStart,
+        periodEnd: monthEnd,
       });
     } catch (error) {
       console.error("Error fetching budget summary:", error);
@@ -1450,7 +1474,7 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
   app.post("/api/budget-plan", isAuthenticated, async (req, res) => {
     try {
       const userId = getUserId(req);
-      const { month, income, strategy, needsAmount, wantsAmount, savingsAmount, investmentAmount } = req.body;
+      const { month, income, strategy, needsAmount, wantsAmount, savingsAmount, investmentAmount, cycleType, cycleStartDay } = req.body;
       if (!month || income === undefined) return res.status(400).json({ message: "month and income required" });
       const plan = await storage.upsertBudgetPlan({
         userId,
@@ -1461,6 +1485,8 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
         wantsAmount: String(wantsAmount || 0),
         savingsAmount: String(savingsAmount || 0),
         investmentAmount: String(investmentAmount || 0),
+        cycleType: cycleType || "monthly",
+        cycleStartDay: cycleStartDay != null ? Number(cycleStartDay) : 1,
       });
       await storage.updateProfile(userId, { monthlyIncome: String(income) });
       res.json(plan);

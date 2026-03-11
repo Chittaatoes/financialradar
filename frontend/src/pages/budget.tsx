@@ -41,6 +41,10 @@ interface BudgetSummaryData {
   }[];
   spentByCategory: Record<string, number>;
   depositsByGoal: Record<string, number>;
+  cycleType?: string;
+  cycleStartDay?: number;
+  periodStart?: string;
+  periodEnd?: string;
 }
 
 interface DebtHealthData {
@@ -723,8 +727,6 @@ export default function BudgetPage() {
   const { isGuest } = useAuth();
   const isGoogleUser = !isGuest;
   const currentMonth = format(new Date(), "yyyy-MM");
-  const monthStart = format(startOfMonth(new Date()), "dd MMM");
-  const monthEnd = format(endOfMonth(new Date()), "dd MMM");
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -751,6 +753,13 @@ export default function BudgetPage() {
       return r.json();
     },
   });
+
+  const monthStart = summary?.periodStart
+    ? format(new Date(summary.periodStart), "dd MMM")
+    : format(startOfMonth(new Date()), "dd MMM");
+  const monthEnd = summary?.periodEnd
+    ? format(new Date(summary.periodEnd), "dd MMM")
+    : format(endOfMonth(new Date()), "dd MMM");
 
   const { data: allocations } = useQuery<BudgetAllocation[]>({
     queryKey: ["/api/budget", currentMonth],
@@ -862,7 +871,7 @@ export default function BudgetPage() {
                 {strategyLabel}
               </Badge>
               <Badge variant="outline" className="text-[10px] border-white/20 text-white/60">
-                {t.budget.periodMonthly}
+                {summary?.cycleType === "custom" ? t.budget.periodCustom : t.budget.periodMonthly}
               </Badge>
             </div>
 
