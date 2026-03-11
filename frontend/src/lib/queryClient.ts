@@ -63,13 +63,14 @@ onlineManager.setEventListener((setOnline) => {
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      queryFn: getQueryFn({ on401: "throw" }),
-      refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: 60000,
-      gcTime: 300000,
-      retry: false,
-    },
+  queryFn: getQueryFn({ on401: "throw" }),
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 30,
+    retry: false,
+  },
     mutations: {
       retry: false,
     },
