@@ -1434,13 +1434,17 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
 
       const totalSpent = expenses.reduce((s, t) => s + Number(t.amount), 0);
 
+      const planIncome = Number(budgetPlan?.income || 0);
+      const effectiveIncome = planIncome > 0 ? planIncome : monthlyIncome;
+
       res.json({
         month,
         monthlyIncome,
+        planIncome,
         totalAllocated,
         totalSpent,
-        remaining: monthlyIncome - totalAllocated,
-        overIncome: totalAllocated > monthlyIncome && monthlyIncome > 0,
+        remaining: effectiveIncome - totalAllocated,
+        overIncome: totalAllocated > effectiveIncome && effectiveIncome > 0,
         categories: categoryDetails,
         spentByCategory: spentByBudgetKey,
         depositsByGoal,

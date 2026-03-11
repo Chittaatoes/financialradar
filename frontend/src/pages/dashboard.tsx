@@ -146,6 +146,7 @@ interface SpendingInsightData {
 interface BudgetCycleSummary {
   cycleType?: string;
   cycleStartDay?: number;
+  planIncome?: number;
   cycleIncome?: number;
   totalSpent?: number;
   periodStart?: string;
@@ -1375,8 +1376,14 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
   const daysPassed = Math.max(0, differenceInDays(now, cycleStart));
   const remainingDays = Math.max(1, daysInCycle - daysPassed);
 
-  // Use cycle-specific income/expense when custom cycle is active
-  const totalIncome = isCustomCycle ? (cycleSummary!.cycleIncome ?? 0) : (insight?.totalIncome ?? 0);
+  // Use budget plan income as primary source (what the user set in the wizard),
+  // falling back to cycle transaction income, then spending-insight totals.
+  const planIncome = cycleSummary?.planIncome ?? 0;
+  const totalIncome = planIncome > 0
+    ? planIncome
+    : isCustomCycle
+      ? (cycleSummary!.cycleIncome ?? 0)
+      : (insight?.totalIncome ?? 0);
   const totalExpense = isCustomCycle ? (cycleSummary!.totalSpent ?? 0) : (insight?.totalExpense ?? 0);
   const remainingBudget = totalIncome - totalExpense;
   const budgetAmanHariIni = remainingDays > 0 ? remainingBudget / remainingDays : 0;

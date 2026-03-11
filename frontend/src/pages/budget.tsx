@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 
 interface BudgetSummaryData {
   monthlyIncome: number;
+  planIncome?: number;
   totalAllocated: number;
   totalSpent: number;
   overBudget: boolean;
