@@ -511,6 +511,8 @@ export class DatabaseStorage implements IStorage {
           wantsAmount: data.wantsAmount,
           savingsAmount: data.savingsAmount,
           investmentAmount: data.investmentAmount,
+          cycleType: data.cycleType,
+          cycleStartDay: data.cycleStartDay,
         })
         .where(eq(budgetPlans.id, existing[0].id))
         .returning();
