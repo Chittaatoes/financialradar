@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { playSound } from "@/hooks/use-sound";
+import { ActionSelectorSheet } from "@/components/action-selector-sheet";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -991,7 +992,7 @@ export default function Transactions() {
       if (!accounts || accounts.length === 0) {
         setSetupOpen(true);
       } else {
-        setDialogOpen(true);
+        setActionPickerOpen(true);
       }
     };
     window.addEventListener("fr-open-add-tx", handler);
@@ -1047,40 +1048,14 @@ export default function Transactions() {
           <Plus className="w-4 h-4 mr-2" /> {t.transactions.addTx}
         </Button>
 
-        <Dialog open={actionPickerOpen} onOpenChange={(open) => { if (!open) { setActionPickerOpen(false); setSelectedAction(null); } }}>
-          <DialogContentBottomSheet>
-            <div className="w-10 h-1 rounded-full bg-muted-foreground/20 mx-auto mt-3" />
-            <div className="px-5 pt-4 pb-2">
-              <h3 className="text-base font-serif font-bold">{(t.dashboard as any).addActionTitle}</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">{(t.dashboard as any).addActionDesc}</p>
-            </div>
-            <div className="px-5 pb-6 space-y-1">
-              {TX_TAB_CONFIG.slice(0, 5).map((cfg) => {
-                const Icon = cfg.icon;
-                return (
-                  <button
-                    key={cfg.type}
-                    type="button"
-                    onClick={() => {
-                      setSelectedAction(cfg.type as TxTabType);
-                      setActionPickerOpen(false);
-                      setDialogOpen(true);
-                    }}
-                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors text-left"
-                    data-testid={`tx-action-${cfg.type}`}
-                  >
-                    <div className={cn("w-10 h-10 rounded-full flex items-center justify-center shrink-0", cfg.color)}>
-                      <Icon className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold">{(t.dashboard as any)[cfg.labelKey]}</p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </DialogContentBottomSheet>
-        </Dialog>
+        <ActionSelectorSheet
+          open={actionPickerOpen}
+          onClose={() => { setActionPickerOpen(false); setSelectedAction(null); }}
+          onSelectAction={(type) => {
+            setSelectedAction(type as TxTabType);
+            setDialogOpen(true);
+          }}
+        />
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContentBottomSheet>
