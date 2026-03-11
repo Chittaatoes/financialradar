@@ -5,17 +5,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
   ChevronRight,
-  Shield,
   ShieldCheck,
   Lock,
-  TrendingUp,
   Award,
   LogOut,
   Globe,
   Moon,
   Sun,
   User,
-  BarChart3,
   Heart,
   Volume2,
   VolumeX,
@@ -192,7 +189,7 @@ function TimezoneSelector({
   );
 }
 
-function NotificationSection() {
+function NotificationRow() {
   const isMobile = useIsMobile();
   const [settings, setSettings] = useState<NotificationSettings>(() => getNotificationSettings());
   const [showPicker, setShowPicker] = useState(false);
@@ -257,24 +254,19 @@ function NotificationSection() {
   const timeLabel = `${String(settings.hour).padStart(2, "0")}:${String(settings.minute).padStart(2, "0")}`;
 
   return (
-    <Card className="rounded-2xl p-4 shadow-sm">
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-        Notifikasi
-      </p>
-
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+    <div>
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-3">
           {settings.enabled ? (
-            <Bell className="w-4 h-4 text-primary" />
+            <Bell className="w-4 h-4 text-muted-foreground" />
           ) : (
             <BellOff className="w-4 h-4 text-muted-foreground" />
           )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium">Pengingat transaksi harian</p>
-          <p className="text-xs text-muted-foreground">Biar kamu nggak lupa catat transaksi</p>
+          <span className="text-sm">Pengingat transaksi harian</span>
         </div>
         <button
+          role="switch"
+          aria-checked={settings.enabled}
           onClick={() => handleToggle(!settings.enabled)}
           data-testid="profile-notif-toggle"
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
@@ -290,10 +282,10 @@ function NotificationSection() {
       </div>
 
       {settings.enabled && (
-        <div className="mt-4 pt-4 border-t border-border/50 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <div className="px-4 pb-3 pt-1 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="relative">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
                 Waktu Pengingat
               </p>
               {!isMobile ? (
@@ -334,7 +326,7 @@ function NotificationSection() {
             </div>
 
             <div>
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
                 Zona Waktu
               </p>
               <TimezoneSelector
@@ -344,10 +336,9 @@ function NotificationSection() {
               />
             </div>
           </div>
-
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -382,16 +373,6 @@ export default function ProfilePage() {
   const displayName = user?.firstName
     || (user as any)?.email
     || pt.guest;
-
-  const insightLinks = [
-    {
-      key: "achievements",
-      icon: Award,
-      title: nt.achievements,
-      desc: pt.achievementsDesc,
-      path: "/achievements",
-    },
-  ];
 
   if (isLoading) {
     return (
@@ -510,70 +491,19 @@ export default function ProfilePage() {
         )}
       </Card>
 
-      <Card className="rounded-2xl p-4 shadow-sm">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-          {pt.financialOverview}
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">
+          {language === "id" ? "Preferensi" : "Preferences"}
         </p>
-        <div className="divide-y">
-          {insightLinks.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link key={item.key} href={item.path}>
-                <button
-                  className="w-full flex items-center gap-3 py-3 text-left hover:bg-muted/40 transition-colors rounded-lg px-1"
-                  data-testid={`profile-link-${item.key}`}
-                >
-                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <Icon className="w-4 h-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{item.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{item.desc}</p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                </button>
-              </Link>
-            );
-          })}
-        </div>
-      </Card>
+        <div className="rounded-2xl bg-card border shadow-sm overflow-hidden">
+          <NotificationRow />
 
-      <a
-        href="https://saweria.co/chittaatoes"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block"
-      >
-        <Card
-          className="rounded-2xl py-4 px-4 shadow-sm hover:scale-[1.02] transition-transform duration-200 cursor-pointer"
-          data-testid="card-support-developer"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
-              <Heart className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold">Dukung Pengembang</p>
-              <p className="text-xs text-muted-foreground/70">
-                Dukungan Anda sangat berarti. Tanpa iklan, tanpa paywall, murni sukarela.
-              </p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-          </div>
-        </Card>
-      </a>
+          <div className="border-t border-border/50" />
 
-      <NotificationSection />
-
-      <Card className="rounded-2xl p-4 shadow-sm">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-          {pt.settings}
-        </p>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm">
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-3">
               <Globe className="w-4 h-4 text-muted-foreground" />
-              <span>{t.common.language}</span>
+              <span className="text-sm">{t.common.language}</span>
             </div>
             <div className="flex rounded-lg border overflow-hidden">
               <button
@@ -601,80 +531,118 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm">
+          <div className="border-t border-border/50" />
+
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-3">
               {theme === "dark" ? (
                 <Moon className="w-4 h-4 text-muted-foreground" />
               ) : (
                 <Sun className="w-4 h-4 text-muted-foreground" />
               )}
-              <span>{theme === "dark" ? pt.darkMode : pt.lightMode}</span>
+              <span className="text-sm">{theme === "dark" ? pt.darkMode : pt.lightMode}</span>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
+            <button
+              role="switch"
+              aria-checked={theme === "dark"}
               onClick={toggleTheme}
-              className="h-7 rounded-lg text-xs"
               data-testid="profile-theme-toggle"
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                theme === "dark" ? "bg-primary" : "bg-muted-foreground/30"
+              }`}
             >
-              {theme === "dark" ? (
-                <Sun className="w-3.5 h-3.5" />
-              ) : (
-                <Moon className="w-3.5 h-3.5" />
-              )}
-            </Button>
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                  theme === "dark" ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm">
+          <div className="border-t border-border/50" />
+
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-3">
               {soundOn ? (
                 <Volume2 className="w-4 h-4 text-muted-foreground" />
               ) : (
                 <VolumeX className="w-4 h-4 text-muted-foreground" />
               )}
-              <span>{pt.soundEffects}</span>
+              <span className="text-sm">{pt.soundEffects}</span>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
+            <button
+              role="switch"
+              aria-checked={soundOn}
               onClick={() => {
                 const next = !soundOn;
                 setSoundOn(next);
                 setSoundEnabled(next);
                 if (next) playSound("xp");
               }}
-              className="h-7 rounded-lg text-xs"
               data-testid="profile-sound-toggle"
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                soundOn ? "bg-primary" : "bg-muted-foreground/30"
+              }`}
             >
-              {soundOn ? (
-                <Volume2 className="w-3.5 h-3.5" />
-              ) : (
-                <VolumeX className="w-3.5 h-3.5" />
-              )}
-            </Button>
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                  soundOn ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
           </div>
         </div>
-      </Card>
+      </div>
 
-      {(profile as any)?.role === "admin" && (
-        <Link href="/admin" className="block mt-2">
-          <Card
-            className="rounded-2xl py-3 px-4 shadow-sm hover:scale-[1.02] transition-transform duration-200 cursor-pointer border-primary/20"
-            data-testid="profile-link-admin"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-4 h-4 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold">{nt.admin}</p>
-                <p className="text-xs text-muted-foreground/70">{pt.adminDesc}</p>
-              </div>
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">
+          {language === "id" ? "Lainnya" : "More"}
+        </p>
+        <div className="rounded-2xl bg-card border shadow-sm overflow-hidden">
+          <Link href="/achievements">
+            <button
+              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
+              data-testid="profile-link-achievements"
+            >
+              <Award className="w-4 h-4 text-muted-foreground" />
+              <span className="flex-1 text-sm">{nt.achievements}</span>
               <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </button>
+          </Link>
+
+          <div className="border-t border-border/50" />
+
+          <a
+            href="https://saweria.co/chittaatoes"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
+            data-testid="card-support-developer"
+          >
+            <Heart className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm">{language === "id" ? "Dukung Pengembang" : "Support Developer"}</p>
             </div>
-          </Card>
-        </Link>
-      )}
+            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+          </a>
+
+          {(profile as any)?.role === "admin" && (
+            <>
+              <div className="border-t border-border/50" />
+              <Link href="/admin">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
+                  data-testid="profile-link-admin"
+                >
+                  <ShieldCheck className="w-4 h-4 text-primary" />
+                  <span className="flex-1 text-sm">{nt.admin}</span>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                </button>
+              </Link>
+            </>
+          )}
+        </div>
+      </div>
 
       {isAuthenticated && (
         <Button
