@@ -882,6 +882,9 @@ export default function BudgetPage() {
                 <span className="uppercase tracking-wider">{t.budget.activePeriod}</span>
               </div>
               <p className="text-xl font-bold text-white/80">{monthStart} - {monthEnd}</p>
+              <p className="text-xs text-white/40 mt-1">
+                {summary?.cycleType === "custom" ? t.budget.cycleSalary : t.budget.cycleMonthly}
+              </p>
             </div>
 
             <div className="grid grid-cols-3 gap-3 border-t border-white/10 pt-4">
