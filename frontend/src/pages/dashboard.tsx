@@ -93,7 +93,7 @@ import { useLanguage } from "@/lib/i18n";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { format } from "date-fns";
+import { format, differenceInDays, parseISO } from "date-fns";
 import type { UserProfile, Goal, DailyFocus, Account, CustomCategory, Liability } from "@shared/schema";
 import ScoreRing from "@/features/score/score-ring";
 import { MilestoneFlame, getMilestoneLevel, getMilestoneName } from "@/features/gamification/milestone-flame";
@@ -141,6 +141,15 @@ interface SpendingInsightData {
   changePercent: number;
   topCategories: { category: string; amount: number }[];
   breakdown: { label: string; amount: number }[];
+}
+
+interface BudgetCycleSummary {
+  cycleType?: string;
+  cycleStartDay?: number;
+  cycleIncome?: number;
+  totalSpent?: number;
+  periodStart?: string;
+  periodEnd?: string;
 }
 
 // === AMOUNT FORMATTING ===
@@ -1335,11 +1344,20 @@ function AddActionDialog({ open, onClose, t, onStreakTriggered, initialAction }:
 
 // === FINANCIAL SUMMARY CARD ===
 // Shows monthly budget overview: safe daily budget, income vs expense, progress bar, status.
-// Data from /api/spending-insight?period=monthly
+// Uses cycle-aware data when a custom budget cycle is active.
 function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animating: boolean }) {
   const { t } = useLanguage();
   const { data: insight, isLoading } = useQuery<SpendingInsightData>({
     queryKey: ["/api/spending-insight?period=monthly"],
+  });
+  const currentMonth = format(new Date(), "yyyy-MM");
+  const { data: cycleSummary } = useQuery<BudgetCycleSummary>({
+    queryKey: ["/api/budget/summary", currentMonth],
+    queryFn: async () => {
+      const r = await fetch(`/api/budget/summary?month=${currentMonth}`, { credentials: "include" });
+      if (!r.ok) return null;
+      return r.json();
+    },
   });
   const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
@@ -1347,16 +1365,23 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
 
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const daysPassed = now.getDate();
-  const remainingDays = Math.max(1, daysInMonth - daysPassed + 1);
 
-  const totalIncome = insight?.totalIncome ?? 0;
-  const totalExpense = insight?.totalExpense ?? 0;
+  const isCustomCycle = cycleSummary?.cycleType === "custom" && !!cycleSummary?.periodStart && !!cycleSummary?.periodEnd;
+
+  // Cycle-aware date math
+  const cycleEnd = isCustomCycle ? parseISO(cycleSummary!.periodEnd!) : new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const cycleStart = isCustomCycle ? parseISO(cycleSummary!.periodStart!) : new Date(now.getFullYear(), now.getMonth(), 1);
+  const daysInCycle = Math.max(1, differenceInDays(cycleEnd, cycleStart) + 1);
+  const daysPassed = Math.max(1, differenceInDays(now, cycleStart) + 1);
+  const remainingDays = Math.max(1, differenceInDays(cycleEnd, now) + 1);
+
+  // Use cycle-specific income/expense when custom cycle is active
+  const totalIncome = isCustomCycle ? (cycleSummary!.cycleIncome ?? 0) : (insight?.totalIncome ?? 0);
+  const totalExpense = isCustomCycle ? (cycleSummary!.totalSpent ?? 0) : (insight?.totalExpense ?? 0);
   const remainingBudget = totalIncome - totalExpense;
   const budgetAmanHariIni = remainingDays > 0 ? remainingBudget / remainingDays : 0;
   const progressPct = totalIncome > 0 ? Math.min((totalExpense / totalIncome) * 100, 100) : 0;
-  const expectedSpending = totalIncome > 0 ? (totalIncome / daysInMonth) * daysPassed : 0;
+  const expectedSpending = totalIncome > 0 ? (totalIncome / daysInCycle) * daysPassed : 0;
 
   const todaySpent = transactions
     .filter(t => t.type === "expense" && t.date === todayStr)

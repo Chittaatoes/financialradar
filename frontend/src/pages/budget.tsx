@@ -43,6 +43,7 @@ interface BudgetSummaryData {
   depositsByGoal: Record<string, number>;
   cycleType?: string;
   cycleStartDay?: number;
+  cycleIncome?: number;
   periodStart?: string;
   periodEnd?: string;
 }

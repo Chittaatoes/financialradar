@@ -1368,6 +1368,9 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
 
       const txs = await storage.getTransactionsByDateRange(userId, monthStart, monthEnd);
       const expenses = txs.filter(t => t.type === "expense");
+      const cycleIncome = txs
+        .filter(t => t.type === "income")
+        .reduce((s, t) => s + Number(t.amount), 0);
 
       const depositsByGoal: Record<string, number> = {};
       txs
@@ -1449,6 +1452,7 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
         depositsByGoal,
         cycleType,
         cycleStartDay,
+        cycleIncome,
         periodStart: monthStart,
         periodEnd: monthEnd,
       });
