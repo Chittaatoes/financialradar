@@ -19,6 +19,9 @@ import { playSound } from "@/hooks/use-sound";
 import { API_URL } from "@/lib/api";
 import { Link } from "wouter";
 
+const DASH_CACHE_KEY = "dashboard_cache";
+const PROFILE_CACHE_KEY = "profile_cache";
+
 function getCacheKey(base: string): string | null {
   try {
     const uid = sessionStorage.getItem("fr_uid");
