@@ -1368,12 +1368,12 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
 
   const isCustomCycle = cycleSummary?.cycleType === "custom" && !!cycleSummary?.periodStart && !!cycleSummary?.periodEnd;
 
-  // Cycle-aware date math
+  // Cycle-aware date math (no double +1: daysPassed + remaining = daysInCycle)
   const cycleEnd = isCustomCycle ? parseISO(cycleSummary!.periodEnd!) : new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const cycleStart = isCustomCycle ? parseISO(cycleSummary!.periodStart!) : new Date(now.getFullYear(), now.getMonth(), 1);
   const daysInCycle = Math.max(1, differenceInDays(cycleEnd, cycleStart) + 1);
-  const daysPassed = Math.max(1, differenceInDays(now, cycleStart) + 1);
-  const remainingDays = Math.max(1, differenceInDays(cycleEnd, now) + 1);
+  const daysPassed = Math.max(0, differenceInDays(now, cycleStart));
+  const remainingDays = Math.max(1, daysInCycle - daysPassed);
 
   // Use cycle-specific income/expense when custom cycle is active
   const totalIncome = isCustomCycle ? (cycleSummary!.cycleIncome ?? 0) : (insight?.totalIncome ?? 0);

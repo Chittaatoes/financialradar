@@ -1347,21 +1347,15 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
       const cycleStartDay = Number(budgetPlan?.cycleStartDay || 1);
       let monthStart: string;
       let monthEnd: string;
+      const [planYear, planMon] = month.split("-").map(Number);
       if (cycleType === "custom" && cycleStartDay > 1) {
-        const today = new Date();
-        const todayDay = today.getDate();
-        let cycleStartDate: Date;
-        if (todayDay >= cycleStartDay) {
-          cycleStartDate = new Date(today.getFullYear(), today.getMonth(), cycleStartDay);
-        } else {
-          cycleStartDate = new Date(today.getFullYear(), today.getMonth() - 1, cycleStartDay);
-        }
-        const cycleEndDate = new Date(cycleStartDate.getFullYear(), cycleStartDate.getMonth() + 1, cycleStartDay - 1);
+        // Cycle anchors to the plan's month: e.g. plan 2026-03 + startDay 12 → Mar 12 → Apr 11
+        const cycleStartDate = new Date(planYear, planMon - 1, cycleStartDay);
+        const cycleEndDate = new Date(planYear, planMon, cycleStartDay - 1);
         monthStart = format(cycleStartDate, "yyyy-MM-dd");
         monthEnd = format(cycleEndDate, "yyyy-MM-dd");
       } else {
-        const [year, mon] = month.split("-").map(Number);
-        const lastDay = new Date(year, mon, 0).getDate();
+        const lastDay = new Date(planYear, planMon, 0).getDate();
         monthStart = `${month}-01`;
         monthEnd = `${month}-${String(lastDay).padStart(2, "0")}`;
       }
