@@ -186,14 +186,18 @@ Browser → Vite dev server (port 5000, /api proxy) → Express API (port 5001) 
 - **Date formats:** ISO `2026-03-09`, `09/03/2026`, `09-03-2026`, `9 Maret 2026`, `9 March 2026`
 - **Category detection:** Keyword matching against merchant name + full OCR text
 
-## Offline-First & PWA Improvements
-- **Network status:** `frontend/src/lib/network-status.ts` — listens to `online`/`offline` events and shows toast notifications; auto-triggers offline queue sync on reconnect
+## Offline-First & PWA Architecture
+- **Local DB:** `frontend/src/lib/local-db.ts` — Dexie.js database `FinancialRadarDB` v2 with 9 tables: `transactions`, `accounts`, `goals`, `debts`, `budgets`, `categories`, `xp_logs`, `streak_logs`, `offline_queue`
+- **IndexedDB:** `frontend/src/lib/indexeddb.ts` — thin re-export from `local-db.ts` for backward compat
+- **Offline queue:** `frontend/src/lib/offline-sync.ts` — `saveOfflineAction(method, endpoint, payload)` enqueues mutations; `syncOfflineQueue()` replays them in order on reconnect and invalidates React Query cache
+- **API interception:** `frontend/src/lib/queryClient.ts` — `apiRequest()` checks `navigator.onLine` before fetch; if offline and method is POST/PATCH/PUT/DELETE (excluding auth/admin), saves to offline queue and returns a fake 200 response so UI proceeds normally
+- **Network status:** `frontend/src/lib/network-status.ts` — `initNetworkStatus()` shows offline/online toast notifications and triggers `syncOfflineQueue()` on reconnect
 - **Daily reminder (spam fix):** `frontend/src/lib/daily-reminder.ts` — sends max one notification per day via `finradar-reminder-YYYY-MM-DD` localStorage key + 10-minute cooldown + `tag: "financial-radar-daily-reminder"` to prevent stacking; singleton guard via `window.finRadarReminderStarted`
-- **IndexedDB schema:** `frontend/src/lib/indexeddb.ts` — Dexie database `FinancialRadarDB` with `transactions` and `offline_queue` tables
-- **Offline sync queue:** `frontend/src/lib/offline-sync.ts` — `enqueueOfflineAction()` stores actions locally when offline; `syncOfflineQueue()` replays them to the server on reconnect
-- **OCR pipeline:** `frontend/src/lib/receipt-ocr.ts` — now compresses images first via `browser-image-compression` (max 0.6MB / 1200px) before canvas preprocessing; uses a persistent Tesseract.js worker singleton (`_worker`) so the worker is created once and reused across all scans
-- **Notifications hook:** `frontend/src/hooks/use-notifications.ts` — `scheduleNotificationCheck()` and `cancelScheduledNotification()` now delegate to `daily-reminder.ts` for proper spam prevention
+- **OCR pipeline:** `frontend/src/lib/receipt-ocr.ts` — compresses images first via `browser-image-compression` (max 0.6MB / 1200px) before canvas preprocessing; uses a persistent Tesseract.js worker singleton (`_worker`) reused across all scans
+- **Notifications hook:** `frontend/src/hooks/use-notifications.ts` — delegates to `daily-reminder.ts` for spam prevention
 - **App init:** `frontend/src/App.tsx` — calls `initNetworkStatus()` and `startDailyReminder()` once on mount
+- **Offline GET caching:** React Query `persistQueryClient` with 24-hour localStorage cache serves as read-side offline fallback — no separate IndexedDB needed for GET queries
+- **Packages added:** `dexie`, `browser-image-compression`
 
 ## Budget Cycle System
 - **Cycle types:** `bulanan` (1st–last of calendar month) and `custom` (user-defined start date)

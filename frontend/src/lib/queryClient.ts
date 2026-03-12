@@ -110,11 +110,35 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+// Endpoints excluded from offline queuing (auth / admin flows)
+const OFFLINE_EXCLUDE = ["/api/auth/", "/api/guest-login", "/api/admin/"];
+
+function shouldQueueOffline(method: string, url: string): boolean {
+  const m = method.toUpperCase();
+  if (!["POST", "PATCH", "PUT", "DELETE"].includes(m)) return false;
+  const path = url.startsWith("/") ? url : `/${url}`;
+  return !OFFLINE_EXCLUDE.some((prefix) => path.startsWith(prefix));
+}
+
+function makeFakeResponse(data: unknown = { offline: true }): Response {
+  return new Response(JSON.stringify(data), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown,
 ): Promise<Response> {
+  // Offline interception: queue mutations and return a fake OK response
+  if (!navigator.onLine && shouldQueueOffline(method, url)) {
+    const { saveOfflineAction } = await import("@/lib/offline-sync");
+    await saveOfflineAction(method.toUpperCase(), url, data ?? null);
+    return makeFakeResponse();
+  }
+
   const res = await fetch(resolveUrl(url), {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
