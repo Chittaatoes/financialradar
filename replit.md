@@ -186,6 +186,16 @@ Browser → Vite dev server (port 5000, /api proxy) → Express API (port 5001) 
 - **Date formats:** ISO `2026-03-09`, `09/03/2026`, `09-03-2026`, `9 Maret 2026`, `9 March 2026`
 - **Category detection:** Keyword matching against merchant name + full OCR text
 
+## Budget Cycle System
+- **Cycle types:** `bulanan` (1st–last of calendar month) and `custom` (user-defined start date)
+- **Fields in `budget_plans`:** `cycle_type`, `cycle_start_day` (int), `cycle_start_date` (text, "YYYY-MM-DD")
+- **Period calculation:** `custom` cycles run from `cycleStartDate` to 30 days later; `bulanan` uses month boundaries
+- **Day extraction:** `cycleStartDate.split("-")[2]` (timezone-safe, avoids JS Date offset issues)
+- **Frontend display:** Budget page header shows "Periode: DD Mmm – DD Mmm YYYY" derived from `periodStart`/`periodEnd` in `/api/budget/summary` response
+- **Critical architecture note:** `backend/shared/` must be real file copies (not symlinks) because `drizzle-orm` only exists in `backend/node_modules`. Symlinks pointing outside `backend/` break Node ESM module resolution
+- **React Query cache:** `persistQueryClient` uses buster key `"financialradar-v2"` to clear stale null values from localStorage. The `getQueryFn` returns `null` (not `undefined`) on 401/errors — React Query v5 requires non-undefined returns
+- **Null guards:** `customCats` and `goals` query results in `budget.tsx` use `?? []` fallback defensively
+
 ## API Routes
 - `/api/auth/*` — Authentication (login, callback, user, logout)
 - `/api/profile` — User profile (XP, level, streak)

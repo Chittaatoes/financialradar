@@ -325,13 +325,13 @@ function SavingsGoalGroup({
 
       {!collapsed && (
         <div className="px-4 pb-4 flex flex-col gap-2">
-          {goals.length === 0 ? (
+          {(goals ?? []).length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
               <span className="text-3xl">🎯</span>
               <p className="text-sm text-muted-foreground">Tambahkan target tabungan untuk mengelola tabungan Anda.</p>
             </div>
           ) : (
-            goals.map((goal) => {
+            (goals ?? []).map((goal) => {
               const current = Number(goal.currentAmount);
               const target = Number(goal.targetAmount);
               const goalPct = target > 0 ? Math.min((current / target) * 100, 100) : 0;
@@ -404,7 +404,7 @@ function CategoryGroup({
     queryKey: ["/api/custom-categories"],
     enabled: isManageable,
   });
-  const groupCustomCats = customCats.filter(c => c.type === groupKey);
+  const groupCustomCats = (customCats ?? []).filter(c => c.type === groupKey);
 
   const addMutation = useMutation({
     mutationFn: (data: { name: string; emoji: string; type: string }) =>
@@ -822,7 +822,7 @@ export default function BudgetPage() {
   });
 
   useEffect(() => {
-    if (!planLoading && budgetPlan === null) {
+    if (!planLoading && budgetPlan == null) {
       setWizardOpen(true);
     }
   }, [planLoading, budgetPlan]);

@@ -204,6 +204,6 @@ if (typeof window !== "undefined") {
     queryClient,
     persister,
     maxAge: 1000 * 60 * 60 * 24, // 24 hours
-    buster: "financialradar-v1", // change when schema changes
+    buster: "financialradar-v2", // change when schema changes
   });
 }
