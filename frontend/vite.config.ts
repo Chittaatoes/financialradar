@@ -8,23 +8,33 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.png", "apple-touch-icon.png"],
+      includeAssets: ["favicon.ico", "favicon.png", "apple-touch-icon.png", "masked-icon.svg"],
       manifest: false,
 
       workbox: {
-        // Pre-cache ALL build output (JS chunks, CSS, HTML, images, fonts)
-        // This ensures every lazy-loaded React.lazy() chunk works offline.
+        // Pre-cache ALL build output so every lazy-loaded chunk works offline.
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,webmanifest}"],
         globIgnores: ["**/node_modules/**"],
 
-        // Don't use navigateFallback for API routes
+        // Don't use navigateFallback for API routes.
         navigateFallbackDenylist: [/^\/api\//],
 
-        // Increase max cached file size to handle large vendor chunks (tesseract, etc.)
+        // Increase limit to handle large vendor chunks (tesseract, recharts, etc.)
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10 MB
 
+        // Remove stale precache entries from previous SW versions.
+        cleanupOutdatedCaches: true,
+
         runtimeCaching: [
-          // Google Fonts — long-lived cache
+          // ── ALL /api/* routes are NEVER cached by the service worker ──────────
+          // Offline reads/mutations are handled by React Query + IndexedDB.
+          // Caching API responses in the SW causes blank screens on reconnect.
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith("/api"),
+            handler: "NetworkOnly",
+          },
+
+          // ── Google Fonts ───────────────────────────────────────────────────────
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: "CacheFirst",
@@ -44,10 +54,11 @@ export default defineConfig({
             },
           },
 
-          // App's own JS/CSS chunks (lazy-loaded pages, vendor splits)
-          // StaleWhileRevalidate: serve from cache immediately, update in background
+          // ── App JS/CSS chunks (lazy-loaded pages, vendor splits) ───────────────
+          // StaleWhileRevalidate: serve from cache instantly, update in background.
           {
-            urlPattern: /\/assets\/.*\.(?:js|css)$/i,
+            urlPattern: ({ request }) =>
+              request.destination === "script" || request.destination === "style",
             handler: "StaleWhileRevalidate",
             options: {
               cacheName: "app-chunks-cache",
@@ -56,48 +67,14 @@ export default defineConfig({
             },
           },
 
-          // Static assets (icons, images, fonts) — long-lived cache
+          // ── Static assets (images, icons, fonts) ──────────────────────────────
           {
-            urlPattern: /\.(?:png|jpg|jpeg|svg|woff2?|ico)$/i,
+            urlPattern: ({ request }) => request.destination === "image",
             handler: "CacheFirst",
             options: {
-              cacheName: "static-assets-cache",
+              cacheName: "static-assets",
               expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-
-          // Auth endpoints — network only (never cache auth flows)
-          {
-            urlPattern: /\/api\/(auth|guest-login|logout).*/i,
-            handler: "NetworkOnly",
-            options: { fetchOptions: { credentials: "include" } },
-          },
-
-          // Core data endpoints — NetworkFirst with 5s timeout, fallback to cache
-          {
-            urlPattern:
-              /\/api\/(dashboard|transactions|goals|budget|accounts|daily-focus|badges|finance-score|spending-insight|smart-save|debt-health|net-worth|profile|custom-categories|liabilities|streak|achievements|reports|score).*/i,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "api-data-cache",
-              expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 },
-              cacheableResponse: { statuses: [0, 200] },
-              networkTimeoutSeconds: 5,
-              fetchOptions: { credentials: "include" },
-            },
-          },
-
-          // All other API endpoints — NetworkFirst as catch-all
-          {
-            urlPattern: /\/api\/.*/i,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "api-other-cache",
-              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 30 },
-              cacheableResponse: { statuses: [0, 200] },
-              networkTimeoutSeconds: 5,
-              fetchOptions: { credentials: "include" },
             },
           },
         ],
@@ -144,7 +121,7 @@ export default defineConfig({
             "@radix-ui/react-tooltip",
             "@radix-ui/react-alert-dialog",
           ],
-          "vendor-dexie":    ["dexie"],
+          "vendor-dexie": ["dexie"],
         },
       },
     },
