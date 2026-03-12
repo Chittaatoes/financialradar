@@ -310,6 +310,7 @@ export const budgetPlans = pgTable("budget_plans", {
   investmentAmount: numeric("investment_amount", { precision: 15, scale: 2 }).notNull().default("0"),
   cycleType: text("cycle_type").default("monthly"),
   cycleStartDay: integer("cycle_start_day").default(1),
+  cycleStartDate: text("cycle_start_date"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

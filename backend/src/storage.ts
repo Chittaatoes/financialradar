@@ -513,6 +513,7 @@ export class DatabaseStorage implements IStorage {
           investmentAmount: data.investmentAmount,
           cycleType: data.cycleType,
           cycleStartDay: data.cycleStartDay,
+          cycleStartDate: data.cycleStartDate,
         })
         .where(eq(budgetPlans.id, existing[0].id))
         .returning();

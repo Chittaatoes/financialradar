@@ -1348,12 +1348,13 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
       let monthStart: string;
       let monthEnd: string;
       const [planYear, planMon] = month.split("-").map(Number);
-      if (cycleType === "custom" && cycleStartDay > 1) {
-        // Cycle anchors to the plan's month: e.g. plan 2026-03 + startDay 12 → Mar 12 → Apr 11
-        const cycleStartDate = new Date(planYear, planMon - 1, cycleStartDay);
-        const cycleEndDate = new Date(planYear, planMon, cycleStartDay - 1);
-        monthStart = format(cycleStartDate, "yyyy-MM-dd");
-        monthEnd = format(cycleEndDate, "yyyy-MM-dd");
+      if (cycleType === "custom" && budgetPlan?.cycleStartDate) {
+        // Use stored full start date for precise cycle calculation (e.g. "2026-02-28" → Feb 28 → Mar 27)
+        const parts = budgetPlan.cycleStartDate.split("-").map(Number);
+        const cycleStart = new Date(parts[0], parts[1] - 1, parts[2]);
+        const cycleEnd = new Date(parts[0], parts[1], parts[2] - 1);
+        monthStart = format(cycleStart, "yyyy-MM-dd");
+        monthEnd = format(cycleEnd, "yyyy-MM-dd");
       } else {
         const lastDay = new Date(planYear, planMon, 0).getDate();
         monthStart = `${month}-01`;
@@ -1476,7 +1477,7 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
   app.post("/api/budget-plan", isAuthenticated, async (req, res) => {
     try {
       const userId = getUserId(req);
-      const { month, income, strategy, needsAmount, wantsAmount, savingsAmount, investmentAmount, cycleType, cycleStartDay } = req.body;
+      const { month, income, strategy, needsAmount, wantsAmount, savingsAmount, investmentAmount, cycleType, cycleStartDay, cycleStartDate } = req.body;
       if (!month || income === undefined) return res.status(400).json({ message: "month and income required" });
       const plan = await storage.upsertBudgetPlan({
         userId,
@@ -1489,6 +1490,7 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
         investmentAmount: String(investmentAmount || 0),
         cycleType: cycleType || "monthly",
         cycleStartDay: cycleStartDay != null ? Number(cycleStartDay) : 1,
+        cycleStartDate: cycleStartDate || null,
       });
       await storage.updateProfile(userId, { monthlyIncome: String(income) });
       res.json(plan);

@@ -602,7 +602,7 @@ export function BudgetSetupWizard({ open, onClose, onComplete, defaultIncome }: 
         investmentAmount = parseFloat(state.investmentAmt) || 0;
       }
       const cycleStartDay = state.cycleType === "custom" && state.cycleStartDate
-        ? new Date(state.cycleStartDate).getDate()
+        ? parseInt(state.cycleStartDate.split("-")[2], 10)
         : 1;
       return apiRequest("POST", "/api/budget-plan", {
         month: currentMonth,
@@ -614,6 +614,7 @@ export function BudgetSetupWizard({ open, onClose, onComplete, defaultIncome }: 
         investmentAmount,
         cycleType: state.cycleType,
         cycleStartDay,
+        cycleStartDate: state.cycleType === "custom" ? (state.cycleStartDate || null) : null,
       });
     },
     onSuccess: () => {
