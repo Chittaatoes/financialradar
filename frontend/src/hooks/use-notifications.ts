@@ -37,34 +37,15 @@ export async function requestNotificationPermission(): Promise<boolean> {
 }
 
 export function scheduleNotificationCheck(): void {
-  const settings = getNotificationSettings();
-  if (!settings.enabled) return;
-  if (!("Notification" in window) || Notification.permission !== "granted") return;
-
-  const now = new Date();
-  const target = new Date();
-  target.setHours(settings.hour, settings.minute, 0, 0);
-  if (target <= now) target.setDate(target.getDate() + 1);
-
-  const delay = target.getTime() - now.getTime();
-
-  const timerId = setTimeout(() => {
-    new Notification("Financial Radar", {
-      body: "Jangan lupa catat transaksi hari ini! 💰",
-      icon: "/favicon.png",
-      tag: "daily-reminder",
-    });
-    scheduleNotificationCheck();
-  }, delay);
-
-  (window as any).__frNotifTimer = timerId;
+  import("@/lib/daily-reminder").then(({ restartDailyReminder }) => {
+    restartDailyReminder();
+  });
 }
 
 export function cancelScheduledNotification(): void {
-  if ((window as any).__frNotifTimer) {
-    clearTimeout((window as any).__frNotifTimer);
-    (window as any).__frNotifTimer = null;
-  }
+  import("@/lib/daily-reminder").then(({ stopDailyReminder }) => {
+    stopDailyReminder();
+  });
 }
 
 export const COMMON_TIMEZONES = [

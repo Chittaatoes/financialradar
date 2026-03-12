@@ -186,6 +186,15 @@ Browser → Vite dev server (port 5000, /api proxy) → Express API (port 5001) 
 - **Date formats:** ISO `2026-03-09`, `09/03/2026`, `09-03-2026`, `9 Maret 2026`, `9 March 2026`
 - **Category detection:** Keyword matching against merchant name + full OCR text
 
+## Offline-First & PWA Improvements
+- **Network status:** `frontend/src/lib/network-status.ts` — listens to `online`/`offline` events and shows toast notifications; auto-triggers offline queue sync on reconnect
+- **Daily reminder (spam fix):** `frontend/src/lib/daily-reminder.ts` — sends max one notification per day via `finradar-reminder-YYYY-MM-DD` localStorage key + 10-minute cooldown + `tag: "financial-radar-daily-reminder"` to prevent stacking; singleton guard via `window.finRadarReminderStarted`
+- **IndexedDB schema:** `frontend/src/lib/indexeddb.ts` — Dexie database `FinancialRadarDB` with `transactions` and `offline_queue` tables
+- **Offline sync queue:** `frontend/src/lib/offline-sync.ts` — `enqueueOfflineAction()` stores actions locally when offline; `syncOfflineQueue()` replays them to the server on reconnect
+- **OCR pipeline:** `frontend/src/lib/receipt-ocr.ts` — now compresses images first via `browser-image-compression` (max 0.6MB / 1200px) before canvas preprocessing; uses a persistent Tesseract.js worker singleton (`_worker`) so the worker is created once and reused across all scans
+- **Notifications hook:** `frontend/src/hooks/use-notifications.ts` — `scheduleNotificationCheck()` and `cancelScheduledNotification()` now delegate to `daily-reminder.ts` for proper spam prevention
+- **App init:** `frontend/src/App.tsx` — calls `initNetworkStatus()` and `startDailyReminder()` once on mount
+
 ## Budget Cycle System
 - **Cycle types:** `bulanan` (1st–last of calendar month) and `custom` (user-defined start date)
 - **Fields in `budget_plans`:** `cycle_type`, `cycle_start_day` (int), `cycle_start_date` (text, "YYYY-MM-DD")

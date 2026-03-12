@@ -16,6 +16,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageProvider } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { initNetworkStatus } from "@/lib/network-status";
+import { startDailyReminder } from "@/lib/daily-reminder";
 import Dashboard from "@/pages/dashboard";
 import NotFound from "@/pages/not-found";
 import { MobileBottomNav } from "@/components/mobile-nav";
@@ -114,6 +116,11 @@ function AppContent() {
   const { toast } = useToast();
   const guestLoginCalled = useRef(false);
   const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    initNetworkStatus();
+    startDailyReminder();
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
