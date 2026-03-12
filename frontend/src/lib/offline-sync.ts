@@ -7,17 +7,20 @@ function resolveUrl(url: string): string {
   return url.startsWith("/") ? `${API_BASE}${url}` : url;
 }
 
-// Which method string maps to a real HTTP method for queued items
-const METHOD_MAP: Record<string, string> = {
-  POST: "POST",
-  PATCH: "PATCH",
-  PUT: "PUT",
-  DELETE: "DELETE",
-};
+// ─── Query-cache invalidation hook (avoids circular dep with queryClient.ts) ──
+type Invalidator = () => void;
+let _invalidate: Invalidator | null = null;
 
 /**
- * Save a mutation to the offline queue so it can be replayed when online.
+ * Call this once at startup (e.g. main.tsx) to wire in React Query invalidation.
+ * Keeps offline-sync.ts free of a direct queryClient import.
  */
+export function setQueryInvalidator(fn: Invalidator): void {
+  _invalidate = fn;
+}
+
+// ─── Save an offline action to the queue ─────────────────────────────────────
+
 export async function saveOfflineAction(
   method: string,
   endpoint: string,
@@ -31,10 +34,11 @@ export async function saveOfflineAction(
   });
 }
 
-/**
- * Replay all queued offline actions against the server.
- * Called automatically when the browser goes back online.
- */
+// Legacy alias used by indexeddb.ts consumers
+export { saveOfflineAction as enqueueOfflineAction };
+
+// ─── Sync queue to server ─────────────────────────────────────────────────────
+
 export async function syncOfflineQueue(): Promise<void> {
   if (!navigator.onLine) return;
 
@@ -46,17 +50,11 @@ export async function syncOfflineQueue(): Promise<void> {
 
   for (const item of items) {
     try {
-      const httpMethod = METHOD_MAP[item.method] ?? "POST";
+      const isDelete = item.method === "DELETE";
       const res = await fetch(resolveUrl(item.endpoint), {
-        method: httpMethod,
-        headers:
-          httpMethod !== "DELETE"
-            ? { "Content-Type": "application/json" }
-            : {},
-        body:
-          httpMethod !== "DELETE" && item.payload
-            ? JSON.stringify(item.payload)
-            : undefined,
+        method: item.method,
+        headers: isDelete ? {} : { "Content-Type": "application/json" },
+        body: isDelete || !item.payload ? undefined : JSON.stringify(item.payload),
         credentials: "include",
       });
 
@@ -73,10 +71,10 @@ export async function syncOfflineQueue(): Promise<void> {
     }
   }
 
-  // Refresh all data after sync so the UI reflects server state
   if (synced > 0) {
-    const { queryClient } = await import("@/lib/queryClient");
-    queryClient.invalidateQueries();
+    // Refresh all queries so UI reflects server state
+    _invalidate?.();
+
     toast.success(
       failed > 0
         ? `${synced} tindakan offline disinkronkan. ${failed} gagal — akan dicoba lagi.`
@@ -88,11 +86,8 @@ export async function syncOfflineQueue(): Promise<void> {
 }
 
 /**
- * Returns the number of items currently in the offline queue.
+ * Returns how many actions are pending in the offline queue.
  */
 export async function getOfflineQueueCount(): Promise<number> {
   return localDb.offline_queue.count();
 }
-
-// Legacy export for network-status.ts compatibility
-export { saveOfflineAction as enqueueOfflineAction };

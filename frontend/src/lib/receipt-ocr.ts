@@ -1,21 +1,19 @@
 import imageCompression from "browser-image-compression";
+import Tesseract from "tesseract.js";
 
-// Persistent Tesseract worker — created once, reused across all scans.
+// ─── Persistent worker (created once, reused across all scans) ────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _worker: any = null;
 let _workerReady = false;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function getWorker(): Promise<any> {
+async function getWorker() {
   if (_worker && _workerReady) return _worker;
-
-  const { createWorker } = await import("tesseract.js");
-  _worker = await createWorker("eng+ind", 1, { logger: () => {} });
+  _worker = await Tesseract.createWorker("eng+ind", 1, { logger: () => {} });
   _workerReady = true;
   return _worker;
 }
 
-// Compress the image before preprocessing to speed up OCR on mobile.
+// ─── Image compression ────────────────────────────────────────────────────────
 async function compressImage(file: File): Promise<File> {
   return imageCompression(file, {
     maxSizeMB: 0.6,
@@ -24,8 +22,7 @@ async function compressImage(file: File): Promise<File> {
   });
 }
 
-// Preprocess receipt image with Canvas API to improve OCR accuracy.
-// Converts to grayscale and boosts contrast.
+// ─── Canvas preprocessing: grayscale + contrast boost ────────────────────────
 async function preprocessImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -45,7 +42,6 @@ async function preprocessImage(file: File): Promise<string> {
       const ctx = canvas.getContext("2d")!;
       ctx.drawImage(img, 0, 0, width, height);
 
-      // Grayscale + contrast boost
       const imgData = ctx.getImageData(0, 0, width, height);
       const d = imgData.data;
       const CONTRAST = 1.5;
@@ -75,28 +71,26 @@ async function preprocessImage(file: File): Promise<string> {
   });
 }
 
-// Run Tesseract OCR on a receipt image.
-// Pipeline: compress → preprocess → OCR (persistent worker).
+// ─── Main OCR entry point ─────────────────────────────────────────────────────
+// Pipeline: compress → canvas preprocess → OCR (persistent worker).
 export async function runOCR(file: File): Promise<string> {
-  let processedFile = file;
-
   // Step 1: compress
+  let processedFile = file;
   try {
     processedFile = await compressImage(file);
   } catch {
-    // Fall back to original file if compression fails
     processedFile = file;
   }
 
-  // Step 2: preprocess
+  // Step 2: canvas preprocess
   let src: string | File = processedFile;
   try {
     src = await preprocessImage(processedFile);
   } catch {
-    // Fall back to compressed file if canvas preprocessing fails
+    // fall through to raw file
   }
 
-  // Step 3: OCR with persistent worker
+  // Step 3: OCR via persistent worker
   try {
     const worker = await getWorker();
     const { data } = await worker.recognize(src as string);
@@ -107,12 +101,11 @@ export async function runOCR(file: File): Promise<string> {
 
     return data.text;
   } catch {
-    // Worker may have failed — reset and fall back to one-time recognize
+    // Worker failed — reset and use one-shot fallback
     _worker = null;
     _workerReady = false;
 
-    const { recognize } = await import("tesseract.js");
-    const { data: { text } } = await recognize(src as string, "eng+ind", {
+    const { data: { text } } = await Tesseract.recognize(src as string, "eng+ind", {
       logger: () => {},
     });
 

@@ -34,8 +34,13 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@/components/theme-provider";
 import { LanguageProvider } from "@/lib/i18n";
 import { queryClient, getQueryFn } from "@/lib/queryClient";
+import { setQueryInvalidator } from "@/lib/offline-sync";
 import App from "./App";
 import "./index.css";
+
+// Wire React Query cache invalidation into the offline sync module
+// so syncOfflineQueue() can refresh data without a circular import.
+setQueryInvalidator(() => queryClient.invalidateQueries());
 
 async function bootstrap() {
   const user = await queryClient.fetchQuery({

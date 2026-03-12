@@ -96,6 +96,8 @@ import {
 } from "@tanstack/react-query";
 import { persistQueryClient } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
+import { saveOfflineAction } from "@/lib/offline-sync";
+import { cacheSet, cacheGet } from "@/lib/local-db";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
@@ -134,7 +136,6 @@ export async function apiRequest(
 ): Promise<Response> {
   // Offline interception: queue mutations and return a fake OK response
   if (!navigator.onLine && shouldQueueOffline(method, url)) {
-    const { saveOfflineAction } = await import("@/lib/offline-sync");
     await saveOfflineAction(method.toUpperCase(), url, data ?? null);
     return makeFakeResponse();
   }
@@ -153,13 +154,43 @@ export async function apiRequest(
 
 type UnauthorizedBehavior = "returnNull" | "throw";
 
+// API endpoints worth caching in IndexedDB for offline reads
+const CACHEABLE_ENDPOINTS = [
+  "/api/dashboard",
+  "/api/transactions",
+  "/api/accounts",
+  "/api/goals",
+  "/api/budget",
+  "/api/budget-plan",
+  "/api/budget/summary",
+  "/api/profile",
+  "/api/daily-focus",
+  "/api/badges",
+  "/api/debt-health",
+  "/api/net-worth",
+  "/api/spending-insight",
+  "/api/custom-categories",
+];
+
+function isCacheable(url: string): boolean {
+  return CACHEABLE_ENDPOINTS.some((ep) => url.startsWith(ep));
+}
+
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401 }) =>
   async ({ queryKey }) => {
+    const url = queryKey.join("/") as string;
+
+    // If offline, serve from IndexedDB cache first
+    if (!navigator.onLine && isCacheable(url)) {
+      const cached = await cacheGet<T>(url);
+      if (cached !== undefined) return cached;
+    }
+
     try {
-      const res = await fetch(resolveUrl(queryKey.join("/") as string), {
+      const res = await fetch(resolveUrl(url), {
         credentials: "include",
         cache: "no-store",
       });
@@ -169,11 +200,28 @@ export const getQueryFn: <T>(options: {
       }
 
       if (!res.ok) {
+        // Try cached data as fallback
+        if (isCacheable(url)) {
+          const cached = await cacheGet<T>(url);
+          if (cached !== undefined) return cached;
+        }
         return null as T;
       }
 
-      return await res.json();
+      const data = await res.json();
+
+      // Cache successful responses for offline use
+      if (isCacheable(url)) {
+        cacheSet(url, data).catch(() => {});
+      }
+
+      return data;
     } catch {
+      // Network error: try IndexedDB cache
+      if (isCacheable(url)) {
+        const cached = await cacheGet<T>(url);
+        if (cached !== undefined) return cached;
+      }
       return null as T;
     }
   };

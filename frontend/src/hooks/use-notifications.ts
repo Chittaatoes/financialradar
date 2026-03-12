@@ -1,3 +1,5 @@
+import { restartDailyReminder, stopDailyReminder } from "@/lib/daily-reminder";
+
 const STORAGE_KEY = "fr_notifications";
 
 export interface NotificationSettings {
@@ -37,15 +39,11 @@ export async function requestNotificationPermission(): Promise<boolean> {
 }
 
 export function scheduleNotificationCheck(): void {
-  import("@/lib/daily-reminder").then(({ restartDailyReminder }) => {
-    restartDailyReminder();
-  });
+  restartDailyReminder();
 }
 
 export function cancelScheduledNotification(): void {
-  import("@/lib/daily-reminder").then(({ stopDailyReminder }) => {
-    stopDailyReminder();
-  });
+  stopDailyReminder();
 }
 
 export const COMMON_TIMEZONES = [
