@@ -756,11 +756,36 @@ export default function BudgetPage() {
     },
   });
 
-  const monthStart = summary?.periodStart
-    ? format(new Date(summary.periodStart), "dd MMM")
+  // Compute active period directly from budgetPlan so it always matches what the user set in the wizard
+  const { periodStart: computedStart, periodEnd: computedEnd } = (() => {
+    const cycleType = budgetPlan?.cycleType || "monthly";
+    const [planYear, planMon] = currentMonth.split("-").map(Number);
+    if (cycleType === "custom" && budgetPlan?.cycleStartDate) {
+      // Use full stored start date (e.g. "2026-02-28") for exact cycle
+      const [y, m, d] = budgetPlan.cycleStartDate.split("-").map(Number);
+      return {
+        periodStart: new Date(y, m - 1, d),
+        periodEnd: new Date(y, m, d - 1),
+      };
+    } else if (cycleType === "custom" && budgetPlan?.cycleStartDay && Number(budgetPlan.cycleStartDay) > 1) {
+      // Day-only fallback: anchor to plan month
+      const day = Number(budgetPlan.cycleStartDay);
+      return {
+        periodStart: new Date(planYear, planMon - 1, day),
+        periodEnd: new Date(planYear, planMon, day - 1),
+      };
+    }
+    // Monthly: 1st to last day of plan month
+    return {
+      periodStart: new Date(planYear, planMon - 1, 1),
+      periodEnd: new Date(planYear, planMon, 0),
+    };
+  })();
+  const monthStart = budgetPlan
+    ? format(computedStart, "dd MMM")
     : format(startOfMonth(new Date()), "dd MMM");
-  const monthEnd = summary?.periodEnd
-    ? format(new Date(summary.periodEnd), "dd MMM")
+  const monthEnd = budgetPlan
+    ? format(computedEnd, "dd MMM")
     : format(endOfMonth(new Date()), "dd MMM");
 
   const { data: allocations } = useQuery<BudgetAllocation[]>({
@@ -873,7 +898,7 @@ export default function BudgetPage() {
                 {strategyLabel}
               </Badge>
               <Badge variant="outline" className="text-[10px] border-white/20 text-white/60">
-                {summary?.cycleType === "custom" ? t.budget.periodCustom : t.budget.periodMonthly}
+                {budgetPlan?.cycleType === "custom" ? t.budget.periodCustom : t.budget.periodMonthly}
               </Badge>
             </div>
 
@@ -884,7 +909,7 @@ export default function BudgetPage() {
               </div>
               <p className="text-xl font-bold text-white/80">{monthStart} - {monthEnd}</p>
               <p className="text-xs text-white/40 mt-1">
-                {summary?.cycleType === "custom" ? t.budget.periodCustom : t.budget.periodMonthly}
+                {budgetPlan?.cycleType === "custom" ? t.budget.periodCustom : t.budget.periodMonthly}
               </p>
             </div>
 
