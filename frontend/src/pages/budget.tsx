@@ -884,7 +884,7 @@ export default function BudgetPage() {
               </div>
               <p className="text-xl font-bold text-white/80">{monthStart} - {monthEnd}</p>
               <p className="text-xs text-white/40 mt-1">
-                {summary?.cycleType === "custom" ? t.budget.cycleSalary : t.budget.cycleMonthly}
+                {summary?.cycleType === "custom" ? t.budget.periodCustom : t.budget.periodMonthly}
               </p>
             </div>
 
