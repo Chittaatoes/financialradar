@@ -87,6 +87,9 @@ export interface CacheStoreItem {
   updatedAt: number;
 }
 
+// Alias used by queryClient.ts (matches the spec's CacheItem name)
+export type CacheItem = CacheStoreItem;
+
 // ─── Database class ───────────────────────────────────────────────────────────
 
 class FinancialRadarDatabase extends Dexie {

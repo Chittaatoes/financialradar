@@ -17,7 +17,7 @@
 import { useState, useCallback, useRef, useEffect, memo, useMemo } from "react";
 import { playSound } from "@/hooks/use-sound";
 import { API_URL } from "@/lib/api";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 const DASH_CACHE_KEY = "dashboard_cache";
 const PROFILE_CACHE_KEY = "profile_cache";
@@ -81,7 +81,7 @@ import {
   BarChart3, Plus, Award,
   ArrowDownLeft, ArrowUpRight, ArrowLeftRight,
   PiggyBank, CreditCard, FileText, LineChart, Camera,
-  CalendarDays,
+  CalendarDays, AlertTriangle, Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, getXpForNextLevel, EXPENSE_CATEGORY_GROUPS, INCOME_CATEGORIES, getTierKey } from "@/lib/constants";
@@ -93,7 +93,7 @@ import { useLanguage } from "@/lib/i18n";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { format, differenceInDays, parseISO } from "date-fns";
+import { format, differenceInDays, parseISO, endOfMonth } from "date-fns";
 import type { UserProfile, Goal, DailyFocus, Account, CustomCategory, Liability } from "@shared/schema";
 import ScoreRing from "@/features/score/score-ring";
 import { MilestoneFlame, getMilestoneLevel, getMilestoneName } from "@/features/gamification/milestone-flame";
@@ -1344,9 +1344,71 @@ function AddActionDialog({ open, onClose, t, onStreakTriggered, initialAction }:
 }
 
 // === FINANCIAL SUMMARY CARD ===
+// ─── Budget period status ─────────────────────────────────────────────────────
+type BudgetPeriodStatus = "ACTIVE" | "ENDING_SOON" | "EXPIRED";
+
+function getBudgetPeriodStatus(
+  periodEnd: Date,
+  now: Date,
+): { status: BudgetPeriodStatus; daysRemaining: number } {
+  const daysRemaining = differenceInDays(periodEnd, now);
+  if (daysRemaining > 3) return { status: "ACTIVE", daysRemaining };
+  if (daysRemaining >= 1) return { status: "ENDING_SOON", daysRemaining };
+  return { status: "EXPIRED", daysRemaining };
+}
+
+// ─── Budget Expired Modal ─────────────────────────────────────────────────────
+function BudgetExpiredModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [, navigate] = useLocation();
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContentBottomSheet>
+        <DialogHeader>
+          <DialogTitle>New budget period started</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground mt-1">
+            Your previous budget period has ended. Would you like to reuse your previous budget setup?
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-2 pt-4">
+          <Button
+            className="w-full"
+            onClick={() => { onClose(); navigate("/budget"); }}
+          >
+            Use Previous Setup
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => { onClose(); navigate("/budget"); }}
+          >
+            Edit Budget
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full text-muted-foreground"
+            onClick={onClose}
+          >
+            Skip for Now
+          </Button>
+        </div>
+      </DialogContentBottomSheet>
+    </Dialog>
+  );
+}
+
 // Shows monthly budget overview: safe daily budget, income vs expense, progress bar, status.
 // Uses cycle-aware data when a custom budget cycle is active.
-function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animating: boolean }) {
+function FinancialSummaryCard({
+  hidden,
+  animating,
+  periodStatus,
+  daysRemaining,
+}: {
+  hidden: boolean;
+  animating: boolean;
+  periodStatus: BudgetPeriodStatus | null;
+  daysRemaining: number;
+}) {
   const { t } = useLanguage();
   const { data: insight, isLoading } = useQuery<SpendingInsightData>({
     queryKey: ["/api/spending-insight?period=monthly"],
@@ -1423,12 +1485,45 @@ function FinancialSummaryCard({ hidden, animating }: { hidden: boolean; animatin
             <span className="text-sm font-semibold text-white/80">{t.dashboard.todaysBudget}</span>
           </div>
           {totalIncome > 0 && (
-            <div className="flex items-center gap-1.5">
-              <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", s.dot)} />
-              <span className={cn("text-xs font-medium", s.color)}>{s.label}</span>
-            </div>
+            <>
+              {periodStatus === "EXPIRED" ? (
+                <Link href="/budget">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 border border-red-500/30 px-2 py-0.5 text-[11px] font-semibold text-red-400 cursor-pointer hover:bg-red-500/30 transition-colors">
+                    <AlertTriangle className="w-3 h-3" />
+                    Budget needs setup
+                  </span>
+                </Link>
+              ) : periodStatus === "ENDING_SOON" ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-amber-400" />
+                  <span className="text-xs font-medium text-amber-400">Budget period ending soon</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", s.dot)} />
+                  <span className={cn("text-xs font-medium", s.color)}>{s.label}</span>
+                </div>
+              )}
+            </>
           )}
         </div>
+
+        {/* Reminder banner — shown when period ends in ≤ 2 days */}
+        {daysRemaining >= 1 && daysRemaining <= 2 && (
+          <div className="rounded-lg bg-amber-500/15 border border-amber-500/25 p-3 flex items-center justify-between gap-2 -mt-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <Bell className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <p className="text-xs text-amber-300 leading-snug">
+                Your budget period ends in {daysRemaining} day{daysRemaining !== 1 ? "s" : ""}. Prepare your next budget.
+              </p>
+            </div>
+            <Link href="/budget">
+              <Button size="sm" variant="ghost" className="text-xs text-amber-300 hover:text-amber-200 hover:bg-amber-500/15 whitespace-nowrap shrink-0 h-7 px-2">
+                Review Budget
+              </Button>
+            </Link>
+          </div>
+        )}
 
         {/* Big number: daily safe budget */}
         <div>
@@ -1582,6 +1677,7 @@ export default function Dashboard() {
   const [streakCelebration, setStreakCelebration] = useState<number | null>(null);
   const [levelUpCelebration, setLevelUpCelebration] = useState<number | null>(null);
   const [scrollCollapsed, setScrollCollapsed] = useState(false);
+  const [budgetExpiredOpen, setBudgetExpiredOpen] = useState(false);
   const prevStreakRef = useRef<number | null>(null);
   const prevLevelRef = useRef<number | null>(null);
 
@@ -1641,6 +1737,54 @@ export default function Dashboard() {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // ─── Budget period status (for whole dashboard) ───────────────────────────
+  const hasBudget = Number(profile?.monthlyIncome || 0) > 0;
+  const _dashMonth = format(new Date(), "yyyy-MM");
+  const { data: dashCycleSummary } = useQuery<BudgetCycleSummary>({
+    queryKey: ["/api/budget/summary", _dashMonth],
+    queryFn: async () => {
+      const r = await fetch(`/api/budget/summary?month=${_dashMonth}`, { credentials: "include" });
+      if (!r.ok) return null;
+      return r.json();
+    },
+    enabled: hasBudget,
+  });
+
+  const _now = new Date();
+  const _isCustom = dashCycleSummary?.cycleType === "custom" && !!dashCycleSummary?.periodEnd;
+  const _periodEnd = _isCustom
+    ? parseISO(dashCycleSummary!.periodEnd!)
+    : endOfMonth(_now);
+  const { status: budgetPeriodStatus, daysRemaining: budgetDaysRemaining } =
+    hasBudget ? getBudgetPeriodStatus(_periodEnd, _now) : { status: "ACTIVE" as BudgetPeriodStatus, daysRemaining: 999 };
+
+  // Daily budget notifications (toast + expired modal) — once per day
+  useEffect(() => {
+    if (!hasBudget) return;
+    const today = format(_now, "yyyy-MM-dd");
+    const toastKey = `fr_budget_toast_${today}`;
+    if (localStorage.getItem(toastKey)) return;
+
+    if (budgetDaysRemaining === 2) {
+      toast({ title: "Budget Reminder", description: "Your budget period will end soon." });
+      localStorage.setItem(toastKey, "1");
+    } else if (budgetPeriodStatus === "EXPIRED") {
+      toast({
+        title: "Budget Expired",
+        description: "Your budget period has ended. Set up your new budget.",
+        variant: "destructive",
+      });
+      localStorage.setItem(toastKey, "1");
+
+      const modalKey = `fr_budget_expired_modal_${today}`;
+      if (!localStorage.getItem(modalKey)) {
+        setBudgetExpiredOpen(true);
+        localStorage.setItem(modalKey, "1");
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budgetPeriodStatus, budgetDaysRemaining, hasBudget]);
 
   const { data: dashboard, isLoading: dashLoading } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
@@ -1804,8 +1948,13 @@ export default function Dashboard() {
       </div>
 
       {/* 3. Financial Summary — Today's Budget card (only if user has set monthly income via budget wizard) */}
-      {!profileLoading && Number(profile?.monthlyIncome || 0) > 0 && (
-        <FinancialSummaryCard hidden={hidden} animating={animating} />
+      {!profileLoading && hasBudget && (
+        <FinancialSummaryCard
+          hidden={hidden}
+          animating={animating}
+          periodStatus={budgetPeriodStatus}
+          daysRemaining={budgetDaysRemaining}
+        />
       )}
 
       {/* 4. Total Assets — Hero card (full width) */}
@@ -1997,6 +2146,11 @@ export default function Dashboard() {
       {chartsReady ? <MonthlyActivityCalendar /> : (
         <Card><CardContent className="p-5"><Skeleton className="h-[200px]" /></CardContent></Card>
       )}
+
+      <BudgetExpiredModal
+        open={budgetExpiredOpen}
+        onClose={() => setBudgetExpiredOpen(false)}
+      />
 
       <SetupFirstAccountModal
         open={setupAccountOpen}
