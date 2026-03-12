@@ -776,18 +776,32 @@ export default function Transactions() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-  const [dateFilter, setDateFilter] = useState<DateFilter>("thisMonth");
-  const [pendingFilter, setPendingFilter] = useState<DateFilter>("thisMonth");
-  const [customStart, setCustomStart] = useState(() => format(startOfMonth(new Date()), "yyyy-MM-dd"));
-  const [customEnd, setCustomEnd] = useState(() => format(new Date(), "yyyy-MM-dd"));
-  const [pendingStart, setPendingStart] = useState(() => format(startOfMonth(new Date()), "yyyy-MM-dd"));
-  const [pendingEnd, setPendingEnd] = useState(() => format(new Date(), "yyyy-MM-dd"));
-  const [accountFilter, setAccountFilter] = useState<number | null>(null);
-  const [pendingAccountFilter, setPendingAccountFilter] = useState<number | null>(null);
+
+  const STORAGE_KEY = "txFilter_v1";
+  const savedFilter = (() => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"); } catch { return null; }
+  })();
+  const defaultStart = format(startOfMonth(new Date()), "yyyy-MM-dd");
+  const defaultEnd = format(new Date(), "yyyy-MM-dd");
+
+  const [dateFilter, setDateFilter] = useState<DateFilter>(savedFilter?.dateFilter ?? "thisMonth");
+  const [pendingFilter, setPendingFilter] = useState<DateFilter>(savedFilter?.dateFilter ?? "thisMonth");
+  const [customStart, setCustomStart] = useState<string>(savedFilter?.customStart ?? defaultStart);
+  const [customEnd, setCustomEnd] = useState<string>(savedFilter?.customEnd ?? defaultEnd);
+  const [pendingStart, setPendingStart] = useState<string>(savedFilter?.customStart ?? defaultStart);
+  const [pendingEnd, setPendingEnd] = useState<string>(savedFilter?.customEnd ?? defaultEnd);
+  const [accountFilter, setAccountFilter] = useState<number | null>(savedFilter?.accountFilter ?? null);
+  const [pendingAccountFilter, setPendingAccountFilter] = useState<number | null>(savedFilter?.accountFilter ?? null);
   const [accountSheetOpen, setAccountSheetOpen] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
-  const [pendingTypeFilter, setPendingTypeFilter] = useState<TypeFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>(savedFilter?.typeFilter ?? "all");
+  const [pendingTypeFilter, setPendingTypeFilter] = useState<TypeFilter>(savedFilter?.typeFilter ?? "all");
   const [typeSheetOpen, setTypeSheetOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ dateFilter, customStart, customEnd, accountFilter, typeFilter }));
+    } catch {}
+  }, [dateFilter, customStart, customEnd, accountFilter, typeFilter]);
   const { toast } = useToast();
   const { t, language } = useLanguage();
 
