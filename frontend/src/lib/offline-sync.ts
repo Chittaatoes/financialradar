@@ -1,4 +1,5 @@
 import { localDb } from "@/lib/local-db";
+import { clearPendingLocalTransactions } from "@/lib/offline-transactions";
 import { toast } from "@/hooks/use-toast";
 
 const API_BASE = (import.meta.env.VITE_API_URL as string) ?? "";
@@ -72,6 +73,10 @@ export async function syncOfflineQueue(): Promise<void> {
   }
 
   if (synced > 0) {
+    // Clear local pending transaction placeholders — server now has the real records.
+    // The _invalidate() call below will refetch /api/transactions with real IDs.
+    await clearPendingLocalTransactions();
+
     // Refresh all queries so UI reflects server state
     _invalidate?.();
 

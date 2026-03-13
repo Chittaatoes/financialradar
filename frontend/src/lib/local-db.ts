@@ -8,9 +8,12 @@ export interface LocalTransaction {
   type: string;
   amount: number;
   accountId?: number;
+  fromAccountId?: number;
+  toAccountId?: number;
   category: string;
   note?: string;
   date: string;
+  createdAt?: number;
   synced: boolean;
 }
 

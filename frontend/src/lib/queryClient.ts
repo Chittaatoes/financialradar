@@ -98,6 +98,7 @@ import { persistQueryClient } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { saveOfflineAction } from "@/lib/offline-sync";
 import { cacheSet, cacheGet } from "@/lib/local-db";
+import { getPendingLocalTransactions } from "@/lib/offline-transactions";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
@@ -250,6 +251,19 @@ export const getQueryFn: <T>(options: {
       // Cache every successful response for offline use
       if (isCacheable(url)) {
         cacheSet(url, responseData).catch(() => {});
+      }
+
+      // For /api/transactions: prepend any pending (unsynced) local transactions
+      // so they remain visible during the race between refetchOnReconnect and syncOfflineQueue.
+      // After sync, clearPendingLocalTransactions() removes these before _invalidate() fires,
+      // so they won't appear here when the server already has the real records.
+      if (url === "/api/transactions" && Array.isArray(responseData)) {
+        try {
+          const pending = await getPendingLocalTransactions();
+          if (pending.length > 0) {
+            return [...pending, ...responseData] as T;
+          }
+        } catch {}
       }
 
       return responseData;

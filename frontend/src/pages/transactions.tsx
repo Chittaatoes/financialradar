@@ -24,6 +24,7 @@ import { formatCurrency, EXPENSE_CATEGORY_GROUPS, INCOME_CATEGORIES } from "@/li
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/auth-utils";
+import { saveLocalTransaction } from "@/lib/offline-transactions";
 import type { Account, Transaction, CustomCategory, Goal, Liability } from "@shared/schema";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -160,15 +161,31 @@ function TransactionForm({ accounts, onClose, initialTab }: { accounts: Account[
       if (data.type === "income" || data.type === "transfer") payload.toAccountId = data.toAccountId ? parseInt(data.toAccountId) : null;
       return apiRequest("POST", "/api/transactions", payload);
     },
-    onSuccess: () => {
+    onSuccess: (_res, variables) => {
       playSound("transaction");
+      if (!navigator.onLine) {
+        saveLocalTransaction(
+          {
+            type: variables.type,
+            amount: variables.amount,
+            date: variables.date,
+            category: variables.category || null,
+            note: variables.note || null,
+            fromAccountId: (variables.type === "expense" || variables.type === "transfer") && variables.fromAccountId
+              ? parseInt(variables.fromAccountId) : null,
+            toAccountId: (variables.type === "income" || variables.type === "transfer") && variables.toAccountId
+              ? parseInt(variables.toAccountId) : null,
+          },
+          queryClient,
+        ).catch(() => {});
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance-score"] });
       queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith("/api/budget") });
-      toast({ title: "Transaction recorded! +5 XP" });
+      toast({ title: !navigator.onLine ? "⏳ Tersimpan offline, akan disinkronkan" : "Transaction recorded! +5 XP" });
       onClose();
     },
     onError: (error: Error) => {
@@ -1282,8 +1299,9 @@ export default function Transactions() {
                   const iconBg = isSavingsDeposit ? "bg-teal-500/10" : cfg.bg;
                   const goalName = isSavingsDeposit ? tx.note?.replace("Deposit to ", "") : null;
                   const txTime = tx.createdAt ? format(new Date(tx.createdAt), "HH:mm") : "";
+                  const isPending = (tx as Transaction & { _pending?: boolean })._pending === true;
                   return (
-                    <Card key={tx.id} className="hover-elevate transition-all duration-200" data-testid={`card-tx-${tx.id}`}>
+                    <Card key={tx.id} className={cn("hover-elevate transition-all duration-200", isPending && "opacity-80")} data-testid={`card-tx-${tx.id}`}>
                       <CardContent className="p-4 flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-md flex items-center justify-center shrink-0 ${iconBg}`}>
                           <Icon className={`w-4 h-4 ${iconColor}`} />
@@ -1300,6 +1318,11 @@ export default function Transactions() {
                             <Badge variant="secondary" className="text-[10px]">
                               {isSavingsDeposit ? (language === "en" ? "Goal" : "Nabung") : typeLabels[tx.type] || cfg.label}
                             </Badge>
+                            {isPending && (
+                              <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-600 dark:text-amber-400">
+                                ⏳ Syncing...
+                              </Badge>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                             <span className="text-xs text-muted-foreground">{txTime}</span>
@@ -1325,11 +1348,11 @@ export default function Transactions() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={() => deleteTxMutation.mutate(tx.id)}
-                          disabled={deleteTxMutation.isPending}
+                          onClick={() => !isPending && deleteTxMutation.mutate(tx.id)}
+                          disabled={deleteTxMutation.isPending || isPending}
                           data-testid={`button-delete-tx-${tx.id}`}
                         >
-                          <Trash2 className="w-4 h-4 text-muted-foreground" />
+                          <Trash2 className={cn("w-4 h-4", isPending ? "text-muted-foreground/30" : "text-muted-foreground")} />
                         </Button>
                       </CardContent>
                     </Card>
