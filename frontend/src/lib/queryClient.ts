@@ -98,7 +98,6 @@ import { persistQueryClient } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { saveOfflineAction } from "@/lib/offline-sync";
 import { cacheSet, cacheGet } from "@/lib/local-db";
-import { getPendingLocalTransactions } from "@/lib/offline-transactions";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
@@ -113,7 +112,7 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-// Endpoints excluded from offline mutation queuing (auth / admin flows)
+// Endpoints excluded from offline queuing (auth / admin flows)
 const OFFLINE_EXCLUDE = ["/api/auth/", "/api/guest-login", "/api/admin/"];
 
 function shouldQueueOffline(method: string, url: string): boolean {
@@ -130,61 +129,14 @@ function makeFakeResponse(data: unknown = { offline: true }): Response {
   });
 }
 
-// ─── Endpoints cached in IndexedDB for offline reads ─────────────────────────
-// IMPORTANT: /api/auth/user is included so bootstrap succeeds while offline.
-const CACHEABLE_ENDPOINTS = [
-  "/api/auth/user",
-  "/api/profile",
-  "/api/dashboard",
-  "/api/transactions",
-  "/api/accounts",
-  "/api/goals",
-  "/api/budget",
-  "/api/budget-plan",
-  "/api/budget/summary",
-  "/api/daily-focus",
-  "/api/badges",
-  "/api/debt-health",
-  "/api/net-worth",
-  "/api/spending-insight",
-  "/api/custom-categories",
-  "/api/finance-score",
-  "/api/smart-save",
-];
-
-function isCacheable(url: string): boolean {
-  return CACHEABLE_ENDPOINTS.some((ep) => url.startsWith(ep));
-}
-
-// ─── apiRequest ───────────────────────────────────────────────────────────────
-// Used for mutations (POST/PATCH/PUT/DELETE). Handles:
-// - Offline GET guard: serves from IndexedDB cache
-// - Offline mutation guard: queues to IndexedDB offline queue
-// - Online: executes fetch and caches cacheable GET-like responses
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown,
 ): Promise<Response> {
-  const m = method.toUpperCase();
-
-  // Offline: serve cached data for read-like calls
-  if (!navigator.onLine && m === "GET") {
-    if (isCacheable(url)) {
-      const cached = await cacheGet(url);
-      if (cached != null) {
-        return new Response(JSON.stringify(cached), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-    }
-    throw new Error("Offline and no cache available");
-  }
-
-  // Offline: queue mutations and return a fake OK response
+  // Offline interception: queue mutations and return a fake OK response
   if (!navigator.onLine && shouldQueueOffline(method, url)) {
-    await saveOfflineAction(m, url, data ?? null);
+    await saveOfflineAction(method.toUpperCase(), url, data ?? null);
     return makeFakeResponse();
   }
 
@@ -197,21 +149,32 @@ export async function apiRequest(
   });
 
   await throwIfResNotOk(res);
-
-  // Cache successful responses for offline use
-  if (res.ok && isCacheable(url)) {
-    try {
-      const cloned = res.clone();
-      cloned.json().then((d) => cacheSet(url, d)).catch(() => {});
-    } catch {}
-  }
-
   return res;
 }
 
-// ─── getQueryFn ───────────────────────────────────────────────────────────────
-// Used by all useQuery calls. Handles offline-first reads + cache writing.
 type UnauthorizedBehavior = "returnNull" | "throw";
+
+// API endpoints worth caching in IndexedDB for offline reads
+const CACHEABLE_ENDPOINTS = [
+  "/api/dashboard",
+  "/api/transactions",
+  "/api/accounts",
+  "/api/goals",
+  "/api/budget",
+  "/api/budget-plan",
+  "/api/budget/summary",
+  "/api/profile",
+  "/api/daily-focus",
+  "/api/badges",
+  "/api/debt-health",
+  "/api/net-worth",
+  "/api/spending-insight",
+  "/api/custom-categories",
+];
+
+function isCacheable(url: string): boolean {
+  return CACHEABLE_ENDPOINTS.some((ep) => url.startsWith(ep));
+}
 
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
@@ -220,11 +183,10 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const url = queryKey.join("/") as string;
 
-    // Offline: serve from IndexedDB cache immediately
+    // If offline, serve from IndexedDB cache first
     if (!navigator.onLine && isCacheable(url)) {
       const cached = await cacheGet<T>(url);
-      if (cached !== undefined && cached !== null) return cached;
-      // No cache available — fall through to fetch attempt (will fail, caught below)
+      if (cached !== undefined) return cached;
     }
 
     try {
@@ -238,46 +200,33 @@ export const getQueryFn: <T>(options: {
       }
 
       if (!res.ok) {
-        // Network error or non-200 — try cached data as graceful fallback
+        // Try cached data as fallback
         if (isCacheable(url)) {
           const cached = await cacheGet<T>(url);
-          if (cached !== undefined && cached !== null) return cached;
+          if (cached !== undefined) return cached;
         }
         return null as T;
       }
 
-      const responseData = await res.json();
+      const data = await res.json();
 
-      // Cache every successful response for offline use
+      // Cache successful responses for offline use
       if (isCacheable(url)) {
-        cacheSet(url, responseData).catch(() => {});
+        cacheSet(url, data).catch(() => {});
       }
 
-      // For /api/transactions: prepend any pending (unsynced) local transactions
-      // so they remain visible during the race between refetchOnReconnect and syncOfflineQueue.
-      // After sync, clearPendingLocalTransactions() removes these before _invalidate() fires,
-      // so they won't appear here when the server already has the real records.
-      if (url === "/api/transactions" && Array.isArray(responseData)) {
-        try {
-          const pending = await getPendingLocalTransactions();
-          if (pending.length > 0) {
-            return [...pending, ...responseData] as T;
-          }
-        } catch {}
-      }
-
-      return responseData;
+      return data;
     } catch {
-      // Network failure — try IndexedDB cache as last resort
+      // Network error: try IndexedDB cache
       if (isCacheable(url)) {
         const cached = await cacheGet<T>(url);
-        if (cached !== undefined && cached !== null) return cached;
+        if (cached !== undefined) return cached;
       }
       return null as T;
     }
   };
 
-// ─── Online/Offline manager ───────────────────────────────────────────────────
+// Detect online / offline
 onlineManager.setEventListener((setOnline) => {
   const onlineHandler = () => setOnline(true);
   const offlineHandler = () => setOnline(false);
@@ -291,25 +240,24 @@ onlineManager.setEventListener((setOnline) => {
   };
 });
 
-// ─── QueryClient ──────────────────────────────────────────────────────────────
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "returnNull" }),
 
-      // Cache behavior
-      staleTime: 1000 * 60 * 5,   // 5 minutes — don't refetch if data is fresh
-      gcTime: 1000 * 60 * 30,     // 30 minutes — keep in memory
-
-      // Refetch behavior
+      // React Query behavior
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      refetchOnReconnect: true,   // ← CRITICAL: refetch when network returns
+      refetchOnReconnect: false,
 
-      // Offline: allow queries to run even without network (serves cache)
+      // Offline friendly
       networkMode: "offlineFirst",
 
-      retry: false,               // Don't retry failed requests automatically
+      // Cache strategy
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 30, // 30 minutes
+
+      retry: false,
     },
     mutations: {
       retry: false,
@@ -318,8 +266,7 @@ export const queryClient = new QueryClient({
   },
 });
 
-// ─── Persist cache to localStorage ───────────────────────────────────────────
-// Restores React Query cache across page refreshes.
+// Persist cache to localStorage (offline support)
 if (typeof window !== "undefined") {
   const persister = createSyncStoragePersister({
     storage: window.localStorage,
@@ -329,6 +276,6 @@ if (typeof window !== "undefined") {
     queryClient,
     persister,
     maxAge: 1000 * 60 * 60 * 24, // 24 hours
-    buster: "financialradar-v2",  // bump this when cache schema changes
+    buster: "financialradar-v2", // change when schema changes
   });
 }
