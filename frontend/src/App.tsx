@@ -168,7 +168,10 @@ function AppContent() {
           setReady(true);
         });
 
-      setTimeout(() => setReady(true), 5000);
+      // Reduced from 5000ms — 2 s is enough even on slow mobile connections.
+      // If guest login hasn't resolved by then, render anyway so the user
+      // doesn't stare at a blank screen.
+      setTimeout(() => setReady(true), 2000);
     }
   }, [isLoading, user]);
 
