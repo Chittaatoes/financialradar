@@ -36,6 +36,7 @@ const ScorePage = lazy(() => import("@/features/score/score-page"));
 const Admin = lazy(() => import("@/pages/admin"));
 const ProfilePage = lazy(() => import("@/pages/profile"));
 const ReportsPage = lazy(() => import("@/pages/reports"));
+const MacroRadar = lazy(() => import("@/pages/macro"));
 
 function useNavPlusHandler() {
   const [location, setLocation] = useLocation();
@@ -97,6 +98,7 @@ function AuthenticatedLayout() {
                 <Route path="/networth" component={NetWorth} />
                 <Route path="/achievements" component={Achievements} />
                 <Route path="/reports" component={ReportsPage} />
+                <Route path="/macro" component={MacroRadar} />
                 <Route path="/score" component={ScorePage} />
                 <Route path="/admin" component={Admin} />
                 <Route path="/profile" component={ProfilePage} />
@@ -168,10 +170,7 @@ function AppContent() {
           setReady(true);
         });
 
-      // Reduced from 5000ms — 2 s is enough even on slow mobile connections.
-      // If guest login hasn't resolved by then, render anyway so the user
-      // doesn't stare at a blank screen.
-      setTimeout(() => setReady(true), 2000);
+      setTimeout(() => setReady(true), 5000);
     }
   }, [isLoading, user]);
 

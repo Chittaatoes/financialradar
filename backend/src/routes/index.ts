@@ -1921,6 +1921,76 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
     }
   });
 
+  // ===== MACRO RADAR — external API proxies (cached 5 min) =====
+  const _macroCache = new Map<string, { data: unknown; ts: number }>();
+  const _MACRO_TTL = 5 * 60 * 1000;
+
+  async function _macroFetch(key: string, url: string): Promise<unknown> {
+    const now = Date.now();
+    const hit = _macroCache.get(key);
+    if (hit && now - hit.ts < _MACRO_TTL) return hit.data;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} from ${url}`);
+    const data = await resp.json();
+    _macroCache.set(key, { data, ts: now });
+    return data;
+  }
+
+  app.get("/api/macro-radar/events", async (req, res) => {
+    try {
+      const url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
+      const raw = await _macroFetch("ff_events", url) as any[];
+      const cutoff = Date.now() - 60_000;
+      const events = (Array.isArray(raw) ? raw : [])
+        .filter((e: any) => e.impact === "High" && new Date(e.date).getTime() >= cutoff)
+        .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .slice(0, 20)
+        .map((e: any) => ({
+          event:    e.title ?? e.event ?? "",
+          country:  e.country ?? "",
+          currency: e.country ?? "",
+          date:     e.date,
+          impact:   e.impact,
+          actual:   e.actual   !== undefined && e.actual   !== "" ? e.actual   : null,
+          forecast: e.forecast !== undefined && e.forecast !== "" ? e.forecast : null,
+          previous: e.previous !== undefined && e.previous !== "" ? e.previous : null,
+        }));
+      res.json(events);
+    } catch (err: any) {
+      console.error("macro-radar/events:", err.message);
+      res.status(500).json({ message: "Failed to fetch macro events" });
+    }
+  });
+
+  app.get("/api/macro-radar/indicators", async (req, res) => {
+    try {
+      const FRED_KEY = "77095150d0e19bd97aab68640aef28d5";
+      const ids = ["FEDFUNDS", "CPIAUCSL", "M2SL", "UNRATE"];
+      const results = await Promise.all(
+        ids.map(async (id) => {
+          const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${FRED_KEY}&file_type=json&sort_order=desc&limit=3`;
+          const data = await _macroFetch(`fred_${id}`, url) as any;
+          const obs: any[] = (data?.observations ?? []).filter((o: any) => o.value !== ".");
+          return {
+            id,
+            value: obs[0] ? parseFloat(obs[0].value) : null,
+            prevValue: obs[1] ? parseFloat(obs[1].value) : null,
+            date: obs[0]?.date ?? null,
+          };
+        })
+      );
+      res.json({
+        interestRate: results.find((r) => r.id === "FEDFUNDS") ?? null,
+        inflation:    results.find((r) => r.id === "CPIAUCSL") ?? null,
+        moneySupply:  results.find((r) => r.id === "M2SL") ?? null,
+        unemployment: results.find((r) => r.id === "UNRATE") ?? null,
+      });
+    } catch (err: any) {
+      console.error("macro-radar/indicators:", err.message);
+      res.status(500).json({ message: "Failed to fetch macro indicators" });
+    }
+  });
+
   // ===== SCORE BONUS XP =====
   app.post("/api/score-bonus", isAuthenticated, async (req, res) => {
     try {
