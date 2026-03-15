@@ -630,11 +630,13 @@ export default function MacroRadarPage() {
   const { data: events = [], isLoading: eventsLoading } = useQuery<MacroEvent[]>({
     queryKey: ["/api/macro-radar/events"],
     refetchInterval: 60 * 1000,
+    retry: 2,
   });
 
-  const { data: indicators, isLoading: indLoading } = useQuery<MacroIndicators>({
+  const { data: indicators, isLoading: indLoading, isError: indError } = useQuery<MacroIndicators>({
     queryKey: ["/api/macro-radar/indicators"],
     refetchInterval: 10 * 60 * 1000,
+    retry: 2,
   });
 
   useEffect(() => {
@@ -665,7 +667,20 @@ export default function MacroRadarPage() {
   const todayEvents = useMemo(() => events.filter((e) => isToday(e.date)), [events]);
   const riskLevel: RiskLevel = useMemo(() => todayEvents.length >= 2 ? "HIGH" : todayEvents.length === 1 ? "MEDIUM" : "LOW", [todayEvents]);
 
-  const fredInsight = useMemo(() => indicators ? buildInsight(indicators, isID) : (isID ? "Memuat data makro…" : "Loading macro data…"), [indicators, isID]);
+  const indUnavailable = !indLoading && (
+    indError ||
+    (indicators != null &&
+      indicators.interestRate?.value == null &&
+      indicators.inflation?.value == null &&
+      indicators.moneySupply?.value == null &&
+      indicators.unemployment?.value == null)
+  );
+
+  const fredInsight = useMemo(() => {
+    if (indError || indUnavailable) return isID ? "Data makro sementara tidak tersedia." : "Macro data temporarily unavailable.";
+    if (!indicators) return isID ? "Memuat data makro…" : "Loading macro data…";
+    return buildInsight(indicators, isID);
+  }, [indicators, indError, indUnavailable, isID]);
 
   const postInsight = useMemo(
     () => isPostRelease && nextEvent && surprise ? buildPostReleaseInsight(nextEvent, surprise, eventType, m) : null,
@@ -674,7 +689,7 @@ export default function MacroRadarPage() {
 
   const bias      = useMemo(() => indicators ? buildBias(indicators) : { usd: "Neutral" as Bias, gold: "Neutral" as Bias, btc: "Neutral" as Bias }, [indicators]);
   const regime    = useMemo(() => indicators ? buildRegime(indicators) : "RISK_ON" as Regime, [indicators]);
-  const indLevels = useMemo(() => indicators ? buildMacroIndicatorLevels(indicators) : null, [indicators]);
+  const indLevels = useMemo(() => (indicators && !indUnavailable) ? buildMacroIndicatorLevels(indicators) : null, [indicators, indUnavailable]);
 
   const biasMeanings = useMemo(() => ({
     usd:  bias.usd  === "Bullish" ? m.usdBullish  : bias.usd  === "Bearish" ? m.usdBearish  : m.usdNeutral,

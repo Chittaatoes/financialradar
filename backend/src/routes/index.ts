@@ -1929,11 +1929,17 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
     const now = Date.now();
     const hit = _macroCache.get(key);
     if (hit && now - hit.ts < _MACRO_TTL) return hit.data;
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status} from ${url}`);
-    const data = await resp.json();
-    _macroCache.set(key, { data, ts: now });
-    return data;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const resp = await fetch(url, { signal: controller.signal });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status} from ${url}`);
+      const data = await resp.json();
+      _macroCache.set(key, { data, ts: now });
+      return data;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   app.get("/api/macro-radar/events", async (req, res) => {
@@ -1958,28 +1964,45 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
       res.json(events);
     } catch (err: any) {
       console.error("macro-radar/events:", err.message);
-      res.status(500).json({ message: "Failed to fetch macro events" });
+      res.status(200).json([]);
     }
   });
 
   app.get("/api/macro-radar/indicators", async (req, res) => {
+    const NULL_RESPONSE = {
+      interestRate: null,
+      inflation:    null,
+      moneySupply:  null,
+      unemployment: null,
+    };
+
+    const FRED_KEY = process.env.FRED_API_KEY ?? "77095150d0e19bd97aab68640aef28d5";
+
+    if (!FRED_KEY) {
+      return res.status(200).json(NULL_RESPONSE);
+    }
+
     try {
-      const FRED_KEY = "77095150d0e19bd97aab68640aef28d5";
       const ids = ["FEDFUNDS", "CPIAUCSL", "M2SL", "UNRATE"];
       const results = await Promise.all(
         ids.map(async (id) => {
-          const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${FRED_KEY}&file_type=json&sort_order=desc&limit=3`;
-          const data = await _macroFetch(`fred_${id}`, url) as any;
-          const obs: any[] = (data?.observations ?? []).filter((o: any) => o.value !== ".");
-          return {
-            id,
-            value: obs[0] ? parseFloat(obs[0].value) : null,
-            prevValue: obs[1] ? parseFloat(obs[1].value) : null,
-            date: obs[0]?.date ?? null,
-          };
+          try {
+            const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${FRED_KEY}&file_type=json&sort_order=desc&limit=3`;
+            const data = await _macroFetch(`fred_${id}`, url) as any;
+            const obs: any[] = (data?.observations ?? []).filter((o: any) => o.value !== ".");
+            return {
+              id,
+              value:     obs[0] ? parseFloat(obs[0].value) : null,
+              prevValue: obs[1] ? parseFloat(obs[1].value) : null,
+              date:      obs[0]?.date ?? null,
+            };
+          } catch (seriesErr: any) {
+            console.error(`FRED fetch error for ${id}:`, seriesErr.message);
+            return { id, value: null, prevValue: null, date: null };
+          }
         })
       );
-      res.json({
+      res.status(200).json({
         interestRate: results.find((r) => r.id === "FEDFUNDS") ?? null,
         inflation:    results.find((r) => r.id === "CPIAUCSL") ?? null,
         moneySupply:  results.find((r) => r.id === "M2SL") ?? null,
@@ -1987,7 +2010,7 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
       });
     } catch (err: any) {
       console.error("macro-radar/indicators:", err.message);
-      res.status(500).json({ message: "Failed to fetch macro indicators" });
+      res.status(200).json(NULL_RESPONSE);
     }
   });
 
