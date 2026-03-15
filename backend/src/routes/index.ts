@@ -1925,23 +1925,6 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
   const _macroCache = new Map<string, { data: unknown; ts: number }>();
   const _MACRO_TTL = 5 * 60 * 1000;
 
-  type IndicatorPoint = { value: number | null; prevValue: number | null };
-  type IndicatorsPayload = {
-    interestRate: IndicatorPoint;
-    inflation:    IndicatorPoint;
-    moneySupply:  IndicatorPoint;
-    unemployment: IndicatorPoint;
-  };
-
-  const DEFAULT_MACRO_INDICATORS: IndicatorsPayload = {
-    interestRate: { value: 3.5,   prevValue: 3.5   },
-    inflation:    { value: 320,   prevValue: 318   },
-    moneySupply:  { value: 22000, prevValue: 21950 },
-    unemployment: { value: 4.2,   prevValue: 4.1   },
-  };
-
-  let lastIndicators: IndicatorsPayload | null = null;
-
   async function _macroFetch(key: string, url: string): Promise<unknown> {
     const now = Date.now();
     const hit = _macroCache.get(key);
@@ -1986,72 +1969,48 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
   });
 
   app.get("/api/macro-radar/indicators", async (req, res) => {
-    const SAFE_NULL = { value: null as number | null, prevValue: null as number | null };
     const NULL_RESPONSE = {
-      interestRate: { ...SAFE_NULL },
-      inflation:    { ...SAFE_NULL },
-      moneySupply:  { ...SAFE_NULL },
-      unemployment: { ...SAFE_NULL },
+      interestRate: null,
+      inflation:    null,
+      moneySupply:  null,
+      unemployment: null,
     };
 
     const FRED_KEY = process.env.FRED_API_KEY ?? "77095150d0e19bd97aab68640aef28d5";
 
-    async function fetchFred(seriesId: string): Promise<{ value: number | null; prevValue: number | null }> {
-      const url =
-        `https://api.stlouisfed.org/fred/series/observations` +
-        `?series_id=${seriesId}&api_key=${FRED_KEY}&file_type=json&sort_order=desc&limit=2`;
-      for (let attempt = 0; attempt <= 2; attempt++) {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 5000);
-        try {
-          const resp = await fetch(url, { signal: controller.signal });
-          clearTimeout(timer);
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const data = await resp.json() as any;
-          const obs: any[] = (data?.observations ?? []).filter(
-            (o: any) => o.value != null && o.value !== "." && o.value !== ""
-          );
-          const val  = obs[0] ? Number(obs[0].value) : null;
-          const prev = obs[1] ? Number(obs[1].value) : null;
-          return {
-            value:     val  !== null && !isNaN(val)  ? val  : null,
-            prevValue: prev !== null && !isNaN(prev) ? prev : null,
-          };
-        } catch (err: any) {
-          clearTimeout(timer);
-          console.error(`FRED fetch failed: ${seriesId} attempt ${attempt + 1}:`, err.message);
-          if (attempt === 2) return { value: null, prevValue: null };
-        }
-      }
-      return { value: null, prevValue: null };
+    if (!FRED_KEY) {
+      return res.status(200).json(NULL_RESPONSE);
     }
 
     try {
-      const [interestRate, inflation, moneySupply, unemployment] = await Promise.all([
-        fetchFred("FEDFUNDS"),
-        fetchFred("CPIAUCSL"),
-        fetchFred("M2SL"),
-        fetchFred("UNRATE"),
-      ]);
-
-      const allNull =
-        interestRate.value == null &&
-        inflation.value    == null &&
-        moneySupply.value  == null &&
-        unemployment.value == null;
-
-      if (allNull) {
-        const fallback = lastIndicators ?? DEFAULT_MACRO_INDICATORS;
-        console.error("FRED fetch failed: all values null, using fallback");
-        return res.status(200).json(fallback);
-      }
-
-      const payload: IndicatorsPayload = { interestRate, inflation, moneySupply, unemployment };
-      lastIndicators = payload;
-      res.status(200).json(payload);
+      const ids = ["FEDFUNDS", "CPIAUCSL", "M2SL", "UNRATE"];
+      const results = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${FRED_KEY}&file_type=json&sort_order=desc&limit=3`;
+            const data = await _macroFetch(`fred_${id}`, url) as any;
+            const obs: any[] = (data?.observations ?? []).filter((o: any) => o.value !== ".");
+            return {
+              id,
+              value:     obs[0] ? parseFloat(obs[0].value) : null,
+              prevValue: obs[1] ? parseFloat(obs[1].value) : null,
+              date:      obs[0]?.date ?? null,
+            };
+          } catch (seriesErr: any) {
+            console.error(`FRED fetch error for ${id}:`, seriesErr.message);
+            return { id, value: null, prevValue: null, date: null };
+          }
+        })
+      );
+      res.status(200).json({
+        interestRate: results.find((r) => r.id === "FEDFUNDS") ?? null,
+        inflation:    results.find((r) => r.id === "CPIAUCSL") ?? null,
+        moneySupply:  results.find((r) => r.id === "M2SL") ?? null,
+        unemployment: results.find((r) => r.id === "UNRATE") ?? null,
+      });
     } catch (err: any) {
-      console.error("FRED fetch failed:", err.message);
-      res.status(200).json(lastIndicators ?? DEFAULT_MACRO_INDICATORS);
+      console.error("macro-radar/indicators:", err.message);
+      res.status(200).json(NULL_RESPONSE);
     }
   });
 
