@@ -1,4 +1,4 @@
-# Financial Radar v1.0
+# Financial Radar v1.1
 
 ## Overview
 Financial Radar is a habit-driven personal finance web application. It helps users track assets (Cash, Bank, E-Wallet), manage income/expenses, set savings goals, and build financial discipline through subtle gamification (XP, Levels, Streaks, Finance Score).
