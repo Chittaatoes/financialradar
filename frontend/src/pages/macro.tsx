@@ -4,7 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Activity, AlertTriangle, TrendingUp, TrendingDown, Minus,
-  Clock, Globe, Zap, Brain, BarChart3, Shield, Layers, DollarSign, Map,
+  Clock, Globe, Zap, Brain, BarChart3, Shield, Layers, DollarSign,
+  Map, Sparkles,
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 
@@ -63,6 +64,25 @@ function isToday(dateStr: string): boolean {
     d.getDate() === now.getDate();
 }
 
+function parseValue(str: string | null): number | null {
+  if (!str || str === "-" || str === "—") return null;
+  const cleaned = str.replace(/[%K$,<>]/g, "").trim();
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? null : num;
+}
+
+function fmtSurprise(n: number, unit: string): string {
+  return (n > 0 ? "+" : "") + n.toFixed(2) + unit;
+}
+
+function detectUnit(str: string | null): string {
+  if (!str) return "";
+  if (str.includes("%")) return "%";
+  if (str.includes("K")) return "K";
+  if (str.includes("B")) return "B";
+  return "";
+}
+
 type EventType = "CPI" | "NFP" | "FOMC" | "GDP" | "UNEMPLOYMENT" | "OTHER";
 
 function detectEventType(name: string): EventType {
@@ -77,6 +97,7 @@ function detectEventType(name: string): EventType {
 
 type Bias = "Bullish" | "Bearish" | "Neutral" | "Volatile";
 type Regime = "RISK_ON" | "RISK_OFF" | "INFLATION" | "LIQUIDITY";
+type SurpriseDir = "POSITIVE" | "NEGATIVE" | "NEUTRAL";
 
 interface AssetBias { usd: Bias; gold: Bias; btc: Bias }
 
@@ -97,6 +118,14 @@ interface QuickImpactItem {
   label: string;
   emoji: string;
   arrow: ArrowDir;
+}
+
+interface SurpriseResult {
+  actualVal: number | null;
+  forecastVal: number | null;
+  surprise: number | null;
+  dir: SurpriseDir;
+  unit: string;
 }
 
 // ─── Market data ──────────────────────────────────────────────────────────────
@@ -123,49 +152,62 @@ const IMPACT_MAP_FULL: Array<{ currency: string; flag: string; pairs: string[] }
 
 function buildCurrencyPairs(currency: string): [CurrencyPair[], CurrencyPair[]] {
   switch (currency) {
-    case "CAD": return [
-      [{ label: "CAD", arrow: "↑" }, { label: "USDCAD", arrow: "↓" }, { label: "CADJPY", arrow: "↑" }],
-      [{ label: "CAD", arrow: "↓" }, { label: "USDCAD", arrow: "↑" }, { label: "CADJPY", arrow: "↓" }],
-    ];
-    case "EUR": return [
-      [{ label: "EUR", arrow: "↑" }, { label: "EURUSD", arrow: "↑" }, { label: "EURJPY", arrow: "↑" }],
-      [{ label: "EUR", arrow: "↓" }, { label: "EURUSD", arrow: "↓" }, { label: "EURJPY", arrow: "↓" }],
-    ];
-    case "JPY": return [
-      [{ label: "JPY", arrow: "↑" }, { label: "USDJPY", arrow: "↓" }, { label: "XAUJPY", arrow: "↓" }],
-      [{ label: "JPY", arrow: "↓" }, { label: "USDJPY", arrow: "↑" }, { label: "XAUJPY", arrow: "↑" }],
-    ];
-    case "GBP": return [
-      [{ label: "GBP", arrow: "↑" }, { label: "GBPUSD", arrow: "↑" }, { label: "GBPJPY", arrow: "↑" }],
-      [{ label: "GBP", arrow: "↓" }, { label: "GBPUSD", arrow: "↓" }, { label: "GBPJPY", arrow: "↓" }],
-    ];
-    case "AUD": return [
-      [{ label: "AUD", arrow: "↑" }, { label: "AUDUSD", arrow: "↑" }, { label: "AUDJPY", arrow: "↑" }],
-      [{ label: "AUD", arrow: "↓" }, { label: "AUDUSD", arrow: "↓" }, { label: "AUDJPY", arrow: "↓" }],
-    ];
-    case "NZD": return [
-      [{ label: "NZD", arrow: "↑" }, { label: "NZDUSD", arrow: "↑" }, { label: "NZDJPY", arrow: "↑" }],
-      [{ label: "NZD", arrow: "↓" }, { label: "NZDUSD", arrow: "↓" }, { label: "NZDJPY", arrow: "↓" }],
-    ];
-    case "CHF": return [
-      [{ label: "CHF", arrow: "↑" }, { label: "USDCHF", arrow: "↓" }, { label: "EURCHF", arrow: "↓" }],
-      [{ label: "CHF", arrow: "↓" }, { label: "USDCHF", arrow: "↑" }, { label: "EURCHF", arrow: "↑" }],
-    ];
-    default: return [[], []];
+    case "CAD": return [[{ label: "CAD", arrow: "↑" }, { label: "USDCAD", arrow: "↓" }, { label: "CADJPY", arrow: "↑" }], [{ label: "CAD", arrow: "↓" }, { label: "USDCAD", arrow: "↑" }, { label: "CADJPY", arrow: "↓" }]];
+    case "EUR": return [[{ label: "EUR", arrow: "↑" }, { label: "EURUSD", arrow: "↑" }, { label: "EURJPY", arrow: "↑" }], [{ label: "EUR", arrow: "↓" }, { label: "EURUSD", arrow: "↓" }, { label: "EURJPY", arrow: "↓" }]];
+    case "JPY": return [[{ label: "JPY", arrow: "↑" }, { label: "USDJPY", arrow: "↓" }, { label: "XAUJPY", arrow: "↓" }], [{ label: "JPY", arrow: "↓" }, { label: "USDJPY", arrow: "↑" }, { label: "XAUJPY", arrow: "↑" }]];
+    case "GBP": return [[{ label: "GBP", arrow: "↑" }, { label: "GBPUSD", arrow: "↑" }, { label: "GBPJPY", arrow: "↑" }], [{ label: "GBP", arrow: "↓" }, { label: "GBPUSD", arrow: "↓" }, { label: "GBPJPY", arrow: "↓" }]];
+    case "AUD": return [[{ label: "AUD", arrow: "↑" }, { label: "AUDUSD", arrow: "↑" }, { label: "AUDJPY", arrow: "↑" }], [{ label: "AUD", arrow: "↓" }, { label: "AUDUSD", arrow: "↓" }, { label: "AUDJPY", arrow: "↓" }]];
+    case "NZD": return [[{ label: "NZD", arrow: "↑" }, { label: "NZDUSD", arrow: "↑" }, { label: "NZDJPY", arrow: "↑" }], [{ label: "NZD", arrow: "↓" }, { label: "NZDUSD", arrow: "↓" }, { label: "NZDJPY", arrow: "↓" }]];
+    case "CHF": return [[{ label: "CHF", arrow: "↑" }, { label: "USDCHF", arrow: "↓" }, { label: "EURCHF", arrow: "↓" }], [{ label: "CHF", arrow: "↓" }, { label: "USDCHF", arrow: "↑" }, { label: "EURCHF", arrow: "↑" }]];
+    default:    return [[], []];
   }
+}
+
+// ─── Surprise logic ───────────────────────────────────────────────────────────
+function calcSurprise(actual: string | null, forecast: string | null): SurpriseResult {
+  const unit = detectUnit(actual ?? forecast);
+  const a = parseValue(actual);
+  const f = parseValue(forecast);
+  if (a === null || f === null) return { actualVal: a, forecastVal: f, surprise: null, dir: "NEUTRAL", unit };
+  const surprise = a - f;
+  const threshold = Math.max(0.05, Math.abs(f) * 0.05);
+  const dir: SurpriseDir = surprise > threshold ? "POSITIVE" : surprise < -threshold ? "NEGATIVE" : "NEUTRAL";
+  return { actualVal: a, forecastVal: f, surprise, dir, unit };
+}
+
+function isBullishForCurrency(eventType: EventType, dir: SurpriseDir): boolean {
+  if (dir === "NEUTRAL") return false;
+  if (eventType === "UNEMPLOYMENT") return dir === "NEGATIVE";
+  return dir === "POSITIVE";
+}
+
+function buildPostReleaseInsight(event: MacroEvent, surprise: SurpriseResult, eventType: EventType, m: any): string {
+  const ccy = event.currency ?? "USD";
+  const [pairsA, pairsB] = buildCurrencyPairs(ccy);
+  const bullish = isBullishForCurrency(eventType, surprise.dir);
+  const activePairs = bullish ? pairsA : pairsB;
+
+  const cameStr = surprise.dir === "POSITIVE" ? m.cameHigher : surprise.dir === "NEGATIVE" ? m.cameLower : m.cameInLine;
+  const contextStr = eventType === "CPI"
+    ? (bullish ? m.inflationPressure : m.inflationEasing)
+    : (surprise.dir === "NEUTRAL" ? m.inLineSuggests : "");
+
+  const pairLines = activePairs.map((p) => `${p.label} ${p.arrow === "↑" ? m.mayStrengthen : m.mayWeaken}`).join(", ");
+
+  return `${event.event} ${cameStr}${contextStr ? " " + contextStr : ""} ${pairLines ? pairLines + "." : ""}`.trim();
 }
 
 // ─── Logic builders ───────────────────────────────────────────────────────────
 function buildScenarios(eventType: EventType, isID: boolean, currency: string): [Scenario, Scenario] {
   const t = {
-    cpiA: isID ? "CPI lebih tinggi dari perkiraan (inflasi panas)" : "CPI higher than forecast (hot inflation)",
-    cpiB: isID ? "CPI lebih rendah dari perkiraan (inflasi mulai dingin)" : "CPI lower than forecast (cooling inflation)",
-    nfpA: isID ? "NFP lebih tinggi dari perkiraan (pasar kerja kuat)" : "NFP higher than forecast (strong jobs)",
-    nfpB: isID ? "NFP lebih rendah dari perkiraan (pasar kerja lemah)" : "NFP lower than forecast (weak jobs)",
-    fomcA: isID ? "Kenaikan suku bunga atau sinyal hawkish" : "Rate hike or hawkish signal",
-    fomcB: isID ? "Pemotongan suku bunga atau sinyal dovish" : "Rate cut or dovish signal",
-    gdpA: isID ? "GDP melampaui ekspektasi (pertumbuhan)" : "GDP beats expectations (growth)",
-    gdpB: isID ? "GDP di bawah ekspektasi (kontraksi)" : "GDP misses expectations (contraction)",
+    cpiA:   isID ? "CPI lebih tinggi dari perkiraan (inflasi panas)" : "CPI higher than forecast (hot inflation)",
+    cpiB:   isID ? "CPI lebih rendah dari perkiraan (inflasi mulai dingin)" : "CPI lower than forecast (cooling inflation)",
+    nfpA:   isID ? "NFP lebih tinggi dari perkiraan (pasar kerja kuat)" : "NFP higher than forecast (strong jobs)",
+    nfpB:   isID ? "NFP lebih rendah dari perkiraan (pasar kerja lemah)" : "NFP lower than forecast (weak jobs)",
+    fomcA:  isID ? "Kenaikan suku bunga atau sinyal hawkish" : "Rate hike or hawkish signal",
+    fomcB:  isID ? "Pemotongan suku bunga atau sinyal dovish" : "Rate cut or dovish signal",
+    gdpA:   isID ? "GDP melampaui ekspektasi (pertumbuhan)" : "GDP beats expectations (growth)",
+    gdpB:   isID ? "GDP di bawah ekspektasi (kontraksi)" : "GDP misses expectations (contraction)",
     unempA: isID ? "Pengangguran lebih tinggi dari ekspektasi" : "Unemployment higher than expected",
     unempB: isID ? "Pengangguran lebih rendah dari ekspektasi" : "Unemployment lower than expected",
     otherA: isID ? "Hasil lebih baik dari ekspektasi" : "Better than expected result",
@@ -173,19 +215,17 @@ function buildScenarios(eventType: EventType, isID: boolean, currency: string): 
   };
   const sA = isID ? "Skenario A" : "Scenario A";
   const sB = isID ? "Skenario B" : "Scenario B";
-
   const [pairsA, pairsB] = buildCurrencyPairs(currency);
 
   let base: [Scenario, Scenario];
   switch (eventType) {
-    case "CPI":         base = [{ label: sA, description: t.cpiA,   usd: "↑", gold: "↑", btc: "↓", stocks: "↓" }, { label: sB, description: t.cpiB,   usd: "↓", gold: "↓", btc: "↑", stocks: "↑" }]; break;
-    case "NFP":         base = [{ label: sA, description: t.nfpA,   usd: "↑", gold: "↓", btc: "↓", stocks: "↑" }, { label: sB, description: t.nfpB,   usd: "↓", gold: "↑", btc: "→", stocks: "↓" }]; break;
-    case "FOMC":        base = [{ label: sA, description: t.fomcA,  usd: "↑", gold: "↓", btc: "↓", stocks: "↓" }, { label: sB, description: t.fomcB,  usd: "↓", gold: "↑", btc: "↑", stocks: "↑" }]; break;
-    case "GDP":         base = [{ label: sA, description: t.gdpA,   usd: "↑", gold: "↓", btc: "↑", stocks: "↑" }, { label: sB, description: t.gdpB,   usd: "↓", gold: "↑", btc: "↓", stocks: "↓" }]; break;
-    case "UNEMPLOYMENT":base = [{ label: sA, description: t.unempA, usd: "↓", gold: "↑", btc: "↓", stocks: "↓" }, { label: sB, description: t.unempB, usd: "↑", gold: "↓", btc: "↑", stocks: "↑" }]; break;
-    default:            base = [{ label: sA, description: t.otherA, usd: "↑", gold: "→", btc: "→" },               { label: sB, description: t.otherB, usd: "↓", gold: "↑", btc: "↓" }]; break;
+    case "CPI":          base = [{ label: sA, description: t.cpiA,   usd: "↑", gold: "↑", btc: "↓", stocks: "↓" }, { label: sB, description: t.cpiB,   usd: "↓", gold: "↓", btc: "↑", stocks: "↑" }]; break;
+    case "NFP":          base = [{ label: sA, description: t.nfpA,   usd: "↑", gold: "↓", btc: "↓", stocks: "↑" }, { label: sB, description: t.nfpB,   usd: "↓", gold: "↑", btc: "→", stocks: "↓" }]; break;
+    case "FOMC":         base = [{ label: sA, description: t.fomcA,  usd: "↑", gold: "↓", btc: "↓", stocks: "↓" }, { label: sB, description: t.fomcB,  usd: "↓", gold: "↑", btc: "↑", stocks: "↑" }]; break;
+    case "GDP":          base = [{ label: sA, description: t.gdpA,   usd: "↑", gold: "↓", btc: "↑", stocks: "↑" }, { label: sB, description: t.gdpB,   usd: "↓", gold: "↑", btc: "↓", stocks: "↓" }]; break;
+    case "UNEMPLOYMENT": base = [{ label: sA, description: t.unempA, usd: "↓", gold: "↑", btc: "↓", stocks: "↓" }, { label: sB, description: t.unempB, usd: "↑", gold: "↓", btc: "↑", stocks: "↑" }]; break;
+    default:             base = [{ label: sA, description: t.otherA, usd: "↑", gold: "→", btc: "→" },              { label: sB, description: t.otherB, usd: "↓", gold: "↑", btc: "↓" }]; break;
   }
-
   return [
     { ...base[0], currencyPairs: pairsA.length > 0 ? pairsA : undefined },
     { ...base[1], currencyPairs: pairsB.length > 0 ? pairsB : undefined },
@@ -200,12 +240,12 @@ function buildQuickImpact(eventType: EventType, isID: boolean): { condition: str
   const bond = isID ? "Obligasi" : "Bonds";
 
   switch (eventType) {
-    case "CPI":         return { condition: isID ? "Jika inflasi naik:"                 : "If inflation rises:",           items: [{ label: usd, emoji: "💵", arrow: "↑" }, { label: gold, emoji: "🥇", arrow: "↑" }, { label: stk, emoji: "📈", arrow: "↓" }, { label: btc, emoji: "₿", arrow: "↓" }] };
-    case "NFP":         return { condition: isID ? "Jika data tenaga kerja kuat:"        : "If jobs data is strong:",       items: [{ label: usd, emoji: "💵", arrow: "↑" }, { label: gold, emoji: "🥇", arrow: "↓" }, { label: stk, emoji: "📈", arrow: "↑" }, { label: btc, emoji: "₿", arrow: "↓" }] };
-    case "FOMC":        return { condition: isID ? "Jika suku bunga naik:"               : "If rate hikes:",                items: [{ label: usd, emoji: "💵", arrow: "↑" }, { label: gold, emoji: "🥇", arrow: "↓" }, { label: bond, emoji: "📉", arrow: "↓" }, { label: btc, emoji: "₿", arrow: "↓" }] };
-    case "GDP":         return { condition: isID ? "Jika GDP melebihi ekspektasi:"       : "If GDP beats expectations:",    items: [{ label: usd, emoji: "💵", arrow: "↑" }, { label: stk, emoji: "📈", arrow: "↑" }, { label: gold, emoji: "🥇", arrow: "→" }, { label: btc, emoji: "₿", arrow: "↑" }] };
-    case "UNEMPLOYMENT":return { condition: isID ? "Jika pengangguran naik:"             : "If unemployment rises:",        items: [{ label: usd, emoji: "💵", arrow: "↓" }, { label: gold, emoji: "🥇", arrow: "↑" }, { label: stk, emoji: "📈", arrow: "↓" }, { label: btc, emoji: "₿", arrow: "↓" }] };
-    default:            return { condition: isID ? "Jika hasil di atas ekspektasi:"      : "If result beats expectations:", items: [{ label: usd, emoji: "💵", arrow: "↑" }, { label: gold, emoji: "🥇", arrow: "→" }, { label: btc, emoji: "₿", arrow: "→" }] };
+    case "CPI":          return { condition: isID ? "Jika inflasi naik:"            : "If inflation rises:",           items: [{ label: usd, emoji: "💵", arrow: "↑" }, { label: gold, emoji: "🥇", arrow: "↑" }, { label: stk, emoji: "📈", arrow: "↓" }, { label: btc, emoji: "₿", arrow: "↓" }] };
+    case "NFP":          return { condition: isID ? "Jika data tenaga kerja kuat:"   : "If jobs data is strong:",       items: [{ label: usd, emoji: "💵", arrow: "↑" }, { label: gold, emoji: "🥇", arrow: "↓" }, { label: stk, emoji: "📈", arrow: "↑" }, { label: btc, emoji: "₿", arrow: "↓" }] };
+    case "FOMC":         return { condition: isID ? "Jika suku bunga naik:"          : "If rate hikes:",                items: [{ label: usd, emoji: "💵", arrow: "↑" }, { label: gold, emoji: "🥇", arrow: "↓" }, { label: bond, emoji: "📉", arrow: "↓" }, { label: btc, emoji: "₿", arrow: "↓" }] };
+    case "GDP":          return { condition: isID ? "Jika GDP melebihi ekspektasi:"  : "If GDP beats expectations:",    items: [{ label: usd, emoji: "💵", arrow: "↑" }, { label: stk, emoji: "📈", arrow: "↑" }, { label: gold, emoji: "🥇", arrow: "→" }, { label: btc, emoji: "₿", arrow: "↑" }] };
+    case "UNEMPLOYMENT": return { condition: isID ? "Jika pengangguran naik:"        : "If unemployment rises:",        items: [{ label: usd, emoji: "💵", arrow: "↓" }, { label: gold, emoji: "🥇", arrow: "↑" }, { label: stk, emoji: "📈", arrow: "↓" }, { label: btc, emoji: "₿", arrow: "↓" }] };
+    default:             return { condition: isID ? "Jika hasil di atas ekspektasi:" : "If result beats expectations:", items: [{ label: usd, emoji: "💵", arrow: "↑" }, { label: gold, emoji: "🥇", arrow: "→" }, { label: btc, emoji: "₿", arrow: "→" }] };
   }
 }
 
@@ -229,39 +269,23 @@ function buildInsight(ind: MacroIndicators, isID: boolean): string {
     }
   }
   if (cpi !== null && cpi > 300) {
-    const annualised = ((cpi / 280) - 1) * 100;
-    if (isID) {
-      if (annualised > 4) lines.push(`Inflasi (indeks CPI ${cpi.toFixed(1)}) masih tinggi, menjaga tekanan pada Fed.`);
-      else lines.push(`Inflasi (indeks CPI ${cpi.toFixed(1)}) tampaknya mulai mereda secara bertahap.`);
-    } else {
-      if (annualised > 4) lines.push(`Inflation (CPI index ${cpi.toFixed(1)}) remains elevated, keeping pressure on the Fed.`);
-      else lines.push(`Inflation (CPI index ${cpi.toFixed(1)}) appears to be cooling gradually.`);
-    }
+    const ann = ((cpi / 280) - 1) * 100;
+    if (isID) lines.push(ann > 4 ? `Inflasi (CPI ${cpi.toFixed(1)}) masih tinggi, menjaga tekanan pada Fed.` : `Inflasi (CPI ${cpi.toFixed(1)}) tampaknya mulai mereda.`);
+    else       lines.push(ann > 4 ? `Inflation (CPI index ${cpi.toFixed(1)}) remains elevated, keeping pressure on the Fed.` : `Inflation (CPI index ${cpi.toFixed(1)}) appears to be cooling gradually.`);
   }
   if (m2 !== null && m2p !== null) {
-    const m2Delta = m2 - m2p;
-    if (isID) {
-      if (m2Delta < 0) lines.push(`Pasokan uang berkontraksi (M2 turun $${Math.abs(m2Delta).toFixed(0)}M), sinyal bearish untuk aset berisiko.`);
-      else lines.push(`Pasokan uang ekspansi (M2 naik $${m2Delta.toFixed(0)}M), secara umum mendukung pasar.`);
-    } else {
-      if (m2Delta < 0) lines.push(`Money supply is contracting (M2 down by $${Math.abs(m2Delta).toFixed(0)}M), a bearish signal for risk assets.`);
-      else lines.push(`Money supply is expanding (M2 up by $${m2Delta.toFixed(0)}M), broadly supportive of markets.`);
-    }
+    const d = m2 - m2p;
+    if (isID) lines.push(d < 0 ? `Pasokan uang berkontraksi (M2 turun $${Math.abs(d).toFixed(0)}M), sinyal bearish.` : `Pasokan uang ekspansi (M2 naik $${d.toFixed(0)}M), mendukung pasar.`);
+    else       lines.push(d < 0 ? `Money supply contracting (M2 down $${Math.abs(d).toFixed(0)}M), bearish for risk assets.` : `Money supply expanding (M2 up $${d.toFixed(0)}M), broadly supportive.`);
   }
   if (unem !== null) {
-    if (isID) {
-      if (unem > 4.5) lines.push(`Pengangguran naik ke ${unem}%, menandakan pelemahan ekonomi.`);
-      else lines.push(`Pengangguran terjaga di ${unem}%, mencerminkan ketahanan pasar tenaga kerja.`);
-    } else {
-      if (unem > 4.5) lines.push(`Unemployment is rising at ${unem}%, signaling economic softness.`);
-      else lines.push(`Unemployment remains contained at ${unem}%, reflecting labor market resilience.`);
-    }
+    if (isID) lines.push(unem > 4.5 ? `Pengangguran naik ke ${unem}%, menandakan pelemahan ekonomi.` : `Pengangguran terjaga di ${unem}%, mencerminkan ketahanan pasar kerja.`);
+    else       lines.push(unem > 4.5 ? `Unemployment rising at ${unem}%, signaling economic softness.` : `Unemployment contained at ${unem}%, reflecting labor market resilience.`);
   }
   if (lines.length === 0) return isID ? "Memuat data makro…" : "Loading macro data…";
-
   const envTag = isID
-    ? ((rate ?? 0) >= 4 ? "Secara keseluruhan, lingkungan makro ini hawkish, yang biasanya mendukung dolar AS." : "Lingkungan makro ini berpotensi mendukung aset berisiko dan mata uang negara berkembang.")
-    : ((rate ?? 0) >= 4 ? "This overall macro environment is hawkish, which typically supports the US dollar." : "This macro environment may support risk assets and emerging market currencies.");
+    ? ((rate ?? 0) >= 4 ? "Secara keseluruhan, lingkungan makro ini hawkish, biasanya mendukung dolar AS." : "Lingkungan makro ini berpotensi mendukung aset berisiko dan mata uang berkembang.")
+    : ((rate ?? 0) >= 4 ? "This overall macro environment is hawkish, typically supporting the US dollar." : "This macro environment may support risk assets and emerging market currencies.");
   return lines.join(" ") + " " + envTag;
 }
 
@@ -278,27 +302,23 @@ function buildBias(ind: MacroIndicators): AssetBias {
   const rateHigh    = rate >= 4.5;
   const rateCut     = rate < rateP;
 
-  const usd:  Bias = rateHigh && !rateCut ? "Bullish" : unemRising ? "Bearish" : "Neutral";
-  const gold: Bias = !rateHigh ? "Bullish" : m2Shrinking ? "Bearish" : "Neutral";
-  const btc:  Bias = m2Shrinking ? "Bearish" : rateHigh ? "Volatile" : "Bullish";
-
-  return { usd, gold, btc };
+  return {
+    usd:  rateHigh && !rateCut ? "Bullish" : unemRising ? "Bearish" : "Neutral",
+    gold: !rateHigh ? "Bullish" : m2Shrinking ? "Bearish" : "Neutral",
+    btc:  m2Shrinking ? "Bearish" : rateHigh ? "Volatile" : "Bullish",
+  };
 }
 
 function buildRegime(ind: MacroIndicators): Regime {
-  const rate  = ind.interestRate?.value ?? 0;
-  const cpi   = ind.inflation?.value ?? 0;
-  const cpip  = ind.inflation?.prevValue ?? cpi;
-  const m2    = ind.moneySupply?.value ?? 0;
-  const m2p   = ind.moneySupply?.prevValue ?? 0;
+  const rate = ind.interestRate?.value ?? 0;
+  const cpi  = ind.inflation?.value ?? 0;
+  const cpip = ind.inflation?.prevValue ?? cpi;
+  const m2   = ind.moneySupply?.value ?? 0;
+  const m2p  = ind.moneySupply?.prevValue ?? 0;
 
-  const inflationRising = cpi > cpip;
-  const rateHigh        = rate >= 4.5;
-  const m2Expanding     = m2 > m2p;
-
-  if (rateHigh && inflationRising) return "INFLATION";
-  if (rateHigh && !m2Expanding)   return "RISK_OFF";
-  if (!rateHigh && m2Expanding)   return "LIQUIDITY";
+  if (rate >= 4.5 && cpi > cpip) return "INFLATION";
+  if (rate >= 4.5 && m2 <= m2p)  return "RISK_OFF";
+  if (rate < 4.5  && m2 > m2p)   return "LIQUIDITY";
   return "RISK_ON";
 }
 
@@ -316,12 +336,9 @@ function buildMacroIndicatorLevels(ind: MacroIndicators): {
   const cpip = ind.inflation?.prevValue ?? cpi;
 
   const dollar: DollarLevel = rate >= 4.5 ? "STRONG" : rate >= 2.5 ? "NEUTRAL" : "WEAK";
-
-  const inflationChange    = cpip > 0 ? ((cpi - cpip) / cpip) : 0;
-  const estimatedInflation = inflationChange * 12 * 100;
-  const realYieldVal       = rate - estimatedInflation;
+  const inflChange = cpip > 0 ? ((cpi - cpip) / cpip) : 0;
+  const realYieldVal = rate - (inflChange * 12 * 100);
   const realYield: RealYieldLevel = realYieldVal > 1.5 ? "RISING" : realYieldVal < 0 ? "FALLING" : "NEUTRAL";
-
   const liquidity: LiquidityLevel = m2 >= m2p ? "EXPANDING" : "CONTRACTING";
 
   return { dollar, realYield, liquidity };
@@ -334,14 +351,9 @@ const BIAS_STYLE: Record<Bias, string> = {
   Neutral:  "text-muted-foreground",
   Volatile: "text-amber-500 dark:text-amber-400",
 };
-
 const BIAS_ICON: Record<Bias, typeof TrendingUp> = {
-  Bullish:  TrendingUp,
-  Bearish:  TrendingDown,
-  Neutral:  Minus,
-  Volatile: Zap,
+  Bullish: TrendingUp, Bearish: TrendingDown, Neutral: Minus, Volatile: Zap,
 };
-
 const ARROW_COLOR: Record<ArrowDir, string> = { "↑": "text-emerald-500", "↓": "text-red-500", "→": "text-amber-500" };
 const ARROW_BG:    Record<ArrowDir, string> = { "↑": "bg-emerald-500/10", "↓": "bg-red-500/10", "→": "bg-amber-500/10" };
 
@@ -357,8 +369,7 @@ function BiasRow({ label, emoji, bias, meaning }: { label: string; emoji: string
         </div>
       </div>
       <div className={`flex items-center gap-1.5 font-semibold text-sm shrink-0 ${BIAS_STYLE[bias]}`}>
-        <Icon className="w-3.5 h-3.5" />
-        {bias}
+        <Icon className="w-3.5 h-3.5" />{bias}
       </div>
     </div>
   );
@@ -366,10 +377,10 @@ function BiasRow({ label, emoji, bias, meaning }: { label: string; emoji: string
 
 function ScenarioCard({ s, currencyImpactLabel }: { s: Scenario; currencyImpactLabel: string }) {
   const genericAssets = [
-    { label: "USD",    arrow: s.usd,    emoji: "💵" },
-    { label: "Gold",   arrow: s.gold,   emoji: "🥇" },
+    { label: "USD", arrow: s.usd, emoji: "💵" },
+    { label: "Gold", arrow: s.gold, emoji: "🥇" },
     ...(s.stocks ? [{ label: "Stocks", arrow: s.stocks, emoji: "📈" }] : []),
-    { label: "BTC",    arrow: s.btc,    emoji: "₿" },
+    { label: "BTC", arrow: s.btc, emoji: "₿" },
   ];
   return (
     <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
@@ -377,7 +388,6 @@ function ScenarioCard({ s, currencyImpactLabel }: { s: Scenario; currencyImpactL
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{s.label}</p>
         <p className="text-sm font-medium mt-0.5 leading-snug">{s.description}</p>
       </div>
-
       {s.currencyPairs && s.currencyPairs.length > 0 && (
         <div>
           <p className="text-[10px] font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wider mb-1.5">{currencyImpactLabel}</p>
@@ -391,7 +401,6 @@ function ScenarioCard({ s, currencyImpactLabel }: { s: Scenario; currencyImpactL
           </div>
         </div>
       )}
-
       <div className="flex flex-wrap gap-2">
         {genericAssets.map(({ label, arrow, emoji }) => (
           <div key={label} className={`flex items-center gap-1 px-2 py-1 rounded-lg ${ARROW_BG[arrow]}`}>
@@ -427,15 +436,135 @@ function MostAffectedMarkets({ currency, label }: { currency: string; label: str
       <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
       <div className="flex flex-wrap gap-1.5">
         {pairs.map((pair) => (
-          <span
-            key={pair}
-            className="px-2.5 py-1 rounded-lg bg-orange-500/10 text-xs font-semibold text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-900"
-          >
+          <span key={pair} className="px-2.5 py-1 rounded-lg bg-orange-500/10 text-xs font-semibold text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-900">
             {pair}
           </span>
         ))}
       </div>
     </div>
+  );
+}
+
+function NewsSurpriseCard({ surprise, event, m }: { surprise: SurpriseResult; event: MacroEvent; m: any }) {
+  const { dir, surprise: diff, unit, actualVal, forecastVal } = surprise;
+
+  const dirLabel = dir === "POSITIVE" ? m.positiveSurprise : dir === "NEGATIVE" ? m.negativeSurprise : m.neutralSurprise;
+  const dirColor = dir === "POSITIVE"
+    ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-200 dark:border-emerald-800"
+    : dir === "NEGATIVE"
+    ? "text-red-500 dark:text-red-400 bg-red-500/10 border-red-200 dark:border-red-800"
+    : "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-200 dark:border-amber-800";
+
+  return (
+    <Card className="rounded-2xl shadow-sm">
+      <CardContent className="p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-yellow-500/15 flex items-center justify-center">
+            <Sparkles className="w-4 h-4 text-yellow-500" />
+          </div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{m.newsSurpriseIndicator}</p>
+          <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 rounded px-2 py-0.5">{m.postRelease}</span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: m.forecast, val: forecastVal != null ? forecastVal.toFixed(2) + unit : (event.forecast ?? "—") },
+            { label: m.actual,   val: actualVal  != null ? actualVal.toFixed(2)  + unit : (event.actual  ?? "—") },
+            { label: m.surpriseLabel, val: diff != null ? fmtSurprise(diff, unit) : "—", accent: true },
+          ].map(({ label, val, accent }) => (
+            <div key={label} className={`rounded-xl p-3 text-center ${accent ? dirColor + " border" : "bg-muted/40"}`}>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</p>
+              <p className={`text-base font-bold mt-0.5 ${accent ? "" : "text-foreground"}`}>{val}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className={`rounded-xl border p-3 flex items-center justify-between ${dirColor}`}>
+          <p className="text-sm font-bold">{dirLabel}</p>
+          {dir !== "NEUTRAL" && (
+            <span className="text-xs font-semibold">
+              {dir === "POSITIVE" ? m.bullishLabel : m.bearishLabel} {event.currency}
+            </span>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ActualMarketImpactCard({ surprise, event, eventType, m }: {
+  surprise: SurpriseResult; event: MacroEvent; eventType: EventType; m: any;
+}) {
+  const ccy = event.currency ?? "USD";
+  const [pairsA, pairsB] = buildCurrencyPairs(ccy);
+  const bullish = isBullishForCurrency(eventType, surprise.dir);
+  const activePairs = bullish ? pairsA : pairsB;
+
+  const genericBias: Record<string, { arrow: ArrowDir; label: string }> = bullish ? {
+    "USD":  { arrow: eventType === "CPI" || eventType === "NFP" || eventType === "FOMC" ? "↑" : "↑", label: m.bullishLabel },
+    "Gold": { arrow: eventType === "CPI" ? "↑" : "↓", label: eventType === "CPI" ? m.bullishLabel : m.bearishLabel },
+    "BTC":  { arrow: eventType === "FOMC" ? "↓" : "↑", label: eventType === "FOMC" ? m.bearishLabel : m.bullishLabel },
+  } : {
+    "USD":  { arrow: "↓", label: m.bearishLabel },
+    "Gold": { arrow: "↑", label: m.bullishLabel },
+    "BTC":  { arrow: eventType === "FOMC" ? "↑" : "↓", label: eventType === "FOMC" ? m.bullishLabel : m.bearishLabel },
+  };
+
+  return (
+    <Card className="rounded-2xl shadow-sm">
+      <CardContent className="p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+            <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{m.actualMarketImpact}</p>
+        </div>
+
+        <div className="rounded-xl bg-muted/30 p-3 space-y-1">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{m.actualVsForecast}</p>
+          <div className="flex items-center gap-3 flex-wrap pt-1">
+            <span className="text-xs"><span className="text-muted-foreground">{m.forecast}:</span> <span className="font-semibold">{event.forecast ?? "—"}</span></span>
+            <span className="text-xs"><span className="text-muted-foreground">{m.actual}:</span> <span className="font-semibold">{event.actual ?? "—"}</span></span>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{m.marketImpactLabel}</p>
+
+          {activePairs.length > 0 && (
+            <div className="space-y-1 mb-3">
+              {activePairs.map(({ label, arrow }) => (
+                <div key={label} className={`flex items-center justify-between px-3 py-2 rounded-lg ${ARROW_BG[arrow]}`}>
+                  <span className="text-sm font-semibold">{label}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-lg font-bold ${ARROW_COLOR[arrow]}`}>{arrow}</span>
+                    <span className={`text-xs font-semibold ${arrow === "↑" ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                      {arrow === "↑" ? m.bullishLabel : m.bearishLabel}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-1">
+            {[
+              { label: "💵 USD", info: genericBias["USD"] },
+              { label: "🥇 Gold", info: genericBias["Gold"] },
+              { label: "₿ BTC", info: genericBias["BTC"] },
+            ].map(({ label, info }) => (
+              <div key={label} className={`flex items-center justify-between px-3 py-2 rounded-lg ${ARROW_BG[info.arrow]}`}>
+                <span className="text-sm font-medium">{label}</span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-lg font-bold ${ARROW_COLOR[info.arrow]}`}>{info.arrow}</span>
+                  <span className={`text-xs font-semibold ${info.arrow === "↑" ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>{info.label}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -447,15 +576,10 @@ function RiskMeter({ level, t }: { level: RiskLevel; t: any }) {
     MEDIUM: { bars: 3, color: "bg-amber-500",   label: t.mediumRisk, title: t.mediumRiskTitle, desc: t.mediumRiskDesc },
     HIGH:   { bars: 5, color: "bg-red-500",     label: t.highRisk,   title: t.highRiskTitle,   desc: t.highRiskDesc },
   }[level];
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className={`text-sm font-semibold ${
-          level === "HIGH" ? "text-red-500 dark:text-red-400" :
-          level === "MEDIUM" ? "text-amber-500 dark:text-amber-400" :
-          "text-emerald-600 dark:text-emerald-400"
-        }`}>
+        <span className={`text-sm font-semibold ${level === "HIGH" ? "text-red-500 dark:text-red-400" : level === "MEDIUM" ? "text-amber-500 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
           {config.label}
         </span>
         <span className="text-xs text-muted-foreground">{level}</span>
@@ -474,15 +598,13 @@ function RiskMeter({ level, t }: { level: RiskLevel; t: any }) {
 }
 
 const REGIME_CONFIG: Record<Regime, { color: string; bg: string; icon: string }> = {
-  RISK_ON:   { color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/30",  icon: "🟢" },
-  RISK_OFF:  { color: "text-red-500 dark:text-red-400",         bg: "bg-red-50 dark:bg-red-950/30",          icon: "🔴" },
-  INFLATION: { color: "text-amber-600 dark:text-amber-400",     bg: "bg-amber-50 dark:bg-amber-950/30",      icon: "🟠" },
-  LIQUIDITY: { color: "text-sky-600 dark:text-sky-400",         bg: "bg-sky-50 dark:bg-sky-950/30",          icon: "🔵" },
+  RISK_ON:   { color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/30", icon: "🟢" },
+  RISK_OFF:  { color: "text-red-500 dark:text-red-400",         bg: "bg-red-50 dark:bg-red-950/30",         icon: "🔴" },
+  INFLATION: { color: "text-amber-600 dark:text-amber-400",     bg: "bg-amber-50 dark:bg-amber-950/30",     icon: "🟠" },
+  LIQUIDITY: { color: "text-sky-600 dark:text-sky-400",         bg: "bg-sky-50 dark:bg-sky-950/30",         icon: "🔵" },
 };
 
-function MacroIndicatorCard({
-  title, value, valueColor, desc, impactLabel,
-}: {
+function MacroIndicatorCard({ title, value, valueColor, desc, impactLabel }: {
   title: string; value: string; valueColor: string; desc: string; impactLabel: string;
 }) {
   return (
@@ -507,7 +629,7 @@ export default function MacroRadarPage() {
 
   const { data: events = [], isLoading: eventsLoading } = useQuery<MacroEvent[]>({
     queryKey: ["/api/macro-radar/events"],
-    refetchInterval: 5 * 60 * 1000,
+    refetchInterval: 60 * 1000,
   });
 
   const { data: indicators, isLoading: indLoading } = useQuery<MacroIndicators>({
@@ -520,19 +642,36 @@ export default function MacroRadarPage() {
     return () => clearInterval(id);
   }, []);
 
-  const nextEvent   = useMemo(() => events[0] ?? null, [events]);
+  const nextEvent    = useMemo(() => events[0] ?? null, [events]);
   const minsUntil   = useMemo(() => nextEvent ? minutesUntil(nextEvent.date) : Infinity, [nextEvent, now]);
   const msUntil     = useMemo(() => nextEvent ? new Date(nextEvent.date).getTime() - now : 0, [nextEvent, now]);
 
   const detectedCurrency = useMemo(() => nextEvent?.currency ?? "USD", [nextEvent]);
   const eventType        = useMemo(() => nextEvent ? detectEventType(nextEvent.event) : "OTHER", [nextEvent]);
-  const scenarios        = useMemo(() => buildScenarios(eventType, isID, detectedCurrency), [eventType, isID, detectedCurrency]);
-  const quickImpact      = useMemo(() => buildQuickImpact(eventType, isID), [eventType, isID]);
+
+  const isPostRelease = useMemo(
+    () => nextEvent?.actual != null && nextEvent.actual.trim() !== "" && nextEvent.actual.trim() !== "-" && nextEvent.actual.trim() !== "—",
+    [nextEvent],
+  );
+
+  const surprise = useMemo(
+    () => isPostRelease ? calcSurprise(nextEvent?.actual ?? null, nextEvent?.forecast ?? null) : null,
+    [isPostRelease, nextEvent],
+  );
+
+  const scenarios   = useMemo(() => buildScenarios(eventType, isID, detectedCurrency), [eventType, isID, detectedCurrency]);
+  const quickImpact = useMemo(() => buildQuickImpact(eventType, isID), [eventType, isID]);
 
   const todayEvents = useMemo(() => events.filter((e) => isToday(e.date)), [events]);
   const riskLevel: RiskLevel = useMemo(() => todayEvents.length >= 2 ? "HIGH" : todayEvents.length === 1 ? "MEDIUM" : "LOW", [todayEvents]);
 
-  const insight   = useMemo(() => indicators ? buildInsight(indicators, isID) : (isID ? "Memuat data makro…" : "Loading macro data…"), [indicators, isID]);
+  const fredInsight = useMemo(() => indicators ? buildInsight(indicators, isID) : (isID ? "Memuat data makro…" : "Loading macro data…"), [indicators, isID]);
+
+  const postInsight = useMemo(
+    () => isPostRelease && nextEvent && surprise ? buildPostReleaseInsight(nextEvent, surprise, eventType, m) : null,
+    [isPostRelease, nextEvent, surprise, eventType, m],
+  );
+
   const bias      = useMemo(() => indicators ? buildBias(indicators) : { usd: "Neutral" as Bias, gold: "Neutral" as Bias, btc: "Neutral" as Bias }, [indicators]);
   const regime    = useMemo(() => indicators ? buildRegime(indicators) : "RISK_ON" as Regime, [indicators]);
   const indLevels = useMemo(() => indicators ? buildMacroIndicatorLevels(indicators) : null, [indicators]);
@@ -542,6 +681,13 @@ export default function MacroRadarPage() {
     gold: bias.gold === "Bullish" ? m.goldBullish : bias.gold === "Bearish" ? m.goldBearish : m.goldNeutral,
     btc:  bias.btc  === "Bullish" ? m.btcBullish  : bias.btc  === "Bearish" ? m.btcBearish  : bias.btc === "Volatile" ? m.btcVolatile : m.btcNeutral,
   }), [bias, m]);
+
+  const postReleaseCurrencyPairs = useMemo(() => {
+    if (!isPostRelease || !surprise) return null;
+    const [pairsA, pairsB] = buildCurrencyPairs(detectedCurrency);
+    const bullish = isBullishForCurrency(eventType, surprise.dir);
+    return bullish ? pairsA : pairsB;
+  }, [isPostRelease, surprise, detectedCurrency, eventType]);
 
   const regimeConfig = REGIME_CONFIG[regime];
   const regimeLabel  = regime === "RISK_ON" ? m.riskOn : regime === "RISK_OFF" ? m.riskOff : regime === "INFLATION" ? m.inflationRegime : m.liquidityRegime;
@@ -561,7 +707,7 @@ export default function MacroRadarPage() {
   return (
     <div className="p-4 sm:p-6 space-y-4 max-w-2xl mx-auto pb-8">
 
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+      {/* Header */}
       <div>
         <div className="flex items-center gap-2">
           <Activity className="w-5 h-5 text-orange-500" />
@@ -570,8 +716,8 @@ export default function MacroRadarPage() {
         <p className="text-sm text-muted-foreground mt-0.5">{m.subtitle}</p>
       </div>
 
-      {/* ── Volatility Warning (<15 min) ───────────────────────────────── */}
-      {minsUntil >= 0 && minsUntil <= 15 && nextEvent && (
+      {/* Volatility Warning <15 min */}
+      {minsUntil >= 0 && minsUntil <= 15 && nextEvent && !isPostRelease && (
         <Card className="rounded-2xl border border-red-500/30 bg-red-500/10 dark:bg-red-500/15">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
@@ -595,11 +741,17 @@ export default function MacroRadarPage() {
               <AlertTriangle className="w-4 h-4 text-rose-500" />
             </div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{m.highImpactEvent}</p>
+            {isPostRelease && (
+              <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 rounded px-2 py-0.5">✓ {m.postRelease}</span>
+            )}
+            {!isPostRelease && nextEvent && (
+              <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded px-2 py-0.5">{m.preRelease}</span>
+            )}
           </div>
 
           {nextEvent ? (
             <>
-              {minsUntil >= 0 && minsUntil <= 30 && (
+              {!isPostRelease && minsUntil >= 0 && minsUntil <= 30 && (
                 <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 px-3 py-2">
                   <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
                   <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">{m.incomingAlert}</p>
@@ -624,14 +776,12 @@ export default function MacroRadarPage() {
                   { label: m.previous, val: nextEvent.previous },
                   { label: m.actual,   val: nextEvent.actual },
                 ].map(({ label, val }) => (
-                  <div key={label} className="rounded-xl bg-muted/40 p-3 text-center">
+                  <div key={label} className={`rounded-xl p-3 text-center ${label === m.actual && isPostRelease ? "bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800" : "bg-muted/40"}`}>
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</p>
-                    <p className="text-sm font-semibold mt-0.5">{val != null ? val : "—"}</p>
+                    <p className={`text-sm font-semibold mt-0.5 ${label === m.actual && isPostRelease ? "text-emerald-600 dark:text-emerald-400" : ""}`}>{val != null ? val : "—"}</p>
                   </div>
                 ))}
               </div>
-
-              {/* Most Affected Markets subsection */}
               <MostAffectedMarkets currency={detectedCurrency} label={m.mostAffectedMarkets} />
             </>
           ) : (
@@ -640,8 +790,8 @@ export default function MacroRadarPage() {
         </CardContent>
       </Card>
 
-      {/* ── 2. Countdown Timer ─────────────────────────────────────────── */}
-      {nextEvent && msUntil > 0 && (
+      {/* ── 2. Countdown Timer (pre-release only) ──────────────────────── */}
+      {nextEvent && !isPostRelease && msUntil > 0 && (
         <Card className="rounded-2xl shadow-sm">
           <CardContent className="p-5">
             <div className="flex items-center gap-2 mb-4">
@@ -652,10 +802,7 @@ export default function MacroRadarPage() {
             </div>
             <div className="text-center">
               <p className="text-xs text-muted-foreground mb-2 truncate">{nextEvent.event} — {m.releaseIn}</p>
-              <p className={`text-5xl font-mono font-bold tracking-widest ${
-                minsUntil <= 15 ? "text-red-500 dark:text-red-400" :
-                minsUntil <= 30 ? "text-amber-500 dark:text-amber-400" : "text-foreground"
-              }`}>
+              <p className={`text-5xl font-mono font-bold tracking-widest ${minsUntil <= 15 ? "text-red-500 dark:text-red-400" : minsUntil <= 30 ? "text-amber-500 dark:text-amber-400" : "text-foreground"}`}>
                 {fmtCountdown(msUntil)}
               </p>
               <p className="text-[11px] text-muted-foreground mt-2">{fmtDate(nextEvent.date)}</p>
@@ -663,17 +810,9 @@ export default function MacroRadarPage() {
           </CardContent>
         </Card>
       )}
-      {nextEvent && msUntil <= 0 && (
-        <Card className="rounded-2xl shadow-sm">
-          <CardContent className="p-5 text-center py-8">
-            <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">✓ {m.eventReleased}</p>
-            <p className="text-xs text-muted-foreground mt-1">{nextEvent.event} {m.dataLive}</p>
-          </CardContent>
-        </Card>
-      )}
 
-      {/* ── 3. Event Impact Prediction (currency-aware) ────────────────── */}
-      {nextEvent && (
+      {/* ── 3a. Event Impact Prediction (PRE-RELEASE only) ─────────────── */}
+      {nextEvent && !isPostRelease && (
         <Card className="rounded-2xl shadow-sm">
           <CardContent className="p-5 space-y-3">
             <div className="flex items-center gap-2 mb-1">
@@ -691,8 +830,8 @@ export default function MacroRadarPage() {
         </Card>
       )}
 
-      {/* ── 4. Quick Market Impact ─────────────────────────────────────── */}
-      {nextEvent && (
+      {/* ── 3b. Quick Market Impact (PRE-RELEASE only) ─────────────────── */}
+      {nextEvent && !isPostRelease && (
         <Card className="rounded-2xl shadow-sm">
           <CardContent className="p-5 space-y-3">
             <div className="flex items-center gap-2">
@@ -706,7 +845,17 @@ export default function MacroRadarPage() {
         </Card>
       )}
 
-      {/* ── 5. AI Macro Insight + What It Means ───────────────────────── */}
+      {/* ── 4a. News Surprise Indicator (POST-RELEASE only) ────────────── */}
+      {isPostRelease && nextEvent && surprise && (
+        <NewsSurpriseCard surprise={surprise} event={nextEvent} m={m} />
+      )}
+
+      {/* ── 4b. Actual Market Impact (POST-RELEASE only) ───────────────── */}
+      {isPostRelease && nextEvent && surprise && (
+        <ActualMarketImpactCard surprise={surprise} event={nextEvent} eventType={eventType} m={m} />
+      )}
+
+      {/* ── 5. AI Macro Insight (adapts post-release) ──────────────────── */}
       <Card className="rounded-2xl shadow-sm border-0 bg-emerald-50 dark:bg-emerald-950/30">
         <CardContent className="p-5 space-y-4">
           <div className="flex items-center gap-2">
@@ -714,8 +863,13 @@ export default function MacroRadarPage() {
               <Brain className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             </div>
             <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">{m.aiMacroInsight}</p>
+            {isPostRelease && <span className="ml-auto text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">✦ {m.postRelease}</span>}
           </div>
-          <p className="text-sm text-emerald-900 dark:text-emerald-200 leading-relaxed">{insight}</p>
+
+          {isPostRelease && postInsight && (
+            <p className="text-sm text-emerald-900 dark:text-emerald-200 leading-relaxed font-medium border-b border-emerald-200 dark:border-emerald-800 pb-3">{postInsight}</p>
+          )}
+          <p className="text-sm text-emerald-900 dark:text-emerald-200 leading-relaxed">{fredInsight}</p>
 
           {indicators && (
             <div className="grid grid-cols-2 gap-2">
@@ -752,8 +906,7 @@ export default function MacroRadarPage() {
                       <span className="text-xs text-emerald-900 dark:text-emerald-200">{meaning}</span>
                     </div>
                     <div className={`flex items-center gap-1 text-xs font-semibold shrink-0 ${BIAS_STYLE[b]}`}>
-                      <Icon className="w-3 h-3" />
-                      {b}
+                      <Icon className="w-3 h-3" />{b}
                     </div>
                   </div>
                 );
@@ -811,7 +964,7 @@ export default function MacroRadarPage() {
         </CardContent>
       </Card>
 
-      {/* ── 8. AI Trading Context ──────────────────────────────────────── */}
+      {/* ── 8. AI Trading Context (updated post-release) ───────────────── */}
       <Card className="rounded-2xl shadow-sm">
         <CardContent className="p-5 space-y-1">
           <div className="flex items-center gap-2 mb-3">
@@ -819,7 +972,30 @@ export default function MacroRadarPage() {
               <TrendingUp className="w-4 h-4 text-sky-500" />
             </div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{m.aiTradingContext}</p>
+            {isPostRelease && <span className="ml-auto text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">✦ {m.postRelease}</span>}
           </div>
+
+          {/* Post-release: show currency-specific pairs first */}
+          {isPostRelease && postReleaseCurrencyPairs && postReleaseCurrencyPairs.length > 0 && (
+            <div className="mb-1">
+              {postReleaseCurrencyPairs.map(({ label, arrow }) => {
+                const isBull = arrow === "↑";
+                return (
+                  <div key={label} className="flex items-center justify-between py-2.5 border-b border-border gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-base shrink-0">💱</span>
+                      <span className="text-sm font-semibold">{label}</span>
+                    </div>
+                    <div className={`flex items-center gap-1.5 font-semibold text-sm shrink-0 ${isBull ? BIAS_STYLE["Bullish"] : BIAS_STYLE["Bearish"]}`}>
+                      {isBull ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                      {isBull ? m.bullishLabel : m.bearishLabel}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <BiasRow label={isID ? "Dolar AS (USD)"  : "US Dollar (USD)"} emoji="💵" bias={bias.usd}  meaning={biasMeanings.usd} />
           <BiasRow label={isID ? "Emas (XAUUSD)"   : "Gold (XAUUSD)"}   emoji="🥇" bias={bias.gold} meaning={biasMeanings.gold} />
           <BiasRow label={isID ? "Bitcoin (BTC)"   : "Bitcoin (BTC)"}   emoji="₿"  bias={bias.btc}  meaning={biasMeanings.btc} />
@@ -876,17 +1052,17 @@ export default function MacroRadarPage() {
 
           <div className="space-y-3">
             {IMPACT_MAP_FULL.map(({ currency, flag, pairs }) => (
-              <div key={currency} className="rounded-xl bg-muted/30 p-3">
+              <div key={currency} className={`rounded-xl p-3 transition-colors ${currency === detectedCurrency && nextEvent ? "bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800" : "bg-muted/30"}`}>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-base">{flag}</span>
                   <p className="text-xs font-semibold">{currency} {m.eventsLabel}</p>
+                  {currency === detectedCurrency && nextEvent && (
+                    <span className="ml-auto text-[10px] font-semibold text-orange-600 dark:text-orange-400">▶ {isID ? "Aktif" : "Active"}</span>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {pairs.map((pair) => (
-                    <span
-                      key={pair}
-                      className="px-2 py-0.5 rounded-md bg-indigo-500/10 text-[11px] font-medium text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900"
-                    >
+                    <span key={pair} className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${currency === detectedCurrency && nextEvent ? "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800" : "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-900"}`}>
                       → {pair}
                     </span>
                   ))}
@@ -895,7 +1071,6 @@ export default function MacroRadarPage() {
             ))}
           </div>
 
-          {/* Why this matters */}
           <div className="rounded-xl bg-muted/50 border border-dashed p-4 space-y-1.5">
             <p className="text-xs font-semibold text-foreground">{m.whyThisMatters}</p>
             <p className="text-xs text-muted-foreground leading-relaxed">{m.whyThisMattersDesc}</p>
@@ -916,6 +1091,7 @@ export default function MacroRadarPage() {
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className="text-[10px] text-muted-foreground">{e.country}</span>
                       {e.currency && <span className="text-[10px] font-semibold bg-muted rounded px-1 py-0.5">{e.currency}</span>}
+                      {e.actual && <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 rounded px-1 py-0.5">✓ {m.actual}</span>}
                     </div>
                   </div>
                   <div className="text-right shrink-0">
