@@ -82,6 +82,7 @@ import {
   ArrowDownLeft, ArrowUpRight, ArrowLeftRight,
   PiggyBank, CreditCard, FileText, LineChart, Camera,
   CalendarDays, AlertTriangle, Bell,
+  Activity, Brain, Wrench, CandlestickChart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, getXpForNextLevel, EXPENSE_CATEGORY_GROUPS, INCOME_CATEGORIES, getTierKey } from "@/lib/constants";
@@ -1680,6 +1681,8 @@ export default function Dashboard() {
   const [budgetExpiredOpen, setBudgetExpiredOpen] = useState(false);
   const prevStreakRef = useRef<number | null>(null);
   const prevLevelRef = useRef<number | null>(null);
+  const menuSliderRef = useRef<HTMLDivElement | null>(null);
+  const [menuPage, setMenuPage] = useState(0);
 
   const { data: accounts } = useQuery<Account[]>({
     queryKey: ["/api/accounts"],
@@ -2060,34 +2063,98 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Menu Utama — quick access grid */}
-      <Card data-testid="card-main-menu">
-        <CardContent className="p-5">
-          <h3 className="text-xs font-semibold text-muted-foreground mb-4 uppercase tracking-widest">{(t as any).mainMenu?.title || "Main Menu"}</h3>
-          <div className="grid grid-cols-5 gap-2">
-            {[
-              { key: "budget", icon: PiggyBank, path: "/budget", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10 dark:bg-emerald-500/15" },
-              { key: "goals", icon: Target, path: "/goals", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10 dark:bg-amber-500/15" },
-              { key: "debt", icon: CreditCard, path: "/debt", color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10 dark:bg-rose-500/15" },
-              { key: "asset", icon: TrendingUp, path: "/networth", color: "text-sky-600 dark:text-sky-400", bg: "bg-sky-500/10 dark:bg-sky-500/15" },
-              { key: "reports", icon: LineChart, path: "/reports", color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-500/10 dark:bg-violet-500/15" },
-            ].map((item) => {
-              const Icon = item.icon;
-              const label = (t as any).mainMenu?.[item.key] || item.key;
-              return (
-                <Link key={item.key} href={item.path} data-testid={`menu-${item.key}`}>
-                  <div className="flex flex-col items-center gap-2 group cursor-pointer">
-                    <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-200 group-hover:scale-105 group-active:scale-95", item.bg)}>
-                      <Icon className={cn("w-5 h-5", item.color)} strokeWidth={2} />
-                    </div>
-                    <span className="text-[10px] font-medium text-muted-foreground text-center leading-tight group-hover:text-foreground transition-colors duration-200">{label}</span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Menu Utama — horizontal scrollable quick access */}
+      {(() => {
+        const menuItems = [
+          { key: "budget",     label: "Budget",      icon: PiggyBank,        path: "/budget",     color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10 dark:bg-emerald-500/15" },
+          { key: "goals",      label: "Goals",       icon: Target,           path: "/goals",      color: "text-amber-600 dark:text-amber-400",     bg: "bg-amber-500/10 dark:bg-amber-500/15" },
+          { key: "debt",       label: "Debt",        icon: CreditCard,       path: "/debt",       color: "text-rose-600 dark:text-rose-400",       bg: "bg-rose-500/10 dark:bg-rose-500/15" },
+          { key: "asset",      label: "Asset",       icon: TrendingUp,       path: "/networth",   color: "text-sky-600 dark:text-sky-400",         bg: "bg-sky-500/10 dark:bg-sky-500/15" },
+          { key: "reports",    label: "Reports",     icon: LineChart,        path: "/reports",    color: "text-violet-600 dark:text-violet-400",   bg: "bg-violet-500/10 dark:bg-violet-500/15" },
+          { key: "invest",     label: "Invest",      icon: BarChart3,        path: "/invest",     color: "text-teal-600 dark:text-teal-400",       bg: "bg-teal-500/10 dark:bg-teal-500/15" },
+          { key: "macroRadar", label: "Macro Radar", icon: Activity,         path: "/macro",      color: "text-orange-600 dark:text-orange-400",   bg: "bg-orange-500/10 dark:bg-orange-500/15" },
+          { key: "aiAdvisor",  label: "AI Advisor",  icon: Brain,            path: "/ai-advisor", color: "text-pink-600 dark:text-pink-400",       bg: "bg-pink-500/10 dark:bg-pink-500/15" },
+          { key: "tools",      label: "Tools",       icon: Wrench,           path: "/tools",      color: "text-slate-600 dark:text-slate-400",     bg: "bg-slate-500/10 dark:bg-slate-500/15" },
+          { key: "market",     label: "Market",      icon: CandlestickChart, path: "/market",     color: "text-cyan-600 dark:text-cyan-400",       bg: "bg-cyan-500/10 dark:bg-cyan-500/15" },
+        ];
+        const ITEMS_PER_PAGE = 5;
+        const menuPages = Math.ceil(menuItems.length / ITEMS_PER_PAGE);
+        return (
+          <Card data-testid="card-main-menu">
+            <CardContent className="p-5">
+              <h3 className="text-xs font-semibold text-muted-foreground mb-4 uppercase tracking-widest">
+                {(t as any).mainMenu?.title || "Main Menu"}
+              </h3>
+
+              {/* Slider — shows exactly 5 items; swipe for more */}
+              <div
+                ref={menuSliderRef}
+                onScroll={() => {
+                  const el = menuSliderRef.current;
+                  if (!el) return;
+                  const page = Math.round(el.scrollLeft / el.clientWidth);
+                  setMenuPage(page);
+                }}
+                className="flex overflow-x-auto"
+                style={{
+                  scrollSnapType: "x mandatory",
+                  WebkitOverflowScrolling: "touch",
+                  msOverflowStyle: "none",
+                  scrollbarWidth: "none",
+                  gap: "8px",
+                }}
+              >
+                {menuItems.map((item) => {
+                  const Icon = item.icon;
+                  const label = (t as any).mainMenu?.[item.key] || item.label;
+                  return (
+                    <Link
+                      key={item.key}
+                      href={item.path}
+                      data-testid={`menu-${item.key}`}
+                      style={{
+                        flex: "0 0 calc(20% - 6.4px)",
+                        scrollSnapAlign: "start",
+                      }}
+                    >
+                      <div className="flex flex-col items-center gap-2 group cursor-pointer">
+                        <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-200 group-hover:scale-105 group-active:scale-95", item.bg)}>
+                          <Icon className={cn("w-5 h-5", item.color)} strokeWidth={2} />
+                        </div>
+                        <span className="text-[10px] font-medium text-muted-foreground text-center leading-tight group-hover:text-foreground transition-colors duration-200">
+                          {label}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* Pagination dots — visible only when menu has more than 5 items */}
+              {menuPages > 1 && (
+                <div className="flex justify-center gap-1.5 mt-4">
+                  {Array.from({ length: menuPages }).map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        menuSliderRef.current?.scrollTo({
+                          left: i * (menuSliderRef.current.clientWidth),
+                          behavior: "smooth",
+                        });
+                      }}
+                      className={`rounded-full transition-all duration-200 ${
+                        i === menuPage
+                          ? "w-4 h-1.5 bg-primary"
+                          : "w-1.5 h-1.5 bg-muted-foreground/30"
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* 4. Smart Save — compact inline banner below hero */}
       <SmartSaveAlert t={t} />
