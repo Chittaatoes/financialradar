@@ -619,6 +619,13 @@ function MacroIndicatorCard({ title, value, valueColor, desc, impactLabel }: {
   );
 }
 
+const INDICATOR_PLACEHOLDER: MacroIndicators = {
+  interestRate: { id: "", value: 3.5,   prevValue: 3.5,   date: null },
+  inflation:    { id: "", value: 320,   prevValue: 318,   date: null },
+  moneySupply:  { id: "", value: 22000, prevValue: 21800, date: null },
+  unemployment: { id: "", value: 4.2,   prevValue: 4.1,   date: null },
+};
+
 // ─── Main page ─────────────────────────────────────────────────────────────────
 export default function MacroRadarPage() {
   const { t, language } = useLanguage();
@@ -636,7 +643,9 @@ export default function MacroRadarPage() {
   const { data: indicators, isLoading: indLoading, isError: indError } = useQuery<MacroIndicators>({
     queryKey: ["/api/macro-radar/indicators"],
     refetchInterval: 10 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     retry: 2,
+    placeholderData: INDICATOR_PLACEHOLDER,
   });
 
   useEffect(() => {
