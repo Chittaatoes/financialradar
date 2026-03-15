@@ -669,18 +669,19 @@ export default function MacroRadarPage() {
 
   const indUnavailable = !indLoading && (
     indError ||
-    (indicators != null &&
-      indicators.interestRate?.value == null &&
+    indicators == null ||
+    (indicators.interestRate?.value == null &&
       indicators.inflation?.value == null &&
       indicators.moneySupply?.value == null &&
       indicators.unemployment?.value == null)
   );
 
   const fredInsight = useMemo(() => {
-    if (indError || indUnavailable) return isID ? "Data makro sementara tidak tersedia." : "Macro data temporarily unavailable.";
-    if (!indicators) return isID ? "Memuat data makro…" : "Loading macro data…";
+    if (indLoading) return isID ? "Memuat data makro…" : "Loading macro data…";
+    if (indUnavailable) return isID ? "Data makro sementara tidak tersedia." : "Macro data temporarily unavailable.";
+    if (!indicators) return isID ? "Data makro sementara tidak tersedia." : "Macro data temporarily unavailable.";
     return buildInsight(indicators, isID);
-  }, [indicators, indError, indUnavailable, isID]);
+  }, [indicators, indLoading, indUnavailable, isID]);
 
   const postInsight = useMemo(
     () => isPostRelease && nextEvent && surprise ? buildPostReleaseInsight(nextEvent, surprise, eventType, m) : null,
