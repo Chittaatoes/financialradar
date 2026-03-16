@@ -102,9 +102,7 @@ import { cacheSet, cacheGet } from "@/lib/local-db";
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
 function resolveUrl(url: string): string {
-  if (url.startsWith("http")) return url;
-  if (!API_BASE) return url;
-  return `${API_BASE}${url}`;
+  return url.startsWith("/") ? `${API_BASE}${url}` : url;
 }
 
 async function throwIfResNotOk(res: Response) {
@@ -172,8 +170,6 @@ const CACHEABLE_ENDPOINTS = [
   "/api/net-worth",
   "/api/spending-insight",
   "/api/custom-categories",
-  "/api/macro-radar/events",
-  "/api/macro-radar/indicators",
 ];
 
 function isCacheable(url: string): boolean {
