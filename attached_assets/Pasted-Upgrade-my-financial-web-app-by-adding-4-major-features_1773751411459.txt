@@ -1,0 +1,196 @@
+Upgrade my financial web app by adding 4 major features: Market, Tools, AI Advisor, and Invest. Use FREE APIs only and ensure scalable, production-ready architecture.
+
+Tech Stack:
+- Frontend: React + TypeScript + Tailwind
+- Backend: Node.js + Express
+- Database: PostgreSQL
+
+----------------------------------------
+1. 📊 MARKET FEATURE (REAL-TIME + NEWS)
+----------------------------------------
+
+Goals:
+- Show simple, impactful market data
+- Focus on Indonesian users
+
+Features:
+
+A. Market Prices (FREE API)
+Use:
+- https://api.exchangerate.host (USD/IDR)
+- https://api.coingecko.com (crypto)
+- https://www.goldapi.io (or fallback static if limited)
+
+Display:
+- Gold (XAU)
+- USD/IDR
+- BTC/ETH
+
+UI:
+- Show price + % change
+- Color indicator (green/red)
+
+---
+
+B. Impactful Financial News (IMPORTANT)
+Use FREE APIs:
+- https://newsapi.org (free tier)
+- OR https://gnews.io (better for filtering)
+
+Filter:
+- Keywords: "economy", "inflation", "interest rate", "Indonesia", "rupiah"
+
+Logic:
+- Only show TOP 3 news
+- Sort by relevance + recency
+
+Enhancement:
+- Add "impact tag":
+  - 🔴 High Impact
+  - 🟡 Medium
+  - 🟢 Low
+
+Simple rule:
+- If keyword contains:
+  "rate hike", "inflation spike", "crisis" → HIGH
+
+---
+
+----------------------------------------
+2. 🛠️ TOOLS FEATURE (UTILITY CORE)
+----------------------------------------
+
+Features:
+
+A. Emergency Fund Calculator
+- Input: monthly expense
+- Output: recommended savings (3–6x)
+
+B. Budget Analyzer
+- Compare income vs expense
+- Show:
+  "Overspending in Food +20%"
+
+C. Savings Simulator
+- Input: target + monthly saving
+- Output: estimated completion date
+
+No external API needed (local logic)
+
+---
+
+----------------------------------------
+3. 🤖 AI ADVISOR (FREE AI ONLY)
+----------------------------------------
+
+IMPORTANT: Use FREE AI options:
+
+Options:
+1. OpenRouter (free models like mistral / llama)
+2. HuggingFace Inference API (free tier)
+
+---
+
+Features:
+
+A. Chat AI (Finance Assistant)
+- User can ask:
+  "Is my finance healthy?"
+  "How much should I save?"
+
+System Prompt:
+"You are a helpful personal finance advisor focused on simple, actionable advice."
+
+---
+
+B. Quick Templates (IMPORTANT UX)
+Add buttons:
+- "Analyze my spending"
+- "How to save faster?"
+- "Am I overspending?"
+
+Click → auto-send prompt
+
+---
+
+C. Context Awareness (basic)
+Send user data:
+- total asset
+- monthly income
+- monthly expense
+
+So AI response is personalized
+
+---
+
+----------------------------------------
+4. 💰 INVEST FEATURE (INDONESIA FOCUS)
+----------------------------------------
+
+Use FREE APIs:
+
+PRIMARY:
+- https://finnhub.io (free tier)
+- https://alpha-vantage.io (fallback)
+
+For Indonesian stocks:
+- Use ticker format:
+  BBCA.JK
+  TLKM.JK
+  BBRI.JK
+
+---
+
+Features:
+
+A. Stock Price Viewer
+- Show price + daily change
+
+B. Portfolio Tracker
+- User input:
+  stock + amount
+
+C. Profit/Loss Calculation
+- Real-time calculation
+
+---
+
+D. Simple Chart (optional)
+- Use lightweight chart (recharts / chart.js)
+
+---
+
+----------------------------------------
+5. ⚙️ PERFORMANCE & UX RULES
+----------------------------------------
+
+- Cache API data (5–10 minutes)
+- Avoid too many API calls
+- Lazy load features
+- Use skeleton loading
+
+---
+
+----------------------------------------
+6. 🎨 UI GUIDELINES (IMPORTANT)
+----------------------------------------
+
+- Keep fintech clean style
+- No heavy cards
+- Use:
+  - subtle colors
+  - small text
+  - clean spacing
+
+- Avoid clutter
+- Prioritize clarity
+
+---
+
+----------------------------------------
+EXPECTED RESULT
+----------------------------------------
+
+- App evolves from tracker → financial assistant
+- Feels like mini fintech super app
+- Smart insights + real data + AI guidance
