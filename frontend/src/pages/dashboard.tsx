@@ -1683,6 +1683,8 @@ export default function Dashboard() {
   const prevLevelRef = useRef<number | null>(null);
   const menuSliderRef = useRef<HTMLDivElement | null>(null);
   const [menuPage, setMenuPage] = useState(0);
+  const cardSliderRef = useRef<HTMLDivElement | null>(null);
+  const [activeCard, setActiveCard] = useState(0);
 
   const { data: accounts } = useQuery<Account[]>({
     queryKey: ["/api/accounts"],
@@ -1950,118 +1952,162 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* 3. Financial Summary — Today's Budget card (only if user has set monthly income via budget wizard) */}
-      {!profileLoading && hasBudget && (
-        <FinancialSummaryCard
-          hidden={hidden}
-          animating={animating}
-          periodStatus={budgetPeriodStatus}
-          daysRemaining={budgetDaysRemaining}
-        />
-      )}
+      {/* 3 + 4. Card Slider — Budget card (if set) + Total Assets card */}
+      {(() => {
+        const totalAset = dashboard?.totalAssets ?? 0;
+        const pctOf = (val: number) => totalAset > 0 ? Math.round((val / totalAset) * 100) : 0;
+        const cashPct  = pctOf(dashboard?.totalCash    ?? 0);
+        const bankPct  = pctOf(dashboard?.totalBank    ?? 0);
+        const ePct     = pctOf(dashboard?.totalEwallet ?? 0);
 
-      {/* 4. Total Assets — Hero card (full width) */}
-      <Card className="border-0 text-white" style={{ background: "linear-gradient(135deg, #1E2F26 0%, #16221C 100%)" }} data-testid="card-total-assets">
-        <CardContent className="p-5 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-white/55" data-testid="text-total-assets-label">{t.dashboard.totalAssets}</p>
-            <div className="flex items-center gap-1">
-              <Button
-                size="icon"
-                variant="ghost"
-                className={`transition-all duration-180 ease-in-out ${
-                  hidden ? "text-white/55" : "text-white/45"
-                } hover:brightness-125`}
-                onClick={toggle}
-                data-testid="button-toggle-amounts"
-                aria-label={hidden ? "Show amounts" : "Hide amounts"}
-                style={{ transition: "color 180ms ease-in-out, transform 180ms ease-in-out" }}
-              >
-                <span
-                  className="inline-flex transition-transform duration-180 ease-in-out"
-                  style={{ transform: animating ? "rotate(-8deg)" : "rotate(0deg)" }}
+        const amtStyle = {
+          opacity: animating ? 0 : 1,
+          transform: animating ? "scale(0.97)" : "scale(1)",
+          transition: "opacity 180ms ease-in-out, transform 180ms ease-in-out",
+        };
+
+        const totalAssetsCard = (
+          <Card className="border-0 text-white h-full" style={{ background: "linear-gradient(135deg, #1E2F26 0%, #16221C 100%)" }} data-testid="card-total-assets">
+            <CardContent className="p-4 space-y-3">
+
+              {/* ── Header row ── */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5 text-emerald-400/70" />
+                  <p className="text-xs font-medium text-white/45 uppercase tracking-widest" data-testid="text-total-assets-label">
+                    {t.dashboard.totalAssets}
+                  </p>
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className={`w-7 h-7 transition-all duration-180 ease-in-out ${hidden ? "text-white/55" : "text-white/35"} hover:brightness-125`}
+                  onClick={toggle}
+                  data-testid="button-toggle-amounts"
+                  aria-label={hidden ? "Show amounts" : "Hide amounts"}
                 >
-                  {hidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </span>
-              </Button>
-              <TrendingUp className="w-5 h-5 text-emerald-400/70" />
-            </div>
-          </div>
-          <p
-            className="text-3xl sm:text-4xl font-bold font-mono tracking-tight"
-            data-testid="text-total-assets"
-            style={{
-              opacity: animating ? 0 : 1,
-              transform: animating ? "scale(0.98)" : "scale(1)",
-              transition: "opacity 180ms ease-in-out, transform 180ms ease-in-out",
-            }}
-          >
-            {hidden ? MASKED_LONG : formatCurrency(dashboard?.totalAssets ?? 0)}
-          </p>
+                  <span
+                    className="inline-flex transition-transform duration-180 ease-in-out"
+                    style={{ transform: animating ? "rotate(-8deg)" : "rotate(0deg)" }}
+                  >
+                    {hidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </span>
+                </Button>
+              </div>
 
-          <div className="grid grid-cols-3 gap-2.5 pt-1">
-            <div className="rounded-md bg-white/8 p-2.5" data-testid="card-cash">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Wallet className="w-3.5 h-3.5 text-white/50" />
-                <span className="text-[11px] text-white/50">{t.dashboard.cash}</span>
-              </div>
+              {/* ── Big total number ── */}
               <p
-                className="text-sm font-mono font-semibold"
-                data-testid="text-cash-amount"
-                style={{
-                  opacity: animating ? 0 : 1,
-                  transform: animating ? "scale(0.98)" : "scale(1)",
-                  transition: "opacity 180ms ease-in-out, transform 180ms ease-in-out",
-                }}
-              >{hidden ? MASKED_SHORT : formatShort(dashboard?.totalCash ?? 0, language)}</p>
-            </div>
-            <div className="rounded-md bg-white/8 p-2.5" data-testid="card-bank">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Landmark className="w-3.5 h-3.5 text-white/50" />
-                <span className="text-[11px] text-white/50">{t.dashboard.bank}</span>
-              </div>
-              <p
-                className="text-sm font-mono font-semibold"
-                data-testid="text-bank-amount"
-                style={{
-                  opacity: animating ? 0 : 1,
-                  transform: animating ? "scale(0.98)" : "scale(1)",
-                  transition: "opacity 180ms ease-in-out, transform 180ms ease-in-out",
-                }}
-              >{hidden ? MASKED_SHORT : formatShort(dashboard?.totalBank ?? 0, language)}</p>
-            </div>
-            <div className="rounded-md bg-white/8 p-2.5" data-testid="card-ewallet">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Smartphone className="w-3.5 h-3.5 text-white/50" />
-                <span className="text-[11px] text-white/50">{t.dashboard.ewallet}</span>
-              </div>
-              <p
-                className="text-sm font-mono font-semibold"
-                data-testid="text-ewallet-amount"
-                style={{
-                  opacity: animating ? 0 : 1,
-                  transform: animating ? "scale(0.98)" : "scale(1)",
-                  transition: "opacity 180ms ease-in-out, transform 180ms ease-in-out",
-                }}
-              >{hidden ? MASKED_SHORT : formatShort(dashboard?.totalEwallet ?? 0, language)}</p>
-            </div>
-          </div>
+                className="text-[2rem] font-bold font-mono tracking-tight leading-none"
+                data-testid="text-total-assets"
+                style={amtStyle}
+              >
+                {hidden ? MASKED_LONG : formatCurrency(totalAset)}
+              </p>
 
-          <div className="pt-1 space-y-1.5">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-white/50">{t.dashboard.savingsGoal}</span>
-              <span className="text-sm font-mono font-semibold text-emerald-400/80" data-testid="text-goal-pct">{goalPct}%</span>
-            </div>
-            <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+              {/* ── Divider ── */}
+              <div className="border-t border-white/8" />
+
+              {/* ── Breakdown grid — 3 cols ── */}
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { icon: Wallet,    label: t.dashboard.cash,    val: dashboard?.totalCash    ?? 0, pct: cashPct, testId: "text-cash-amount" },
+                  { icon: Landmark,  label: t.dashboard.bank,    val: dashboard?.totalBank    ?? 0, pct: bankPct, testId: "text-bank-amount" },
+                  { icon: Smartphone,label: t.dashboard.ewallet, val: dashboard?.totalEwallet ?? 0, pct: ePct,    testId: "text-ewallet-amount" },
+                ].map(({ icon: Icon, label, val, pct, testId }) => (
+                  <div key={label} className="rounded-lg bg-white/[0.07] p-2.5 space-y-1.5">
+                    <div className="flex items-center gap-1">
+                      <Icon className="w-3 h-3 text-white/40 shrink-0" />
+                      <span className="text-[10px] text-white/40 font-medium truncate">{label}</span>
+                    </div>
+                    <p className="text-[13px] font-mono font-semibold leading-none" data-testid={testId} style={amtStyle}>
+                      {hidden ? MASKED_SHORT : formatShort(val, language)}
+                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex-1 h-1 rounded-full bg-white/10 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-emerald-400/60 transition-all duration-500"
+                          style={{ width: hidden ? "0%" : `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-white/30 font-mono shrink-0" style={amtStyle}>
+                        {hidden ? "--" : `${pct}%`}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* ── Savings goal progress ── */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-white/40">{t.dashboard.savingsGoal}</span>
+                  <span className="text-[11px] font-mono font-semibold text-emerald-400/80" data-testid="text-goal-pct">{goalPct}%</span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-emerald-500/70 transition-all duration-500"
+                    style={{ width: `${goalPct}%` }}
+                    data-testid="progress-savings-goal"
+                  />
+                </div>
+              </div>
+
+            </CardContent>
+          </Card>
+        );
+
+        if (!profileLoading && hasBudget) {
+          return (
+            <div className="space-y-2.5">
+              {/* Swipeable slider */}
               <div
-                className="h-full rounded-full bg-emerald-500/70 transition-all duration-500"
-                style={{ width: `${goalPct}%` }}
-                data-testid="progress-savings-goal"
-              />
+                ref={cardSliderRef}
+                className="flex overflow-x-auto snap-x snap-mandatory"
+                style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
+                onScroll={(e) => {
+                  const el = e.currentTarget;
+                  const idx = Math.round(el.scrollLeft / el.offsetWidth);
+                  setActiveCard(idx);
+                }}
+              >
+                {/* Card 1: Budget */}
+                <div className="w-full flex-none snap-center">
+                  <FinancialSummaryCard
+                    hidden={hidden}
+                    animating={animating}
+                    periodStatus={budgetPeriodStatus}
+                    daysRemaining={budgetDaysRemaining}
+                  />
+                </div>
+                {/* Card 2: Total Assets */}
+                <div className="w-full flex-none snap-center">
+                  {totalAssetsCard}
+                </div>
+              </div>
+              {/* Dot indicators */}
+              <div className="flex justify-center items-center gap-2">
+                {[0, 1].map((idx) => (
+                  <button
+                    key={idx}
+                    aria-label={`Card ${idx + 1}`}
+                    onClick={() => {
+                      cardSliderRef.current?.scrollTo({ left: idx * cardSliderRef.current.offsetWidth, behavior: "smooth" });
+                      setActiveCard(idx);
+                    }}
+                    className={`rounded-full transition-all duration-300 ${
+                      activeCard === idx
+                        ? "w-5 h-1.5 bg-emerald-500"
+                        : "w-1.5 h-1.5 bg-foreground/20 hover:bg-foreground/35"
+                    }`}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          );
+        }
+
+        return totalAssetsCard;
+      })()}
 
       {/* Menu Utama — horizontal scrollable quick access */}
       {(() => {
