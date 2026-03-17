@@ -151,12 +151,12 @@ export default function AiAdvisorPage() {
         )}
       </div>
 
-      {/* Chat card */}
-      <Card className="rounded-2xl border border-border shadow-sm">
-        <CardContent className="p-4 space-y-3">
+      {/* Chat card — stretches to near bottom nav */}
+      <Card className="rounded-2xl border border-border shadow-sm" style={{ minHeight: "calc(100dvh - 220px)" }}>
+        <CardContent className="p-4 flex flex-col gap-3 h-full" style={{ minHeight: "calc(100dvh - 220px)" }}>
 
-          {/* Messages */}
-          <div className="space-y-2.5 min-h-[200px]">
+          {/* Messages — grows to fill space */}
+          <div className="flex-1 space-y-2.5">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center min-h-[180px] gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-500/15 border border-violet-200 dark:border-violet-500/20 flex items-center justify-center">
@@ -184,12 +184,12 @@ export default function AiAdvisorPage() {
             )}
           </div>
 
-          {/* Quick chips (once chat started) */}
+          {/* Quick prompts — vertical stack, no scroll */}
           {messages.length > 0 && (
-            <div className="flex gap-1.5 overflow-x-auto scrollbar-none -mx-1 px-1 pb-0.5">
+            <div className="flex flex-col gap-1.5">
               {QUICK_PROMPTS.map(q => (
                 <button key={q.label} onClick={() => handleSend(q.prompt)} disabled={send.isPending}
-                  className="shrink-0 text-[11px] text-muted-foreground bg-muted hover:bg-accent border border-border rounded-full px-3 py-1 transition-colors disabled:opacity-40 whitespace-nowrap">
+                  className="text-left text-[11px] text-muted-foreground bg-muted hover:bg-accent border border-border rounded-xl px-3 py-2 transition-colors disabled:opacity-40 leading-snug">
                   {q.label}
                 </button>
               ))}
