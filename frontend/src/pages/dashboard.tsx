@@ -164,17 +164,17 @@ function formatShort(amount: number, lang = "id"): string {
   return `Rp ${amount}`;
 }
 
-const MASKED_LONG = "Rp......";
-const MASKED_SHORT = "******";
+const MASKED_LONG = "Rp *** *** ***";
+const MASKED_SHORT = "Rp *****";
 
 // === EYE TOGGLE HOOK ===
-// Manages show/hide state for all currency amounts on dashboard.
-// State persisted to localStorage key "fr_hide_amounts".
+// Manages show/hide state for currency amounts.
+// key: localStorage key to persist state independently per card.
 // Animation: 90ms delay before toggling, then animating flag triggers
 // 180ms fade (opacity 0→1) + scale (0.98→1) CSS transitions on amounts.
-function useAmountVisibility() {
+function useAmountVisibility(key = "fr_hide_amounts") {
   const [hidden, setHidden] = useState(() => {
-    try { return localStorage.getItem("fr_hide_amounts") === "1"; } catch { return false; }
+    try { return localStorage.getItem(key) === "1"; } catch { return false; }
   });
   const [animating, setAnimating] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
@@ -185,10 +185,10 @@ function useAmountVisibility() {
     timeoutRef.current = setTimeout(() => {
       const next = !hidden;
       setHidden(next);
-      try { localStorage.setItem("fr_hide_amounts", next ? "1" : "0"); } catch {}
+      try { localStorage.setItem(key, next ? "1" : "0"); } catch {}
       requestAnimationFrame(() => setAnimating(false));
     }, 90);
-  }, [hidden]);
+  }, [hidden, key]);
 
   return { hidden, toggle, animating };
 }
@@ -1508,6 +1508,15 @@ function FinancialSummaryCard({
   daysRemaining: number;
 }) {
   const { t } = useLanguage();
+  const [dailyHidden, setDailyHidden] = useState(false);
+  const [dailyAnimating, setDailyAnimating] = useState(false);
+  const dailyToggle = useCallback(() => {
+    setDailyAnimating(true);
+    setTimeout(() => {
+      setDailyHidden(h => !h);
+      requestAnimationFrame(() => setDailyAnimating(false));
+    }, 90);
+  }, []);
   const { data: insight, isLoading } = useQuery<SpendingInsightData>({
     queryKey: ["/api/spending-insight?period=monthly"],
   });
@@ -1567,7 +1576,7 @@ function FinancialSummaryCard({
   };
   const s = statusConfig[status];
 
-  const MASKED = "Rp......";
+  const MASKED = "Rp *** *** ***";
 
   return (
     <Card
@@ -1625,7 +1634,19 @@ function FinancialSummaryCard({
 
         {/* Big number: daily safe budget */}
         <div className="shrink-0">
-          <p className="text-[11px] text-white/45 mb-1 uppercase tracking-wide">{t.dashboard.dailySafeSpend}</p>
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-[11px] text-white/45 uppercase tracking-wide">{t.dashboard.dailySafeSpend}</p>
+            <button
+              onClick={dailyToggle}
+              className="text-white/30 hover:text-white/60 transition-colors duration-150"
+              aria-label={dailyHidden ? "Show amount" : "Hide amount"}
+            >
+              {dailyHidden
+                ? <EyeOff className="w-3 h-3" />
+                : <Eye className="w-3 h-3" />
+              }
+            </button>
+          </div>
           {isLoading ? (
             <Skeleton className="h-9 w-40 bg-white/10" />
           ) : (
@@ -1633,13 +1654,13 @@ function FinancialSummaryCard({
               className="text-3xl font-bold font-mono tracking-tight"
               data-testid="text-budget-aman"
               style={{
-                opacity: animating ? 0 : 1,
-                transform: animating ? "scale(0.98)" : "scale(1)",
+                opacity: dailyAnimating ? 0 : 1,
+                transform: dailyAnimating ? "scale(0.98)" : "scale(1)",
                 transition: "opacity 180ms ease-in-out, transform 180ms ease-in-out",
                 color: budgetAmanHariIni >= 0 ? "white" : "#f87171",
               }}
             >
-              {hidden ? MASKED : formatCurrency(Math.max(0, budgetAmanHariIni))}
+              {dailyHidden ? MASKED : formatCurrency(Math.max(0, budgetAmanHariIni))}
             </p>
           )}
           {!isLoading && totalIncome === 0 && (
@@ -1770,6 +1791,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const { t, language } = useLanguage();
   const { hidden, toggle, animating } = useAmountVisibility();
+  const { hidden: assetHidden, toggle: assetToggle, animating: assetAnimating } = useAmountVisibility("fr_hide_assets");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [initialAction, setInitialAction] = useState<ActionType | null>(null);
   const [setupAccountOpen, setSetupAccountOpen] = useState(false);
@@ -2061,9 +2083,13 @@ export default function Dashboard() {
         const bankPct  = pctOf(dashboard?.totalBank    ?? 0);
         const ePct     = pctOf(dashboard?.totalEwallet ?? 0);
 
+        // Total Asset card uses its own independent hide state
+        const hidden   = assetHidden;
+        const toggle   = assetToggle;
+
         const amtStyle = {
-          opacity: animating ? 0 : 1,
-          transform: animating ? "scale(0.97)" : "scale(1)",
+          opacity: assetAnimating ? 0 : 1,
+          transform: assetAnimating ? "scale(0.97)" : "scale(1)",
           transition: "opacity 180ms ease-in-out, transform 180ms ease-in-out",
         };
 
