@@ -1675,7 +1675,7 @@ function FinancialSummaryCard({
                   className="text-xs font-mono font-semibold text-red-400"
                   style={{ opacity: animating ? 0 : 1, transition: "opacity 180ms ease-in-out" }}
                 >
-                  {hidden ? "******" : formatCurrency(todaySpent)}
+                  {dailyHidden ? MASKED_SHORT : formatCurrency(todaySpent)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -1688,7 +1688,7 @@ function FinancialSummaryCard({
                     color: isTodayOver ? "#f87171" : "#6ee7b7",
                   }}
                 >
-                  {hidden ? "******" : isTodayOver ? `Rp 0 · ${t.dashboard.statusOverspending}` : formatCurrency(remainingToday)}
+                  {dailyHidden ? MASKED_SHORT : isTodayOver ? `Rp 0 · ${t.dashboard.statusOverspending}` : formatCurrency(remainingToday)}
                 </span>
               </div>
             </div>
@@ -1711,7 +1711,7 @@ function FinancialSummaryCard({
                   transition: "opacity 180ms ease-in-out",
                 }}
               >
-                {hidden ? "******" : formatCurrency(totalIncome)}
+                {dailyHidden ? MASKED_SHORT : formatCurrency(totalIncome)}
               </p>
             )}
           </div>
@@ -1728,7 +1728,7 @@ function FinancialSummaryCard({
                   transition: "opacity 180ms ease-in-out",
                 }}
               >
-                {hidden ? "******" : formatCurrency(totalExpense)}
+                {dailyHidden ? MASKED_SHORT : formatCurrency(totalExpense)}
               </p>
             )}
           </div>
@@ -1751,7 +1751,7 @@ function FinancialSummaryCard({
                   color: remainingBudget >= 0 ? "#6ee7b7" : "#f87171",
                 }}
               >
-                {hidden ? "******" : formatCurrency(remainingBudget)}
+                {dailyHidden ? MASKED_SHORT : formatCurrency(remainingBudget)}
               </span>
             )}
           </div>
@@ -2146,7 +2146,7 @@ export default function Dashboard() {
                     <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${dominantCat.color}`} />
                     <span className="text-xs text-white/50 font-medium">
                       {dominantCat.label} mendominasi{" "}
-                      <span className="font-mono">{hidden ? "–" : `${dominantCat.pct}%`}</span>
+                      <span className="font-mono">{dominantCat.pct}%</span>
                     </span>
                   </div>
                 )}
