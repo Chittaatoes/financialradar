@@ -2556,4 +2556,52 @@ STYLE
     }
   });
 
+  // GET /api/invest/search?q=QUERY — search all IDX stocks via Yahoo Finance
+  app.get("/api/invest/search", isAuthenticated, async (req, res) => {
+    const q = String(req.query.q || "").trim();
+    if (q.length < 2) return res.json([]);
+    try {
+      const url = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&lang=en-US&region=ID&quotesCount=15&newsCount=0&enableFuzzyQuery=true`;
+      const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" } });
+      if (!r.ok) throw new Error(`Yahoo search ${r.status}`);
+      const json = await r.json() as any;
+      const results = ((json.quotes ?? []) as any[])
+        .filter(item => typeof item.symbol === "string" && item.symbol.endsWith(".JK") && item.quoteType === "EQUITY")
+        .map(item => ({ symbol: item.symbol, name: item.longname || item.shortname || item.symbol.replace(".JK", "") }))
+        .slice(0, 12);
+      res.json(results);
+    } catch (err) {
+      console.error("Stock search error:", err);
+      res.json([]);
+    }
+  });
+
+  // GET /api/invest/ihsg — IHSG index data + intraday sparkline
+  app.get("/api/invest/ihsg", isAuthenticated, async (_req, res) => {
+    try {
+      const bucket = Math.floor(Date.now() / (5 * 60_000));
+      const data = await cached(`ihsg_${bucket}`, async () => {
+        const url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EJKSE?interval=5m&range=1d";
+        const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+        if (!r.ok) throw new Error(`Yahoo IHSG ${r.status}`);
+        const json = await r.json() as any;
+        const result = json.chart?.result?.[0];
+        if (!result) throw new Error("No IHSG data");
+        const meta = result.meta;
+        const timestamps: number[] = result.timestamp || [];
+        const closes: (number | null)[] = result.indicators?.quote?.[0]?.close || [];
+        const points = timestamps
+          .map((t, i) => ({ t: t * 1000, v: closes[i] }))
+          .filter(p => p.v != null) as { t: number; v: number }[];
+        const prev = meta.chartPreviousClose ?? meta.previousClose ?? meta.regularMarketPrice;
+        const price = meta.regularMarketPrice ?? prev;
+        return { price, prevClose: prev, change: price - prev, changePct: prev > 0 ? ((price - prev) / prev) * 100 : 0, points };
+      });
+      res.json(data);
+    } catch (err) {
+      console.error("IHSG fetch error:", err);
+      res.status(500).json({ message: "Failed to fetch IHSG" });
+    }
+  });
+
 }

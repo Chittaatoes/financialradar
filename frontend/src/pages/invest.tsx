@@ -16,6 +16,10 @@ interface DBHolding {
   id: number; userId: string; symbol: string;
   lots: number; avgPrice: string; buyDate: string | null; createdAt: string;
 }
+interface IHSGData {
+  price: number; prevClose: number; change: number; changePct: number;
+  points: { t: number; v: number }[];
+}
 
 // ── Constants ──────────────────────────────────────────────────────────
 interface StockEntry { symbol: string; name: string; aliases: string[]; }
@@ -136,11 +140,7 @@ function StockRow({ symbol, onAdd, isLast }: { symbol: string; onAdd?: (q: Stock
       <Skeleton className="h-4 w-20" />
     </div>
   );
-  if (!data) return (
-    <div className={`flex items-center py-3 ${!isLast ? "border-b border-border" : ""}`}>
-      <span className="text-xs text-muted-foreground">Data {symbol} tidak tersedia</span>
-    </div>
-  );
+  if (!data) return null;
   const ticker = data.symbol.replace(".JK", "");
   return (
     <div className={`flex items-center justify-between py-3 ${!isLast ? "border-b border-border" : ""}`}>
@@ -330,12 +330,61 @@ function InvestInsight({ holdings, quotes }: { holdings: DBHolding[]; quotes: Ma
   );
 }
 
+// ── IHSG Sparkline Banner ─────────────────────────────────────────────
+function Sparkline({ points, up }: { points: { t: number; v: number }[]; up: boolean }) {
+  if (points.length < 2) return null;
+  const W = 120; const H = 40;
+  const minV = Math.min(...points.map(p => p.v));
+  const maxV = Math.max(...points.map(p => p.v));
+  const range = maxV - minV || 1;
+  const xs = points.map((_, i) => (i / (points.length - 1)) * W);
+  const ys = points.map(p => H - ((p.v - minV) / range) * (H - 4) - 2);
+  const d = xs.map((x, i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(" ");
+  const color = up ? "#10b981" : "#ef4444";
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="overflow-visible">
+      <path d={d} fill="none" stroke={color} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IHSGBanner() {
+  const { data, isLoading } = useQuery<IHSGData | null>({
+    queryKey: ["/api/invest/ihsg"], staleTime: 5 * 60_000, retry: 1,
+  });
+  if (isLoading) return (
+    <div className="rounded-2xl border border-border bg-card px-4 py-3.5 flex items-center justify-between">
+      <div className="space-y-1.5"><Skeleton className="h-3 w-16" /><Skeleton className="h-5 w-28" /></div>
+      <Skeleton className="h-10 w-28 rounded-lg" />
+    </div>
+  );
+  if (!data) return null;
+  const up = data.change >= 0;
+  const color = up ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
+  return (
+    <div className="rounded-2xl border border-border bg-card px-4 py-3.5 flex items-center justify-between gap-3">
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide mb-0.5">IHSG · IDX Composite</p>
+        <p className="text-[22px] font-bold font-mono text-foreground leading-tight">{data.price.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          {up ? <TrendingUp className={`w-3 h-3 ${color}`} /> : <TrendingDown className={`w-3 h-3 ${color}`} />}
+          <span className={`text-[12px] font-semibold tabular-nums ${color}`}>
+            {up ? "+" : ""}{data.change.toFixed(2)} ({up ? "+" : ""}{data.changePct.toFixed(2)}%)
+          </span>
+        </div>
+      </div>
+      <div className="shrink-0">
+        <Sparkline points={data.points} up={up} />
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────
 export default function InvestPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [manualSearched, setManualSearched] = useState<string[]>([]);
   const [addSheet, setAddSheet] = useState<StockQuote | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -359,29 +408,35 @@ export default function InvestPage() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [search]);
 
-  // Scored search
-  const listMatches = debouncedSearch.trim().length >= 1
+  // Local instant results (scored from local list)
+  const localMatches = debouncedSearch.trim().length >= 1
     ? ALL_STOCKS
         .map(s => ({ s, score: scoreStock(s, debouncedSearch) }))
         .filter(x => x.score > 0)
         .sort((a, b) => b.score - a.score)
-        .slice(0, 12)
+        .slice(0, 8)
         .map(x => x.s)
     : [];
 
-  const handleManualSearch = () => {
-    const sym = search.trim().toUpperCase();
-    if (!sym) return;
-    const withJK = sym.endsWith(".JK") ? sym : `${sym}.JK`;
-    const inList = ALL_STOCKS.find(s => s.symbol === withJK);
-    if (inList) {
-      setSearch(sym.replace(".JK", ""));
-      setDebouncedSearch(sym.replace(".JK", ""));
-    } else {
-      setManualSearched(p => p.includes(withJK) ? p : [...p, withJK]);
-      setSearch(""); setDebouncedSearch("");
-    }
-  };
+  // API search — hits Yahoo Finance for all IDX stocks
+  const { data: apiSearchRaw, isFetching: searchFetching } = useQuery<{ symbol: string; name: string }[] | null>({
+    queryKey: ["/api/invest/search", debouncedSearch],
+    queryFn: async () => {
+      if (debouncedSearch.trim().length < 2) return null;
+      const res = await apiRequest("GET", `/api/invest/search?q=${encodeURIComponent(debouncedSearch.trim())}`);
+      return res.json();
+    },
+    enabled: debouncedSearch.trim().length >= 2,
+    staleTime: 30_000,
+  });
+  const apiResults: { symbol: string; name: string }[] = Array.isArray(apiSearchRaw) ? apiSearchRaw : [];
+
+  // Merge: local first (instant), then API results not already in local
+  const localSymbols = new Set(localMatches.map(s => s.symbol));
+  const mergedResults = [
+    ...localMatches,
+    ...apiResults.filter(a => !localSymbols.has(a.symbol)),
+  ].slice(0, 12);
 
   const isSearching = debouncedSearch.length >= 1;
 
@@ -408,46 +463,52 @@ export default function InvestPage() {
           <p className="text-xs text-muted-foreground">Pantau harga saham Indonesia</p>
         </div>
 
+        {/* IHSG Banner */}
+        <IHSGBanner />
+
         {/* Search */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-            <Input className="pl-9 h-9 text-sm"
-              placeholder="Cari saham: BCA, Bank, Telkom…"
-              value={search} onChange={e => setSearch(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleManualSearch()} />
-          </div>
-          <Button size="sm" className="h-9 px-4 text-xs shrink-0" onClick={handleManualSearch}>Cari</Button>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+          <Input className="pl-9 pr-9 h-9 text-sm"
+            placeholder="Cari saham: BCA, Bumi, Telkom, bank…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onKeyDown={e => { if (e.key === "Escape") { setSearch(""); setDebouncedSearch(""); } }}
+          />
+          {search && (
+            <button onClick={() => { setSearch(""); setDebouncedSearch(""); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Search results */}
         {isSearching && (
           <Card className="rounded-2xl border border-border shadow-sm">
             <CardContent className="px-4 py-2">
-              {listMatches.length > 0 ? (
+              {mergedResults.length > 0 ? (
                 <>
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wide pt-2 pb-1">
-                    Hasil untuk &ldquo;{debouncedSearch}&rdquo;
-                  </p>
-                  {listMatches.map((s, i) => (
-                    <StockRow key={s.symbol} symbol={s.symbol} isLast={i === listMatches.length - 1}
+                  <div className="flex items-center justify-between pt-2 pb-1">
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                      Hasil pencarian
+                    </p>
+                    {searchFetching && <span className="text-[10px] text-muted-foreground animate-pulse">Mencari…</span>}
+                  </div>
+                  {mergedResults.map((s, i) => (
+                    <StockRow key={s.symbol} symbol={s.symbol} isLast={i === mergedResults.length - 1}
                       onAdd={q => setAddSheet(q)} />
                   ))}
                 </>
+              ) : searchFetching ? (
+                <div className="py-3 flex items-center gap-2">
+                  <span className="text-[12px] text-muted-foreground animate-pulse">Mencari di bursa…</span>
+                </div>
               ) : (
                 <div className="py-3">
                   <p className="text-[12px] text-muted-foreground">Tidak ditemukan untuk &ldquo;{debouncedSearch}&rdquo;</p>
                   <p className="text-[11px] text-muted-foreground/60 mt-0.5">Tekan Cari untuk lookup langsung ke bursa.</p>
                 </div>
-              )}
-              {manualSearched.length > 0 && (
-                <>
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wide pt-3 pb-1">Pencarian manual</p>
-                  {manualSearched.map((s, i) => (
-                    <StockRow key={s} symbol={s} isLast={i === manualSearched.length - 1}
-                      onAdd={q => setAddSheet(q)} />
-                  ))}
-                </>
               )}
             </CardContent>
           </Card>
