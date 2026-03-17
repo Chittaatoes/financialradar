@@ -275,9 +275,10 @@ export default function InvestPage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // DB portfolio
-  const { data: holdings = [] } = useQuery<DBHolding[]>({
+  const { data: holdingsRaw } = useQuery<DBHolding[] | null>({
     queryKey: ["/api/portfolio"], staleTime: 0, gcTime: 0, refetchOnMount: true,
   });
+  const holdings: DBHolding[] = Array.isArray(holdingsRaw) ? holdingsRaw : [];
 
   // Prefetch quotes for portfolio holdings
   const quotes = new Map<string, StockQuote>();

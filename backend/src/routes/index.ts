@@ -2433,7 +2433,7 @@ STYLE
   // GET /api/portfolio — list all stock holdings for user
   app.get("/api/portfolio", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req.user as any).id;
+      const userId = (req.session as any)?.user?.id;
       const holdings = await db
         .select()
         .from(stockHoldings)
@@ -2449,7 +2449,7 @@ STYLE
   // POST /api/portfolio — add or update a holding
   app.post("/api/portfolio", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req.user as any).id;
+      const userId = (req.session as any)?.user?.id;
       const { symbol, lots, avgPrice, buyDate } = req.body;
       if (!symbol || !lots || !avgPrice) return res.status(400).json({ message: "symbol, lots, avgPrice required" });
 
@@ -2493,7 +2493,7 @@ STYLE
   // DELETE /api/portfolio/:id — remove a holding
   app.delete("/api/portfolio/:id", isAuthenticated, async (req, res) => {
     try {
-      const userId = (req.user as any).id;
+      const userId = (req.session as any)?.user?.id;
       const id = Number(req.params.id);
       await db.delete(stockHoldings).where(and(eq(stockHoldings.id, id), eq(stockHoldings.userId, userId)));
       res.json({ ok: true });
