@@ -28,6 +28,10 @@ import {
   Award,
   PiggyBank,
   User,
+  BarChart2,
+  Calculator,
+  Bot,
+  CandlestickChart,
 } from "lucide-react";
 import logoImg from "@assets/favicon_1771971850849.png";
 import {
@@ -77,6 +81,13 @@ export function AppSidebar() {
     { title: (t.nav as any).profile || "Profile", url: "/profile", icon: User },
   ];
 
+  const exploreItems = [
+    { title: "Market", url: "/market", icon: BarChart2 },
+    { title: "Tools", url: "/tools", icon: Calculator },
+    { title: "AI Advisor", url: "/ai-advisor", icon: Bot },
+    { title: "Investasi", url: "/invest", icon: CandlestickChart },
+  ];
+
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
@@ -120,6 +131,32 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {advancedItems.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location === item.url}
+                    data-testid={`link-nav-${item.url.replace("/", "")}`}
+                  >
+                    <Link
+                      href={item.url}
+                      onMouseEnter={() => prefetchRouteData(item.url)}
+                      onTouchStart={() => prefetchRouteData(item.url)}
+                    >
+                      <item.icon className="w-4 h-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Explore</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {exploreItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton
                     asChild

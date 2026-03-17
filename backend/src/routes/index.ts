@@ -2055,4 +2055,290 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
     }
   });
 
+  // ══════════════════════════════════════════════════════
+  // MARKET FEATURE
+  // ══════════════════════════════════════════════════════
+
+  // Cache simple in-memory (5 min TTL)
+  const marketCache: Record<string, { data: unknown; ts: number }> = {};
+  const CACHE_TTL = 5 * 60 * 1000;
+
+  function cached<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const hit = marketCache[key];
+    if (hit && Date.now() - hit.ts < CACHE_TTL) return Promise.resolve(hit.data as T);
+    return fn().then(data => { marketCache[key] = { data, ts: Date.now() }; return data; });
+  }
+
+  // GET /api/market/prices — USD/IDR, Gold, BTC, ETH (no API keys needed)
+  app.get("/api/market/prices", isAuthenticated, async (_req, res) => {
+    try {
+      const data = await cached("market_prices", async () => {
+        const [fxRes, cryptoRes] = await Promise.all([
+          fetch("https://api.exchangerate-api.com/v4/latest/USD"),
+          fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=idr&include_24hr_change=true"),
+        ]);
+
+        const fx = fxRes.ok ? await fxRes.json() : null;
+        const crypto = cryptoRes.ok ? await cryptoRes.json() : null;
+
+        const usdIdr = fx?.rates?.IDR ?? 16000;
+
+        // Gold estimate: XAU/USD ≈ 3200 USD (static fallback, updated periodically)
+        const xauUsd = 3200;
+        const goldPerGram = (xauUsd / 31.1035) * usdIdr;
+
+        return {
+          usdIdr,
+          goldGram: Math.round(goldPerGram),
+          bitcoin: crypto?.bitcoin?.idr ?? 0,
+          ethereum: crypto?.ethereum?.idr ?? 0,
+          btcChange: crypto?.bitcoin?.idr_24h_change ?? 0,
+          ethChange: crypto?.ethereum?.idr_24h_change ?? 0,
+          goldChange: 0,
+          usdChange: 0,
+          updatedAt: new Date().toISOString(),
+        };
+      });
+      res.json(data);
+    } catch (err) {
+      console.error("Market prices error:", err);
+      res.status(500).json({ message: "Failed to fetch market prices" });
+    }
+  });
+
+  // GET /api/market/news — financial news (GNews if key set, else curated fallback)
+  app.get("/api/market/news", isAuthenticated, async (_req, res) => {
+    try {
+      const GNEWS_KEY = process.env.GNEWS_API_KEY;
+      const data = await cached("market_news", async () => {
+        if (GNEWS_KEY) {
+          const url = `https://gnews.io/api/v4/search?q=inflasi+ekonomi+rupiah+Indonesia&lang=id&max=5&token=${GNEWS_KEY}`;
+          const r = await fetch(url);
+          if (r.ok) {
+            const json = await r.json() as { articles: Array<{ title: string; source: { name: string }; url: string; publishedAt: string }> };
+            const HIGH_KWORDS = ["naik", "turun", "crisis", "inflasi tinggi", "suku bunga", "resesi"];
+            const MED_KWORDS = ["ekonomi", "rupiah", "dolar", "investasi", "saham"];
+            const articles = (json.articles || []).slice(0, 3).map((a) => {
+              const t = (a.title || "").toLowerCase();
+              const impact = HIGH_KWORDS.some(k => t.includes(k)) ? "high"
+                : MED_KWORDS.some(k => t.includes(k)) ? "medium" : "low";
+              return { title: a.title, source: a.source?.name || "GNews", url: a.url, publishedAt: a.publishedAt, impact };
+            });
+            return { articles };
+          }
+        }
+        // Curated fallback news
+        return {
+          articles: [
+            {
+              title: "Bank Indonesia Pertahankan Suku Bunga Acuan di 6,25% untuk Jaga Stabilitas Rupiah",
+              source: "Kontan",
+              url: "https://investasi.kontan.co.id",
+              publishedAt: new Date(Date.now() - 2 * 3600000).toISOString(),
+              impact: "high",
+            },
+            {
+              title: "Inflasi Indonesia Terkendali di 2,8%, Konsumsi Domestik Jadi Motor Pertumbuhan",
+              source: "Kompas",
+              url: "https://money.kompas.com",
+              publishedAt: new Date(Date.now() - 5 * 3600000).toISOString(),
+              impact: "medium",
+            },
+            {
+              title: "OJK Dorong Literasi Keuangan Digital Masyarakat Indonesia Naik 10% di 2025",
+              source: "Bisnis.com",
+              url: "https://finansial.bisnis.com",
+              publishedAt: new Date(Date.now() - 24 * 3600000).toISOString(),
+              impact: "low",
+            },
+          ],
+        };
+      });
+      res.json(data);
+    } catch (err) {
+      console.error("Market news error:", err);
+      res.status(500).json({ message: "Failed to fetch news" });
+    }
+  });
+
+  // ══════════════════════════════════════════════════════
+  // AI ADVISOR
+  // ══════════════════════════════════════════════════════
+
+  app.post("/api/ai/chat", isAuthenticated, async (req, res) => {
+    try {
+      const { message, history = [], context = {} } = req.body as {
+        message: string;
+        history: Array<{ role: string; content: string }>;
+        context: {
+          totalAssets?: number;
+          monthlyIncome?: number;
+          monthlyExpense?: number;
+          level?: number;
+          streakCount?: number;
+        };
+      };
+
+      if (!message) return res.status(400).json({ message: "Message required" });
+
+      const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
+      const HF_KEY = process.env.HUGGINGFACE_API_KEY;
+
+      const formatIDR = (n: number) => `Rp ${Math.round(n).toLocaleString("id-ID")}`;
+
+      const systemPrompt = `Kamu adalah AI Advisor keuangan pribadi yang ramah dan praktis, berbicara dalam Bahasa Indonesia.
+Berikan saran yang singkat, spesifik, dan actionable. Hindari jargon yang terlalu teknis.
+Fokus pada kondisi keuangan pengguna Indonesia.
+
+Data keuangan pengguna saat ini:
+- Total aset: ${formatIDR(context.totalAssets ?? 0)}
+- Pemasukan bulanan: ${formatIDR(context.monthlyIncome ?? 0)}
+- Pengeluaran bulanan: ${formatIDR(context.monthlyExpense ?? 0)}
+- Level gamifikasi: ${context.level ?? 1}
+- Streak aktif: ${context.streakCount ?? 0} hari
+
+Berikan respons maksimal 3 paragraf pendek. Gunakan bahasa yang hangat dan supportif.`;
+
+      const messages = [
+        { role: "system", content: systemPrompt },
+        ...history.slice(-6).map((h) => ({ role: h.role, content: h.content })),
+        { role: "user", content: message },
+      ];
+
+      if (OPENROUTER_KEY) {
+        const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${OPENROUTER_KEY}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://financialradar.app",
+          },
+          body: JSON.stringify({
+            model: "mistralai/mistral-7b-instruct:free",
+            messages,
+            max_tokens: 400,
+          }),
+        });
+        if (r.ok) {
+          const json = await r.json() as { choices: Array<{ message: { content: string } }> };
+          const reply = json.choices?.[0]?.message?.content ?? "Maaf, tidak bisa memproses.";
+          return res.json({ reply, configured: true });
+        }
+      }
+
+      if (HF_KEY) {
+        const r = await fetch("https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${HF_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            inputs: messages.map(m => `${m.role === "user" ? "[INST]" : ""}${m.content}${m.role === "user" ? "[/INST]" : ""}`).join("\n"),
+            parameters: { max_new_tokens: 300 },
+          }),
+        });
+        if (r.ok) {
+          const json = await r.json() as Array<{ generated_text: string }>;
+          const raw = json[0]?.generated_text ?? "";
+          const reply = raw.split("[/INST]").pop()?.trim() ?? "Maaf, tidak bisa memproses.";
+          return res.json({ reply, configured: true });
+        }
+      }
+
+      // Fallback: rule-based response when no AI key configured
+      const income = context.monthlyIncome ?? 0;
+      const expense = context.monthlyExpense ?? 0;
+      const surplus = income - expense;
+      const savingRatio = income > 0 ? (surplus / income) * 100 : 0;
+      const assets = context.totalAssets ?? 0;
+
+      let reply = "";
+      const lowerMsg = message.toLowerCase();
+
+      if (lowerMsg.includes("sehat") || lowerMsg.includes("analisis") || lowerMsg.includes("kondisi")) {
+        if (savingRatio >= 20) {
+          reply = `Keuanganmu terlihat sehat! 🎉 Rasio tabunganmu ${savingRatio.toFixed(0)}% — sudah melebihi standar ideal 20%. Total aset ${formatIDR(assets)} juga menunjukkan kamu konsisten membangun kekayaan.\n\nTeruslah pertahankan kebiasaan ini dan pertimbangkan untuk mulai menginvestasikan kelebihan dana agar asetmu terus bertumbuh.`;
+        } else if (savingRatio >= 10) {
+          reply = `Kondisi keuanganmu cukup baik, dengan rasio tabungan ${savingRatio.toFixed(0)}%. Namun idealnya kamu bisa mencapai 20% agar lebih cepat mencapai kebebasan finansial.\n\nCoba cek lagi pengeluaran rutin — biasanya ada 10-15% yang bisa dipangkas dari kategori hiburan atau makan di luar.`;
+        } else if (income > 0) {
+          reply = `Perlu perhatian! Rasio tabunganmu saat ini hanya ${savingRatio.toFixed(0)}% dari pemasukan. Pengeluaranmu (${formatIDR(expense)}) terlalu mendekati pemasukan (${formatIDR(income)}).\n\nCoba terapkan metode 50/30/20: 50% kebutuhan pokok, 30% keinginan, 20% tabungan. Mulai dari memotong 1-2 pengeluaran tidak esensial bulan ini.`;
+        } else {
+          reply = `Belum ada data pemasukan bulan ini. Catat dulu pemasukan dan pengeluaranmu agar saya bisa menganalisis kondisi keuanganmu secara akurat! 📊`;
+        }
+      } else if (lowerMsg.includes("menabung") || lowerMsg.includes("tabung") || lowerMsg.includes("saving")) {
+        reply = `Untuk menabung lebih cepat, coba strategi "Pay Yourself First": segera sisihkan 20% dari gaji begitu diterima, sebelum digunakan untuk apapun. Otomatiskan transfer ke rekening terpisah.\n\nSelain itu, terapkan aturan 24 jam: tunda setiap pembelian non-esensial selama 24 jam. Banyak keinginan impulsif yang akan hilang sendiri setelah dipikirkan matang.`;
+      } else if (lowerMsg.includes("boros") || lowerMsg.includes("overspending")) {
+        if (expense > income * 0.9 && income > 0) {
+          reply = `Ya, berdasarkan data kamu, pengeluaran (${formatIDR(expense)}) sudah hampir menyamai pemasukan (${formatIDR(income)}). Ini perlu segera diperbaiki.\n\nLangkah pertama: catat setiap pengeluaran selama 1 minggu untuk tahu di mana uang "bocor". Biasanya tersembunyi di langganan digital, makan siang, atau belanja online kecil-kecilan.`;
+        } else {
+          reply = `Dari data yang ada, pengeluaranmu masih dalam batas wajar. Tapi tetap waspada ya! Boros seringkali terasa "tidak terasa" karena banyak pengeluaran kecil yang terkumpul.\n\nCoba audit langgananmu — apakah semua streaming, aplikasi, dan membership yang kamu bayar benar-benar kamu gunakan?`;
+        }
+      } else if (lowerMsg.includes("investasi") || lowerMsg.includes("invest")) {
+        reply = `Untuk pemula, mulailah dengan yang paling aman dulu: pastikan dana darurat sudah ada (minimal 3× pengeluaran bulanan), baru kemudian berinvestasi.\n\nPilihan investasi cocok untuk pemula Indonesia: Reksa Dana Pasar Uang (risiko rendah), ORI/SBR (obligasi pemerintah aman), atau saham blue-chip IDX seperti BBCA, BBRI. Mulai dari nominal kecil untuk belajar.`;
+      } else {
+        reply = `Terima kasih sudah bertanya! Untuk memberikan saran yang lebih personal, coba tanyakan hal spesifik seperti:\n\n• "Apakah kondisi keuanganku sehat?"\n• "Bagaimana cara menabung lebih cepat?"\n• "Apa yang harus aku lakukan agar tidak boros?"\n\nSaya siap membantu dengan saran keuangan yang praktis dan sesuai kondisimu! 💚`;
+      }
+
+      res.json({ reply, configured: false });
+    } catch (err) {
+      console.error("AI chat error:", err);
+      res.status(500).json({ message: "Failed to process chat" });
+    }
+  });
+
+  // ══════════════════════════════════════════════════════
+  // INVEST FEATURE — Stock quotes via Yahoo Finance
+  // ══════════════════════════════════════════════════════
+
+  app.get("/api/invest/quote/:ticker", isAuthenticated, async (req, res) => {
+    const { ticker } = req.params;
+    if (!ticker || ticker.length > 20) return res.status(400).json({ message: "Invalid ticker" });
+
+    try {
+      const data = await cached(`stock_${ticker}`, async () => {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5d`;
+        const r = await fetch(url, {
+          headers: { "User-Agent": "Mozilla/5.0" },
+        });
+        if (!r.ok) throw new Error(`Yahoo Finance returned ${r.status}`);
+        const json = await r.json() as {
+          chart: {
+            result: Array<{
+              meta: {
+                regularMarketPrice: number;
+                previousClose: number;
+                shortName?: string;
+                longName?: string;
+                currency: string;
+                marketState: string;
+              };
+            }>;
+            error: { message: string } | null;
+          };
+        };
+
+        if (json.chart?.error) throw new Error(json.chart.error.message);
+        const meta = json.chart?.result?.[0]?.meta;
+        if (!meta) throw new Error("No data");
+
+        const price = meta.regularMarketPrice ?? 0;
+        const prev = meta.previousClose ?? price;
+        const change = price - prev;
+        const changePct = prev > 0 ? (change / prev) * 100 : 0;
+
+        return {
+          symbol: ticker,
+          name: meta.shortName || meta.longName || ticker,
+          price,
+          change,
+          changePct,
+          currency: meta.currency ?? "IDR",
+          marketStatus: (meta.marketState === "REGULAR" ? "open" : "closed") as "open" | "closed",
+        };
+      });
+      res.json(data);
+    } catch (err) {
+      console.error(`Stock quote error for ${ticker}:`, err);
+      res.status(502).json({ message: `Tidak bisa mengambil data ${ticker}` });
+    }
+  });
+
 }

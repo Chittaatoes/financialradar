@@ -37,6 +37,10 @@ const Admin = lazy(() => import("@/pages/admin"));
 const ProfilePage = lazy(() => import("@/pages/profile"));
 const ReportsPage = lazy(() => import("@/pages/reports"));
 const MacroRadar = lazy(() => import("@/pages/macro"));
+const MarketPage = lazy(() => import("@/pages/market"));
+const ToolsPage = lazy(() => import("@/pages/tools"));
+const AiAdvisorPage = lazy(() => import("@/pages/ai-advisor"));
+const InvestPage = lazy(() => import("@/pages/invest"));
 
 function useNavPlusHandler() {
   const [location, setLocation] = useLocation();
@@ -102,6 +106,10 @@ function AuthenticatedLayout() {
                 <Route path="/score" component={ScorePage} />
                 <Route path="/admin" component={Admin} />
                 <Route path="/profile" component={ProfilePage} />
+                <Route path="/market" component={MarketPage} />
+                <Route path="/tools" component={ToolsPage} />
+                <Route path="/ai-advisor" component={AiAdvisorPage} />
+                <Route path="/invest" component={InvestPage} />
                 <Route component={NotFound} />
               </Switch>
             </Suspense>
