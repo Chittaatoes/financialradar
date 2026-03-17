@@ -115,6 +115,7 @@ export async function setupAuth(app: Express) {
   });
 
   const isProduction = process.env.NODE_ENV === "production";
+  const isHttps = isProduction || !!process.env.REPLIT_DEV_DOMAIN;
 
   app.use(
     session({
@@ -125,7 +126,7 @@ export async function setupAuth(app: Express) {
       rolling: true,
       proxy: true,
       cookie: {
-        secure: isProduction,
+        secure: isHttps,
         httpOnly: true,
         sameSite: "lax",
         maxAge: 7 * 24 * 60 * 60 * 1000,
@@ -277,21 +278,13 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/logout", (req, res) => {
     const frontendUrl = process.env.FRONTEND_URL || "";
-    req.session.destroy((err) => {
-      if (err) {
-        console.error("[logout] session.destroy error:", err);
-      }
-      res.clearCookie("connect.sid", { path: "/" });
+    req.session.destroy(() => {
       res.redirect(frontendUrl || "/");
     });
   });
 
   app.post("/api/auth/logout", (req, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        console.error("[logout] session.destroy error:", err);
-      }
-      res.clearCookie("connect.sid", { path: "/" });
+    req.session.destroy(() => {
       res.json({ ok: true });
     });
   });

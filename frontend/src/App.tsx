@@ -15,6 +15,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageProvider } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
+import { Skeleton } from "@/components/ui/skeleton";
 import { initNetworkStatus } from "@/lib/network-status";
 import { startDailyReminder } from "@/lib/daily-reminder";
 import Dashboard from "@/pages/dashboard";
@@ -83,7 +84,7 @@ function AuthenticatedLayout() {
             <Suspense
               fallback={
                 <div className="flex items-center justify-center p-8">
-                  <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                  <Skeleton className="h-8 w-32" />
                 </div>
               }
             >
@@ -131,7 +132,7 @@ function AppContent() {
       const clean = window.location.pathname;
       window.history.replaceState({}, "", clean);
       if (loginResult === "success") {
-        queryClient.invalidateQueries({ queryKey: ["user"] });
+        queryClient.invalidateQueries();
         toast({
           title: "Login berhasil!",
           description: "Akun Google kamu sudah terhubung.",
@@ -163,7 +164,7 @@ function AppContent() {
       guestLoginCalled.current = true;
       apiRequest("POST", "/api/guest-login", {})
         .then(() => {
-          queryClient.invalidateQueries({ queryKey: ["user"] });
+          queryClient.invalidateQueries();
         })
         .catch(() => {
           setReady(true);
@@ -180,13 +181,9 @@ function AppContent() {
   if (isLoading || !ready) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-          </div>
-          <div className="h-2 w-24 rounded-full bg-primary/20 overflow-hidden">
-            <div className="h-full bg-primary/50 rounded-full animate-pulse" style={{ width: "60%" }} />
-          </div>
+        <div className="space-y-4 text-center">
+          <Skeleton className="h-10 w-10 rounded-md mx-auto" />
+          <Skeleton className="h-4 w-32 mx-auto" />
         </div>
       </div>
     );

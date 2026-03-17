@@ -71,14 +71,14 @@ if (API) {
   fetch(`${API}/health`).catch(() => {});
 }
 
-createRoot(document.getElementById("root")!).render(
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <LanguageProvider>
-        <App />
-      </LanguageProvider>
-    </ThemeProvider>
-  </QueryClientProvider>,
-);
-
-bootstrap();
+bootstrap().finally(() => {
+  createRoot(document.getElementById("root")!).render(
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <LanguageProvider>
+          <App />
+        </LanguageProvider>
+      </ThemeProvider>
+    </QueryClientProvider>,
+  );
+});
