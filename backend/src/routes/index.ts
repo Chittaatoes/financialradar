@@ -2186,18 +2186,28 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
 
       const formatIDR = (n: number) => `Rp ${Math.round(n).toLocaleString("id-ID")}`;
 
-      const systemPrompt = `Kamu adalah AI Advisor keuangan pribadi yang ramah dan praktis, berbicara dalam Bahasa Indonesia.
-Berikan saran yang singkat, spesifik, dan actionable. Hindari jargon yang terlalu teknis.
-Fokus pada kondisi keuangan pengguna Indonesia.
+      const income = context.monthlyIncome ?? 0;
+      const expense = context.monthlyExpense ?? 0;
+      const surplus = income - expense;
+      const savingRatio = income > 0 ? Math.round((surplus / income) * 100) : 0;
+      const assets = context.totalAssets ?? 0;
 
-Data keuangan pengguna saat ini:
-- Total aset: ${formatIDR(context.totalAssets ?? 0)}
-- Pemasukan bulanan: ${formatIDR(context.monthlyIncome ?? 0)}
-- Pengeluaran bulanan: ${formatIDR(context.monthlyExpense ?? 0)}
-- Level gamifikasi: ${context.level ?? 1}
-- Streak aktif: ${context.streakCount ?? 0} hari
+      const systemPrompt = `Kamu adalah AI Advisor keuangan pribadi yang cerdas, berbicara dalam Bahasa Indonesia.
 
-Berikan respons maksimal 3 paragraf pendek. Gunakan bahasa yang hangat dan supportif.`;
+DATA KEUANGAN PENGGUNA (gunakan ini untuk personalisasi jawaban):
+- Total aset: ${formatIDR(assets)}
+- Pemasukan bulanan: ${formatIDR(income)}
+- Pengeluaran bulanan: ${formatIDR(expense)}
+- Saving rate: ${savingRatio}%
+- Level aplikasi: ${context.level ?? 1} | Streak: ${context.streakCount ?? 0} hari
+
+ATURAN RESPONS (wajib diikuti):
+1. Mulai dengan INSIGHT singkat 1 kalimat tentang kondisi keuangan mereka
+2. Jika ada MASALAH, sebutkan dengan spesifik (pakai angka nyata dari data di atas)
+3. Berikan SARAN AKSI maksimal 2 langkah konkret yang bisa dilakukan minggu ini
+4. Gunakan angka rupiah nyata dari data di atas — jangan generik
+5. Maksimal 3 paragraf pendek, bahasa hangat dan to-the-point
+6. Hindari jawaban generik yang tidak menggunakan data pengguna`;
 
       const messages = [
         { role: "system", content: systemPrompt },
@@ -2243,38 +2253,46 @@ Berikan respons maksimal 3 paragraf pendek. Gunakan bahasa yang hangat dan suppo
         }
       }
 
-      // Fallback: rule-based response when no AI key configured
-      const income = context.monthlyIncome ?? 0;
-      const expense = context.monthlyExpense ?? 0;
-      const surplus = income - expense;
-      const savingRatio = income > 0 ? (surplus / income) * 100 : 0;
-      const assets = context.totalAssets ?? 0;
-
+      // Fallback: smart rule-based response using real user data
       let reply = "";
       const lowerMsg = message.toLowerCase();
+      const hasData = income > 0;
 
-      if (lowerMsg.includes("sehat") || lowerMsg.includes("analisis") || lowerMsg.includes("kondisi")) {
-        if (savingRatio >= 20) {
-          reply = `Keuanganmu terlihat sehat! 🎉 Rasio tabunganmu ${savingRatio.toFixed(0)}% — sudah melebihi standar ideal 20%. Total aset ${formatIDR(assets)} juga menunjukkan kamu konsisten membangun kekayaan.\n\nTeruslah pertahankan kebiasaan ini dan pertimbangkan untuk mulai menginvestasikan kelebihan dana agar asetmu terus bertumbuh.`;
+      if (lowerMsg.includes("analisis") || lowerMsg.includes("pengeluaran") || lowerMsg.includes("kondisi") || lowerMsg.includes("sehat")) {
+        if (!hasData) {
+          reply = `Belum ada data pemasukan bulan ini di akunmu. Catat dulu pemasukan dan pengeluaranmu agar saya bisa menganalisis kondisi keuanganmu secara akurat! 📊\n\nGunakan fitur Transaksi untuk mulai mencatat.`;
+        } else if (savingRatio >= 20) {
+          reply = `Kondisi keuanganmu sangat sehat! 🎉 Saving rate-mu ${savingRatio}% — jauh di atas standar ideal 20%. Dari pemasukan ${formatIDR(income)}, kamu berhasil menyimpan ${formatIDR(surplus)} setiap bulan.\n\nTotal aset ${formatIDR(assets)} menunjukkan progress yang solid. Langkah selanjutnya: pastikan kelebihan dana diinvestasikan agar tidak tergerus inflasi. Reksa Dana atau SBN bisa jadi pilihan.`;
         } else if (savingRatio >= 10) {
-          reply = `Kondisi keuanganmu cukup baik, dengan rasio tabungan ${savingRatio.toFixed(0)}%. Namun idealnya kamu bisa mencapai 20% agar lebih cepat mencapai kebebasan finansial.\n\nCoba cek lagi pengeluaran rutin — biasanya ada 10-15% yang bisa dipangkas dari kategori hiburan atau makan di luar.`;
-        } else if (income > 0) {
-          reply = `Perlu perhatian! Rasio tabunganmu saat ini hanya ${savingRatio.toFixed(0)}% dari pemasukan. Pengeluaranmu (${formatIDR(expense)}) terlalu mendekati pemasukan (${formatIDR(income)}).\n\nCoba terapkan metode 50/30/20: 50% kebutuhan pokok, 30% keinginan, 20% tabungan. Mulai dari memotong 1-2 pengeluaran tidak esensial bulan ini.`;
+          reply = `Keuanganmu cukup stabil, tapi masih ada ruang untuk diperbaiki. Saving rate-mu ${savingRatio}% — idealnya 20% dari ${formatIDR(income)} = ${formatIDR(income * 0.2)} per bulan.\n\nKamu perlu menghemat tambahan ${formatIDR(income * 0.2 - surplus)} lagi per bulan. Coba audit pengeluaran: kategori mana yang bisa dipangkas 10-15%?`;
+        } else if (savingRatio >= 0) {
+          reply = `Perlu perhatian serius! Saving rate-mu hanya ${savingRatio}% — pengeluaran ${formatIDR(expense)} hampir menghabiskan seluruh pemasukan ${formatIDR(income)}.\n\nAksi segera: (1) Sisihkan ${formatIDR(Math.round(income * 0.1))} (10% dulu) di hari pertama gajian. (2) Identifikasi 1 kategori pengeluaran terbesar dan kurangi 20% bulan ini.`;
         } else {
-          reply = `Belum ada data pemasukan bulan ini. Catat dulu pemasukan dan pengeluaranmu agar saya bisa menganalisis kondisi keuanganmu secara akurat! 📊`;
+          reply = `⚠️ Defisit! Pengeluaranmu (${formatIDR(expense)}) melebihi pemasukan (${formatIDR(income)}) sebesar ${formatIDR(Math.abs(surplus))} per bulan. Ini tidak berkelanjutan.\n\nAksi darurat: (1) Stop semua pengeluaran non-esensial minggu ini. (2) Cari sumber pendapatan tambahan atau kurangi pengeluaran rutin minimal ${formatIDR(Math.abs(surplus) + income * 0.1)}.`;
         }
-      } else if (lowerMsg.includes("menabung") || lowerMsg.includes("tabung") || lowerMsg.includes("saving")) {
-        reply = `Untuk menabung lebih cepat, coba strategi "Pay Yourself First": segera sisihkan 20% dari gaji begitu diterima, sebelum digunakan untuk apapun. Otomatiskan transfer ke rekening terpisah.\n\nSelain itu, terapkan aturan 24 jam: tunda setiap pembelian non-esensial selama 24 jam. Banyak keinginan impulsif yang akan hilang sendiri setelah dipikirkan matang.`;
-      } else if (lowerMsg.includes("boros") || lowerMsg.includes("overspending")) {
-        if (expense > income * 0.9 && income > 0) {
-          reply = `Ya, berdasarkan data kamu, pengeluaran (${formatIDR(expense)}) sudah hampir menyamai pemasukan (${formatIDR(income)}). Ini perlu segera diperbaiki.\n\nLangkah pertama: catat setiap pengeluaran selama 1 minggu untuk tahu di mana uang "bocor". Biasanya tersembunyi di langganan digital, makan siang, atau belanja online kecil-kecilan.`;
+      } else if (lowerMsg.includes("nabung") || lowerMsg.includes("tabung") || lowerMsg.includes("saving")) {
+        const target20 = hasData ? formatIDR(income * 0.2) : "20% dari gaji";
+        const current = hasData ? formatIDR(Math.max(surplus, 0)) : "saat ini";
+        reply = `Berdasarkan data kamu, kamu saat ini menabung ${current} per bulan. Target ideal adalah ${target20} (20% dari pemasukan).\n\nStrategi terbaik: "Pay Yourself First" — transfer ${target20} ke rekening tabungan TERPISAH di hari pertama gajian, sebelum bayar apapun. Buat itu otomatis agar tidak tergoda.\n\nAturan 24 jam juga ampuh: tunda semua pembelian non-esensial 24 jam. 80% keinginan impulsif akan hilang sendiri.`;
+      } else if (lowerMsg.includes("boros") || lowerMsg.includes("hemat")) {
+        if (hasData && expense > income * 0.85) {
+          reply = `Ya, berdasarkan data: pengeluaran ${formatIDR(expense)} = ${Math.round((expense / income) * 100)}% dari pemasukan ${formatIDR(income)}. Ini tergolong boros — idealnya max 80%.\n\nLangkah konkret: (1) Buka halaman Transaksi, lihat kategori mana yang paling besar. (2) Potong kategori hiburan/makan luar sebesar ${formatIDR(Math.round(expense * 0.15))} bulan ini.`;
+        } else if (hasData) {
+          reply = `Dari data, pengeluaranmu ${formatIDR(expense)} masih dalam batas wajar (${Math.round((expense / income) * 100)}% dari pemasukan). Tapi "boros yang tidak terasa" sering datang dari pengeluaran kecil yang terkumpul.\n\nAudit langganan digital: hitung semua subscription yang kamu bayar per bulan. Biasanya ada 1-2 yang jarang dipakai dan bisa dihemat.`;
         } else {
-          reply = `Dari data yang ada, pengeluaranmu masih dalam batas wajar. Tapi tetap waspada ya! Boros seringkali terasa "tidak terasa" karena banyak pengeluaran kecil yang terkumpul.\n\nCoba audit langgananmu — apakah semua streaming, aplikasi, dan membership yang kamu bayar benar-benar kamu gunakan?`;
+          reply = `Untuk mengetahui apakah kamu boros, pertama catat semua pemasukan dan pengeluaran bulan ini di aplikasi. Saya akan langsung bisa menganalisis dan memberikan angka yang konkret.\n\nSementara itu, tips umum: pengeluaran ideal max 80% dari gaji. Sisanya 20% untuk tabungan/investasi.`;
         }
-      } else if (lowerMsg.includes("investasi") || lowerMsg.includes("invest")) {
-        reply = `Untuk pemula, mulailah dengan yang paling aman dulu: pastikan dana darurat sudah ada (minimal 3× pengeluaran bulanan), baru kemudian berinvestasi.\n\nPilihan investasi cocok untuk pemula Indonesia: Reksa Dana Pasar Uang (risiko rendah), ORI/SBR (obligasi pemerintah aman), atau saham blue-chip IDX seperti BBCA, BBRI. Mulai dari nominal kecil untuk belajar.`;
+      } else if (lowerMsg.includes("investasi") || lowerMsg.includes("invest") || lowerMsg.includes("saham") || lowerMsg.includes("reksadana")) {
+        const danaDarurat = hasData ? formatIDR(expense * 3) : "3× pengeluaran bulanan";
+        reply = `Sebelum investasi, pastikan dana darurat sudah ada (minimal ${danaDarurat}). ${hasData && assets >= expense * 3 ? `Asetmu ${formatIDR(assets)} sudah mencukupi — kamu siap berinvestasi! ✅` : `Asetmu ${formatIDR(assets)} belum cukup untuk dana darurat — prioritaskan ini dulu.`}\n\nUrutan investasi untuk pemula Indonesia: (1) Reksa Dana Pasar Uang (risiko rendah, mulai Rp 10rb) → (2) ORI/SBR pemerintah (aman, kupon 6-7%) → (3) Saham blue-chip seperti BBCA atau BBRI untuk jangka panjang.`;
+      } else if (lowerMsg.includes("dana darurat") || lowerMsg.includes("emergency")) {
+        const target = hasData ? expense * 6 : 0;
+        reply = `Dana darurat ideal = 6× pengeluaran bulanan${hasData ? ` = ${formatIDR(target)}` : ""}. ${hasData && assets >= target ? `Asetmu ${formatIDR(assets)} sudah melewati target — excellent! 🎉` : hasData ? `Kamu masih perlu ${formatIDR(Math.max(target - assets, 0))} lagi untuk mencapai target.` : ""}\n\nSimpan dana darurat di rekening yang mudah dicairkan (tabungan biasa atau Reksa Dana Pasar Uang), bukan deposito atau investasi yang terkunci.`;
       } else {
-        reply = `Terima kasih sudah bertanya! Untuk memberikan saran yang lebih personal, coba tanyakan hal spesifik seperti:\n\n• "Apakah kondisi keuanganku sehat?"\n• "Bagaimana cara menabung lebih cepat?"\n• "Apa yang harus aku lakukan agar tidak boros?"\n\nSaya siap membantu dengan saran keuangan yang praktis dan sesuai kondisimu! 💚`;
+        const statusLine = hasData
+          ? `Dari data kamu: pemasukan ${formatIDR(income)}, pengeluaran ${formatIDR(expense)}, saving rate ${savingRatio}%.`
+          : `Belum ada data keuangan bulan ini.`;
+        reply = `${statusLine}\n\nSaya bisa membantu dengan pertanyaan spesifik seperti:\n• "Analisis pengeluaranku"\n• "Apakah saya boros?"\n• "Cara nabung lebih cepat"\n• "Tips investasi untuk kondisi saya"\n\nSemakin spesifik pertanyaanmu, semakin personal saran yang bisa saya berikan! 💚`;
       }
 
       res.json({ reply, configured: false });

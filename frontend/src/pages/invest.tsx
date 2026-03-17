@@ -30,7 +30,7 @@ function fmtRp(n: number) {
 function ChangePill({ v }: { v: number }) {
   const up = v >= 0;
   return (
-    <span className={`flex items-center gap-0.5 text-[11px] font-semibold tabular-nums ${up ? "text-emerald-400" : "text-red-400"}`}>
+    <span className={`flex items-center gap-0.5 text-[11px] font-semibold tabular-nums ${up ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
       {up ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
       {up ? "+" : ""}{v.toFixed(2)}%
     </span>
@@ -42,45 +42,45 @@ function StockRow({ symbol, onAdd }: { symbol: string; onAdd?: (q: StockQuote) =
     queryKey: [`/api/invest/quote/${symbol}`], staleTime: 5 * 60_000, retry: 1,
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
-        <div className="flex items-center gap-2.5">
-          <Skeleton className="w-8 h-8 rounded-lg bg-white/8" />
-          <div className="space-y-1.5"><Skeleton className="h-3 w-14 bg-white/8" /><Skeleton className="h-2.5 w-10 bg-white/8" /></div>
-        </div>
-        <Skeleton className="h-4 w-20 bg-white/8" />
+  if (isLoading) return (
+    <div className="flex items-center justify-between py-3 border-b border-border last:border-0">
+      <div className="flex items-center gap-2.5">
+        <Skeleton className="w-8 h-8 rounded-lg" />
+        <div className="space-y-1.5"><Skeleton className="h-3 w-20" /><Skeleton className="h-2.5 w-12" /></div>
       </div>
-    );
-  }
-  if (!data) return (
-    <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
-      <span className="text-xs text-white/30">{symbol} — tidak tersedia</span>
+      <Skeleton className="h-4 w-20" />
     </div>
   );
 
+  if (!data) return (
+    <div className="flex items-center py-3 border-b border-border last:border-0">
+      <span className="text-xs text-muted-foreground">{symbol} — tidak tersedia</span>
+    </div>
+  );
+
+  const ticker = data.symbol.replace(".JK", "");
   return (
-    <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
+    <div className="flex items-center justify-between py-3 border-b border-border last:border-0">
       <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-lg bg-white/[0.07] flex items-center justify-center">
-          <span className="text-[9px] font-bold text-white/50">{data.symbol.replace(".JK","")}</span>
+        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+          <span className="text-[9px] font-bold text-muted-foreground">{ticker}</span>
         </div>
         <div>
-          <p className="text-[13px] font-medium">{data.name || data.symbol}</p>
+          <p className="text-[13px] font-medium text-foreground">{data.name || data.symbol}</p>
           <ChangePill v={data.changePct} />
         </div>
       </div>
       <div className="flex items-center gap-2">
         <div className="text-right">
-          <p className="text-[13px] font-mono font-semibold">Rp {data.price.toLocaleString("id-ID")}</p>
-          <p className={`text-[10px] font-mono ${data.change >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+          <p className="text-[13px] font-mono font-semibold text-foreground">Rp {data.price.toLocaleString("id-ID")}</p>
+          <p className={`text-[10px] font-mono ${data.change >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
             {data.change >= 0 ? "+" : ""}{data.change.toFixed(0)}
           </p>
         </div>
         {onAdd && (
           <button onClick={() => onAdd(data)}
-            className="w-7 h-7 rounded-lg bg-white/5 hover:bg-emerald-500/20 transition-colors flex items-center justify-center">
-            <Plus className="w-3.5 h-3.5 text-white/50" />
+            className="w-7 h-7 rounded-lg bg-muted hover:bg-primary/10 transition-colors flex items-center justify-center">
+            <Plus className="w-3.5 h-3.5 text-muted-foreground" />
           </button>
         )}
       </div>
@@ -92,7 +92,6 @@ export default function InvestPage() {
   const [search, setSearch] = useState("");
   const [searched, setSearched] = useState<string[]>([]);
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
-
   const [addSym, setAddSym] = useState("");
   const [addShares, setAddShares] = useState("");
   const [addPrice, setAddPrice] = useState("");
@@ -141,15 +140,15 @@ export default function InvestPage() {
     <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
 
       <div>
-        <h1 className="text-lg font-semibold">Investasi</h1>
+        <h1 className="text-lg font-semibold text-foreground">Investasi</h1>
         <p className="text-xs text-muted-foreground">Pantau harga saham Indonesia</p>
       </div>
 
       {/* Search */}
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 pointer-events-none" />
-          <Input className="pl-9 h-9 text-sm font-mono uppercase bg-white/[0.04] border-white/10"
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+          <Input className="pl-9 h-9 text-sm font-mono uppercase"
             placeholder="Cari kode saham, mis. BBCA"
             value={search} onChange={e => setSearch(e.target.value.toUpperCase())}
             onKeyDown={e => e.key === "Enter" && handleSearch()} />
@@ -159,43 +158,43 @@ export default function InvestPage() {
 
       {/* Search results */}
       {searched.length > 0 && (
-        <Card className="rounded-2xl border border-white/8 bg-white/[0.03]">
+        <Card className="rounded-2xl border border-border shadow-sm">
           <CardContent className="px-4 py-2">
-            <p className="text-[11px] text-white/40 uppercase tracking-wide pt-2 pb-1">Hasil pencarian</p>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide pt-2 pb-1">Hasil pencarian</p>
             {searched.map(sym => <StockRow key={sym} symbol={sym} onAdd={addToPortfolio} />)}
           </CardContent>
         </Card>
       )}
 
       {/* Popular stocks */}
-      <Card className="rounded-2xl border border-white/8 bg-white/[0.03]">
+      <Card className="rounded-2xl border border-border shadow-sm">
         <CardContent className="px-4 py-2">
-          <p className="text-[11px] text-white/40 uppercase tracking-wide pt-2 pb-1">Saham Populer IDX</p>
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide pt-2 pb-1">Saham Populer IDX</p>
           {POPULAR.map(({ symbol }) => <StockRow key={symbol} symbol={symbol} onAdd={addToPortfolio} />)}
         </CardContent>
       </Card>
 
       {/* Portfolio */}
-      <Card className="rounded-2xl border border-white/8 bg-white/[0.03]">
+      <Card className="rounded-2xl border border-border shadow-sm">
         <CardContent className="px-4 pt-4 pb-4 space-y-4">
-          <p className="text-[11px] text-white/40 uppercase tracking-wide">Portofolio Saya</p>
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Portofolio Saya</p>
 
           {portfolio.length > 0 && (
             <>
-              {/* Summary */}
-              <div className={`rounded-xl border p-3 ${totalPL >= 0 ? "bg-emerald-500/10 border-emerald-500/20" : "bg-red-500/10 border-red-500/20"}`}>
+              {/* P&L summary */}
+              <div className={`rounded-xl border p-3 ${totalPL >= 0 ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20" : "bg-red-50 border-red-200 dark:bg-red-500/10 dark:border-red-500/20"}`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] text-white/40">Nilai Portofolio</p>
-                    <p className="text-lg font-bold font-mono">{fmtRp(totalValue)}</p>
+                    <p className="text-[10px] text-muted-foreground">Nilai Portofolio</p>
+                    <p className="text-lg font-bold font-mono text-foreground">{fmtRp(totalValue)}</p>
                   </div>
                   {totalCost > 0 && (
                     <div className="text-right">
-                      <p className="text-[10px] text-white/40">Untung / Rugi</p>
-                      <p className={`text-sm font-bold font-mono ${totalPL >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      <p className="text-[10px] text-muted-foreground">Untung / Rugi</p>
+                      <p className={`text-sm font-bold font-mono ${totalPL >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                         {totalPL >= 0 ? "+" : ""}{fmtRp(Math.abs(totalPL))}
                       </p>
-                      <p className={`text-[10px] ${totalPL >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      <p className={`text-[10px] ${totalPL >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                         {totalPLPct >= 0 ? "+" : ""}{totalPLPct.toFixed(2)}%
                       </p>
                     </div>
@@ -203,75 +202,75 @@ export default function InvestPage() {
                 </div>
               </div>
 
-              {/* Holdings list */}
-              <div className="space-y-0">
-                {portfolio.map(item => {
-                  const q = quotes.get(item.symbol);
-                  const cur = q?.price ?? item.avgPrice;
-                  const val = cur * item.shares;
-                  const pl = item.avgPrice > 0 ? (cur - item.avgPrice) * item.shares : 0;
-                  const plp = item.avgPrice > 0 ? ((cur - item.avgPrice) / item.avgPrice) * 100 : 0;
-                  return (
-                    <div key={item.symbol} className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-white/[0.07] flex items-center justify-center">
-                          <span className="text-[9px] font-bold text-white/50">{item.symbol.replace(".JK","")}</span>
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[13px] font-medium">{item.symbol.replace(".JK","")}</span>
-                            {q && <ChangePill v={q.changePct} />}
-                          </div>
-                          <p className="text-[10px] text-white/35">{item.shares} lbr · avg Rp {item.avgPrice.toLocaleString("id-ID")}</p>
-                        </div>
+              {/* Holdings */}
+              {portfolio.map(item => {
+                const q = quotes.get(item.symbol);
+                const cur = q?.price ?? item.avgPrice;
+                const val = cur * item.shares;
+                const pl = item.avgPrice > 0 ? (cur - item.avgPrice) * item.shares : 0;
+                const plp = item.avgPrice > 0 ? ((cur - item.avgPrice) / item.avgPrice) * 100 : 0;
+                return (
+                  <div key={item.symbol} className="flex items-center justify-between py-3 border-b border-border last:border-0">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+                        <span className="text-[9px] font-bold text-muted-foreground">{item.symbol.replace(".JK","")}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="text-right">
-                          <p className="text-[13px] font-mono font-semibold">{fmtRp(val)}</p>
-                          {item.avgPrice > 0 && (
-                            <p className={`text-[10px] font-mono ${pl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                              {pl >= 0 ? "+" : ""}{fmtRp(Math.abs(pl))}
-                            </p>
-                          )}
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[13px] font-medium text-foreground">{item.symbol.replace(".JK","")}</span>
+                          {q && <ChangePill v={q.changePct} />}
                         </div>
-                        <button onClick={() => setPortfolio(p => p.filter(x => x.symbol !== item.symbol))}
-                          className="w-6 h-6 rounded-md hover:bg-red-500/15 transition-colors flex items-center justify-center">
-                          <Trash2 className="w-3 h-3 text-white/25 hover:text-red-400" />
-                        </button>
+                        <p className="text-[10px] text-muted-foreground">{item.shares} lbr · avg Rp {item.avgPrice.toLocaleString("id-ID")}</p>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <p className="text-[13px] font-mono font-semibold text-foreground">{fmtRp(val)}</p>
+                        {item.avgPrice > 0 && (
+                          <p className={`text-[10px] font-mono ${pl >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                            {pl >= 0 ? "+" : ""}{fmtRp(Math.abs(pl))} ({plp >= 0 ? "+" : ""}{plp.toFixed(1)}%)
+                          </p>
+                        )}
+                      </div>
+                      <button onClick={() => setPortfolio(p => p.filter(x => x.symbol !== item.symbol))}
+                        className="w-6 h-6 rounded-md hover:bg-red-100 dark:hover:bg-red-500/15 transition-colors flex items-center justify-center group">
+                        <Trash2 className="w-3 h-3 text-muted-foreground group-hover:text-red-600 dark:group-hover:text-red-400" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </>
           )}
 
           {portfolio.length === 0 && (
-            <p className="text-xs text-white/30 text-center py-2">Belum ada saham. Tambahkan dari daftar di atas atau manual di bawah.</p>
+            <p className="text-xs text-muted-foreground text-center py-2">
+              Belum ada saham. Tambahkan via (+) dari daftar atau isi manual di bawah.
+            </p>
           )}
 
           {/* Add manually */}
-          <div className="rounded-xl border border-white/8 bg-white/[0.04] p-3 space-y-3">
-            <p className="text-[11px] text-white/40 font-medium">Tambah manual</p>
+          <div className="rounded-xl border border-border bg-muted/50 p-3 space-y-3">
+            <p className="text-[11px] text-muted-foreground font-medium">Tambah manual</p>
             <div className="grid grid-cols-3 gap-2">
               <div>
-                <p className="text-[10px] text-white/30 mb-1">Kode</p>
-                <Input className="h-8 text-xs font-mono uppercase bg-white/5 border-white/10"
+                <p className="text-[10px] text-muted-foreground mb-1">Kode</p>
+                <Input className="h-8 text-xs font-mono uppercase"
                   placeholder="BBCA" value={addSym} onChange={e => setAddSym(e.target.value.toUpperCase())} />
               </div>
               <div>
-                <p className="text-[10px] text-white/30 mb-1">Lembar</p>
-                <Input className="h-8 text-xs font-mono bg-white/5 border-white/10"
+                <p className="text-[10px] text-muted-foreground mb-1">Lembar</p>
+                <Input className="h-8 text-xs font-mono"
                   type="number" placeholder="100" value={addShares} onChange={e => setAddShares(e.target.value)} />
               </div>
               <div>
-                <p className="text-[10px] text-white/30 mb-1">Harga beli</p>
-                <Input className="h-8 text-xs font-mono bg-white/5 border-white/10"
+                <p className="text-[10px] text-muted-foreground mb-1">Harga beli</p>
+                <Input className="h-8 text-xs font-mono"
                   type="number" placeholder="9500" value={addPrice} onChange={e => setAddPrice(e.target.value)} />
               </div>
             </div>
             <Button size="sm" variant="outline"
-              className="w-full h-8 text-xs border-white/10 bg-white/5 hover:bg-white/10"
+              className="w-full h-8 text-xs"
               onClick={addManual} disabled={!addSym || !addShares}>
               <Plus className="w-3 h-3 mr-1" /> Tambah ke Portofolio
             </Button>
@@ -279,8 +278,8 @@ export default function InvestPage() {
         </CardContent>
       </Card>
 
-      <p className="text-[10px] text-white/20 text-center pb-2">
-        Data via Yahoo Finance. Mungkin tertunda 15 menit. Bukan rekomendasi investasi.
+      <p className="text-[10px] text-muted-foreground/60 text-center pb-2">
+        Data via Yahoo Finance · Mungkin tertunda 15 menit · Bukan rekomendasi investasi
       </p>
     </div>
   );

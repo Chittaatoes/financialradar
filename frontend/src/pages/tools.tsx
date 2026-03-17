@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import type { BudgetSummary } from "@shared/schema";
 
-/* ── helpers ──────────────────────────────────────────── */
+/* ── helpers ────────────────────────────────────────────── */
 const fmt = (n: number) => `Rp ${Math.round(n).toLocaleString("id-ID")}`;
 
 function useIDRInput() {
@@ -29,27 +29,26 @@ function MoneyInput({ label, value: { raw, onChange }, placeholder }: {
 }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-[11px] text-white/50">{label}</Label>
+      <Label className="text-[11px] text-muted-foreground">{label}</Label>
       <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-white/35 pointer-events-none">Rp</span>
-        <Input className="pl-8 h-9 text-sm font-mono bg-white/5 border-white/10 focus:border-white/20"
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">Rp</span>
+        <Input className="pl-8 h-9 text-sm font-mono"
           placeholder={placeholder ?? "0"} value={raw} onChange={onChange} inputMode="numeric" />
       </div>
     </div>
   );
 }
 
-function ResultRow({ label, value, highlight }: { label: string; value: string; highlight?: "green" | "red" | "none" }) {
-  const color = highlight === "green" ? "text-emerald-400" : highlight === "red" ? "text-red-400" : "text-white";
+function ResultRow({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-xs text-white/50">{label}</span>
-      <span className={`text-sm font-mono font-semibold ${color}`}>{value}</span>
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className={`text-sm font-mono font-semibold ${color ?? "text-foreground"}`}>{value}</span>
     </div>
   );
 }
 
-/* ── Tool 1 ───────────────────────────────────────────── */
+/* ── Tool 1: Dana Darurat ───────────────────────────────── */
 function EmergencyFund() {
   const expense = useIDRInput();
   const [months, setMonths] = useState(6);
@@ -60,26 +59,26 @@ function EmergencyFund() {
       <MoneyInput label="Pengeluaran bulanan" value={expense} />
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label className="text-[11px] text-white/50">Bulan proteksi</Label>
-          <span className="text-sm font-bold text-emerald-400">{months}×</span>
+          <Label className="text-[11px] text-muted-foreground">Bulan proteksi</Label>
+          <span className="text-sm font-bold text-primary">{months}×</span>
         </div>
         <Slider min={3} max={12} step={1} value={[months]} onValueChange={([v]) => setMonths(v)} />
-        <div className="flex justify-between text-[10px] text-white/25">
+        <div className="flex justify-between text-[10px] text-muted-foreground/70">
           <span>3× min</span><span>12× ideal</span>
         </div>
       </div>
       {expense.value > 0 && (
-        <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 space-y-2">
-          <p className="text-[10px] text-white/40 uppercase tracking-wide">Rekomendasi dana darurat</p>
-          <p className="text-2xl font-bold font-mono text-emerald-400">{fmt(recommended)}</p>
-          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-white/8">
+        <div className="rounded-xl bg-primary/8 border border-primary/20 p-3 space-y-2">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Rekomendasi dana darurat</p>
+          <p className="text-2xl font-bold font-mono text-primary">{fmt(recommended)}</p>
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
             <div className="text-center">
-              <p className="text-[10px] text-white/35">Minimal (3×)</p>
-              <p className="text-xs font-mono font-semibold">{fmt(expense.value * 3)}</p>
+              <p className="text-[10px] text-muted-foreground">Minimal (3×)</p>
+              <p className="text-xs font-mono font-semibold text-foreground">{fmt(expense.value * 3)}</p>
             </div>
             <div className="text-center">
-              <p className="text-[10px] text-white/35">Ideal (6×)</p>
-              <p className="text-xs font-mono font-semibold">{fmt(expense.value * 6)}</p>
+              <p className="text-[10px] text-muted-foreground">Ideal (6×)</p>
+              <p className="text-xs font-mono font-semibold text-foreground">{fmt(expense.value * 6)}</p>
             </div>
           </div>
         </div>
@@ -88,7 +87,7 @@ function EmergencyFund() {
   );
 }
 
-/* ── Tool 2 ───────────────────────────────────────────── */
+/* ── Tool 2: Budget Analyzer ────────────────────────────── */
 function BudgetAnalyzer() {
   const { data: budget } = useQuery<BudgetSummary>({ queryKey: ["/api/budget/summary"] });
   const income = useIDRInput();
@@ -116,17 +115,17 @@ function BudgetAnalyzer() {
       <MoneyInput label={`Pemasukan${budget ? " (dari data kamu)" : ""}`} value={income}
         placeholder={budget ? budget.monthlyIncome.toLocaleString("id-ID") : "0"} />
       <div className="space-y-2">
-        <p className="text-[11px] text-white/50">Pengeluaran per kategori</p>
+        <p className="text-[11px] text-muted-foreground">Pengeluaran per kategori</p>
         {cats.map(c => (
           <div key={c.label} className="flex items-center gap-2">
-            <span className="text-[11px] text-white/40 w-24 shrink-0">{c.label}</span>
+            <span className="text-[11px] text-muted-foreground w-24 shrink-0">{c.label}</span>
             <div className="relative flex-1">
-              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-white/25 pointer-events-none">Rp</span>
-              <Input className="pl-6 h-8 text-xs font-mono bg-white/5 border-white/10"
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">Rp</span>
+              <Input className="pl-6 h-8 text-xs font-mono"
                 placeholder="0" value={c.input.raw} onChange={c.input.onChange} inputMode="numeric" />
             </div>
             {incomeVal > 0 && c.input.value > 0 && (
-              <span className={`text-[10px] w-9 text-right font-mono shrink-0 ${c.input.value / incomeVal > c.ideal ? "text-red-400" : "text-emerald-400"}`}>
+              <span className={`text-[10px] w-9 text-right font-mono shrink-0 ${c.input.value / incomeVal > c.ideal ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
                 {((c.input.value / incomeVal) * 100).toFixed(0)}%
               </span>
             )}
@@ -134,14 +133,14 @@ function BudgetAnalyzer() {
         ))}
       </div>
       {totalExpense > 0 && incomeVal > 0 && (
-        <div className={`rounded-xl border p-3 space-y-2 ${surplus >= 0 ? "bg-emerald-500/10 border-emerald-500/20" : "bg-red-500/10 border-red-500/20"}`}>
+        <div className={`rounded-xl border p-3 space-y-2 ${surplus >= 0 ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20" : "bg-red-50 border-red-200 dark:bg-red-500/10 dark:border-red-500/20"}`}>
           <ResultRow label="Total pengeluaran" value={fmt(totalExpense)} />
           <ResultRow label="Sisa / Tabungan" value={`${fmt(Math.abs(surplus))}${surplus < 0 ? " (defisit)" : ""}`}
-            highlight={surplus >= 0 ? "green" : "red"} />
+            color={surplus >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"} />
           <ResultRow label="Rasio tabungan" value={`${savingPct.toFixed(1)}%`}
-            highlight={savingPct >= 20 ? "green" : savingPct >= 10 ? "none" : "red"} />
+            color={savingPct >= 20 ? "text-emerald-600 dark:text-emerald-400" : savingPct >= 10 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"} />
           {cats.filter(c => incomeVal > 0 && c.input.value / incomeVal > c.ideal && c.input.value > 0).map(c => (
-            <p key={c.label} className="text-[11px] text-red-300">
+            <p key={c.label} className="text-[11px] text-red-600 dark:text-red-300">
               ⚠️ {c.label} terlalu tinggi (+{(((c.input.value / incomeVal) - c.ideal) * 100).toFixed(0)}%)
             </p>
           ))}
@@ -151,7 +150,7 @@ function BudgetAnalyzer() {
   );
 }
 
-/* ── Tool 3 ───────────────────────────────────────────── */
+/* ── Tool 3: Simulasi Tabungan ──────────────────────────── */
 function SavingsSimulator() {
   const target = useIDRInput();
   const monthly = useIDRInput();
@@ -187,29 +186,29 @@ function SavingsSimulator() {
       <MoneyInput label="Tabungan saat ini (opsional)" value={existing} />
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label className="text-[11px] text-white/50">Return tahunan (opsional)</Label>
-          <span className="text-sm font-bold text-emerald-400">{returnPct}%</span>
+          <Label className="text-[11px] text-muted-foreground">Return tahunan (opsional)</Label>
+          <span className="text-sm font-bold text-primary">{returnPct}%</span>
         </div>
         <Slider min={0} max={15} step={0.5} value={[returnPct]} onValueChange={([v]) => setReturnPct(v)} />
-        <div className="flex justify-between text-[10px] text-white/25">
+        <div className="flex justify-between text-[10px] text-muted-foreground/70">
           <span>0% (tanpa bunga)</span><span>15%</span>
         </div>
       </div>
       {result && (
-        <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 space-y-2">
+        <div className="rounded-xl bg-primary/8 border border-primary/20 p-3 space-y-2">
           {result.months === 0 ? (
-            <p className="text-center text-emerald-400 font-semibold text-sm">🎉 Target sudah tercapai!</p>
+            <p className="text-center text-primary font-semibold text-sm">🎉 Target sudah tercapai!</p>
           ) : (
             <>
-              <p className="text-[10px] text-white/40 uppercase tracking-wide">Perkiraan waktu</p>
-              <p className="text-2xl font-bold text-emerald-400">{durationLabel(result.months)}</p>
-              <p className="text-xs text-white/40">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Perkiraan waktu</p>
+              <p className="text-2xl font-bold text-primary">{durationLabel(result.months)}</p>
+              <p className="text-xs text-muted-foreground">
                 {result.date.toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
               </p>
-              <div className="pt-1 border-t border-white/8">
+              <div className="pt-1 border-t border-border space-y-1.5">
                 <ResultRow label="Total terkumpul" value={fmt(result.total)} />
                 {returnPct > 0 && result.total > target.value && (
-                  <p className="text-[11px] text-emerald-400 mt-1">
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400">
                     💰 Potensi bunga: {fmt(result.total - target.value)}
                   </p>
                 )}
@@ -222,11 +221,11 @@ function SavingsSimulator() {
   );
 }
 
-/* ── Page ─────────────────────────────────────────────── */
+/* ── Page ─────────────────────────────────────────────────── */
 const TOOLS = [
-  { id: "emergency", icon: PiggyBank, label: "Dana Darurat", desc: "Hitung kebutuhan dana darurat idealmu", component: EmergencyFund, color: "bg-blue-500/15 text-blue-400" },
-  { id: "budget",    icon: BarChart3,  label: "Analisator Budget", desc: "Bandingkan pemasukan vs pengeluaran", component: BudgetAnalyzer, color: "bg-yellow-500/15 text-yellow-400" },
-  { id: "savings",   icon: Calculator, label: "Simulasi Tabungan", desc: "Kapan target tabunganmu tercapai?", component: SavingsSimulator, color: "bg-emerald-500/15 text-emerald-400" },
+  { id: "emergency", icon: PiggyBank, label: "Dana Darurat", desc: "Hitung kebutuhan dana darurat idealmu", component: EmergencyFund, iconCls: "bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400" },
+  { id: "budget",    icon: BarChart3,  label: "Analisator Budget", desc: "Bandingkan pemasukan vs pengeluaran",  component: BudgetAnalyzer, iconCls: "bg-yellow-100 text-yellow-600 dark:bg-yellow-500/15 dark:text-yellow-400" },
+  { id: "savings",   icon: Calculator, label: "Simulasi Tabungan", desc: "Kapan target tabunganmu tercapai?",    component: SavingsSimulator, iconCls: "bg-primary/10 text-primary" },
 ];
 
 export default function ToolsPage() {
@@ -236,30 +235,30 @@ export default function ToolsPage() {
     <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
 
       <div>
-        <h1 className="text-lg font-semibold">Tools</h1>
+        <h1 className="text-lg font-semibold text-foreground">Tools</h1>
         <p className="text-xs text-muted-foreground">Kalkulator & alat perencanaan keuangan</p>
       </div>
 
       <div className="space-y-2">
-        {TOOLS.map(({ id, icon: Icon, label, desc, component: Comp, color }) => (
-          <Card key={id} className="rounded-2xl border border-white/8 bg-white/[0.03] overflow-hidden">
+        {TOOLS.map(({ id, icon: Icon, label, desc, component: Comp, iconCls }) => (
+          <Card key={id} className="rounded-2xl border border-border shadow-sm overflow-hidden">
             <button
-              className="w-full text-left active:bg-white/5 transition-colors"
+              className="w-full text-left hover:bg-accent/50 active:bg-accent transition-colors"
               onClick={() => setOpen(open === id ? null : id)}
             >
               <div className="flex items-center gap-3 p-4">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
-                  <Icon className="w-4.5 h-4.5" />
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${iconCls}`}>
+                  <Icon className="w-4 h-4" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white">{label}</p>
-                  <p className="text-[11px] text-white/40 mt-0.5 truncate">{desc}</p>
+                  <p className="text-sm font-medium text-foreground">{label}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{desc}</p>
                 </div>
-                <ChevronRight className={`w-4 h-4 text-white/25 shrink-0 transition-transform duration-200 ${open === id ? "rotate-90" : ""}`} />
+                <ChevronRight className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 ${open === id ? "rotate-90" : ""}`} />
               </div>
             </button>
             {open === id && (
-              <div className="px-4 pb-4 pt-0 border-t border-white/5">
+              <div className="px-4 pb-4 border-t border-border">
                 <div className="pt-4">
                   <Comp />
                 </div>
@@ -269,14 +268,12 @@ export default function ToolsPage() {
         ))}
       </div>
 
-      {/* Quick tip */}
-      <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-4">
-        <p className="text-[11px] text-white/40 font-medium uppercase tracking-wide mb-2">💡 Tips Keuangan</p>
-        <p className="text-xs text-white/60 leading-relaxed">
-          Idealnya, alokasikan <span className="text-emerald-400 font-medium">50%</span> untuk kebutuhan,{" "}
-          <span className="text-yellow-400 font-medium">30%</span> keinginan, dan{" "}
-          <span className="text-blue-400 font-medium">20%</span> tabungan. Ini dikenal sebagai metode{" "}
-          <span className="font-medium text-white/70">50/30/20</span>.
+      <div className="rounded-2xl bg-primary/6 border border-primary/15 p-4">
+        <p className="text-[11px] text-primary font-medium uppercase tracking-wide mb-2">💡 Tips 50/30/20</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Alokasikan <span className="text-primary font-medium">50%</span> untuk kebutuhan,{" "}
+          <span className="text-yellow-600 dark:text-yellow-400 font-medium">30%</span> keinginan, dan{" "}
+          <span className="text-blue-600 dark:text-blue-400 font-medium">20%</span> tabungan & investasi.
         </p>
       </div>
 
