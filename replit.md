@@ -231,3 +231,52 @@ Browser → Vite dev server (port 5000, /api proxy) → Express API (port 5001) 
 - `/api/guest-login` — Create guest account
 - `/api/onboarding` — Save user preferences
 - `/api/admin/*` — Admin-only routes
+- `/api/market/prices` — Live USD/IDR, gold, BTC, ETH via CoinGecko + exchangerate-api (no key required)
+- `/api/market/news` — Indonesian financial news (GNews if `GNEWS_API_KEY` set, else curated fallback)
+- `/api/ai/chat` — AI financial chat (OpenRouter if `OPENROUTER_API_KEY` set, HuggingFace fallback, then rule-based)
+- `/api/invest/quote/:ticker` — IDX stock quotes via Yahoo Finance (no key required)
+
+## Explore Section (New Pages v1.2)
+Four new pages added under the "Explore" sidebar section:
+
+| Page | Route | File |
+|---|---|---|
+| Market | `/market` | `frontend/src/pages/market.tsx` |
+| Tools | `/tools` | `frontend/src/pages/tools.tsx` |
+| AI Advisor | `/ai-advisor` | `frontend/src/pages/ai-advisor.tsx` |
+| Investasi | `/invest` | `frontend/src/pages/invest.tsx` |
+
+### Market Page
+- 2×2 snapshot grid: USD/IDR, Emas/gram, Bitcoin, Ethereum
+- Indonesian financial news with impact badges (High/Medium/Low)
+- Auto-refresh button; data cached 5 min (prices) / 10 min (news)
+
+### Tools Page
+- 3 collapsible calculators: Dana Darurat, Analisator Budget, Simulasi Tabungan
+- Uses `@radix-ui/react-slider` for interactive sliders
+- Budget Analyzer pre-fills income from live `/api/budget/summary`
+- 50/30/20 tip card at bottom
+
+### AI Advisor Page
+- Context summary card shows live Total Aset / Pemasukan / Pengeluaran
+- Quick-action chips: 4 preset prompts (empty state grid + inline chips after chat starts)
+- Chat bubbles with user/bot avatars, typing animation
+- Enter to send (Shift+Enter for newline)
+- **Bug fix:** `apiRequest` returns `Response` object — must call `.json()` to parse reply
+- Optional API keys: `OPENROUTER_API_KEY` (Mistral-7B free), `HUGGINGFACE_API_KEY`
+
+### Invest Page
+- Compact search bar + 5 popular IDX stocks (BBCA, BBRI, TLKM, ASII, BMRI)
+- Portfolio tracker: add via (+) button or manual form (symbol, lembar, harga beli)
+- P&L summary banner per holding + total portfolio value
+- Data via Yahoo Finance (15-min delay, no API key needed)
+
+## Optional API Keys (Explore features)
+| Secret | Feature | Fallback |
+|---|---|---|
+| `OPENROUTER_API_KEY` | Real AI (Mistral-7B) | Rule-based responses |
+| `HUGGINGFACE_API_KEY` | Secondary AI | Rule-based responses |
+| `GNEWS_API_KEY` | Live Indonesian news | Curated static articles |
+
+## New Packages (v1.2)
+- `@radix-ui/react-slider` — Slider component used in Tools page (installed in `frontend/`)

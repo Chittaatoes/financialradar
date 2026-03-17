@@ -72,7 +72,7 @@ export default function AiAdvisorPage() {
 
   const send = useMutation({
     mutationFn: async (msg: string) => {
-      const r = await apiRequest("POST", "/api/ai/chat", {
+      const res = await apiRequest("POST", "/api/ai/chat", {
         message: msg,
         history: messages.slice(-6),
         context: {
@@ -83,7 +83,7 @@ export default function AiAdvisorPage() {
           streakCount: profile?.streakCount ?? 0,
         },
       });
-      return r as ChatResponse;
+      return res.json() as Promise<ChatResponse>;
     },
     onSuccess: (data) => setMessages(p => [...p, { role: "assistant", content: data.reply }]),
     onError: () => setMessages(p => [...p, { role: "assistant", content: "Maaf, terjadi kesalahan. Silakan coba lagi." }]),
