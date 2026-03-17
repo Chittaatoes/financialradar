@@ -53,9 +53,10 @@ export function MonthlyActivityCalendar() {
   const month = now.getMonth();
   const today = now.getDate();
 
-  const { data: transactions = [] } = useQuery<Transaction[]>({
+  const { data: rawTransactions } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
   });
+  const transactions = rawTransactions ?? [];
 
   const dayMap = useMemo(
     () => groupTransactionsByDate(transactions, year, month),
