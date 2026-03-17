@@ -1,0 +1,102 @@
+Refactor the AI Advisor chat layout for mobile to achieve a full-height, clean, and modern chat experience.
+
+Goals:
+- Chat area fills screen height (no empty space)
+- Input stays near bottom navigation
+- Remove visual clutter (slider)
+- Improve template suggestion UX
+
+----------------------------------------
+1. FULL HEIGHT CHAT LAYOUT (CRITICAL)
+----------------------------------------
+
+1. Main container:
+   - min-h-screen
+   - flex flex-col
+
+2. Chat area:
+   - flex-grow
+   - overflow-y-auto
+   - px-4 py-3
+
+3. Bottom section (fixed area):
+   - sticky bottom-0
+   - background same as page
+   - include:
+     → templates
+     → input field
+
+4. Add safe spacing for navbar:
+   - pb-24 (or match navbar height)
+
+----------------------------------------
+2. REMOVE SLIDER (IMPORTANT)
+----------------------------------------
+
+- Remove horizontal scroll slider entirely
+- No scroll bar
+- No arrows
+
+Reason:
+- Looks cluttered
+- Breaks clean fintech feel
+
+----------------------------------------
+3. TEMPLATE UI REDESIGN
+----------------------------------------
+
+Replace slider with:
+
+OPTION A (RECOMMENDED):
+- Grid layout (2 rows)
+
+Example:
+[ Analisis ] [ Nabung ]
+[ Boros?   ] [ Invest ]
+
+Style:
+- rounded-full
+- text-xs
+- px-3 py-2
+- bg-neutral-100 / bg-white/10
+
+---
+
+OPTION B (if many templates):
+- vertical list
+- OR expandable section (show more)
+
+---
+
+OPTION C (advanced):
+- show only 2–3 templates
+- + "Lihat semua"
+
+----------------------------------------
+4. INPUT AREA IMPROVEMENT
+----------------------------------------
+
+- Input always visible at bottom
+- Use:
+  flex items-center gap-2
+
+- Style:
+  rounded-full
+  px-4 py-2
+
+----------------------------------------
+5. REMOVE EMPTY SPACE
+----------------------------------------
+
+- Ensure chat area expands dynamically
+- No fixed height containers
+- No margin-bottom hacks
+
+----------------------------------------
+EXPECTED RESULT
+----------------------------------------
+
+- Chat fills full screen
+- No wasted space
+- Clean, modern UI
+- Templates easy to use (no slider)

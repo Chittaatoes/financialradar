@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Send, Bot, User, Sparkles } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,10 +13,10 @@ interface Message { role: "user" | "assistant"; content: string }
 interface ChatResponse { reply: string; configured: boolean }
 
 const QUICK_PROMPTS = [
-  { label: "Analisis pengeluaranku", prompt: "Tolong analisis kondisi pengeluaran saya bulan ini dan berikan saran konkret." },
-  { label: "Cara nabung lebih cepat", prompt: "Berikan strategi spesifik agar saya bisa menabung lebih banyak setiap bulan." },
+  { label: "Analisis pengeluaran", prompt: "Tolong analisis kondisi pengeluaran saya bulan ini dan berikan saran konkret." },
+  { label: "Cara nabung cepat", prompt: "Berikan strategi spesifik agar saya bisa menabung lebih banyak setiap bulan." },
   { label: "Apakah saya boros?", prompt: "Berdasarkan data keuangan saya, apakah saya boros? Apa yang harus diperbaiki?" },
-  { label: "Tips investasi pemula", prompt: "Saya pemula dalam investasi. Dengan kondisi keuangan saya, apa yang harus saya lakukan?" },
+  { label: "Tips investasi", prompt: "Saya pemula dalam investasi. Dengan kondisi keuangan saya, apa yang harus saya lakukan?" },
 ];
 
 function fmtRp(n: number) {
@@ -56,7 +55,7 @@ function Typing() {
         <Bot className="w-3 h-3 text-muted-foreground" />
       </div>
       <div className="bg-muted rounded-2xl rounded-tl-sm px-3 py-2.5 flex items-center gap-1">
-        {[0,1,2].map(i => (
+        {[0, 1, 2].map(i => (
           <div key={i} className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce"
             style={{ animationDelay: `${i * 150}ms` }} />
         ))}
@@ -69,6 +68,7 @@ export default function AiAdvisorPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: profile } = useQuery<UserProfile>({ queryKey: ["/api/profile"] });
   const { data: dashboard } = useQuery<DashboardData>({ queryKey: ["/api/dashboard"] });
@@ -90,7 +90,7 @@ export default function AiAdvisorPage() {
       return res.json() as Promise<ChatResponse>;
     },
     onSuccess: (data) => setMessages(p => [...p, { role: "assistant", content: data.reply }]),
-    onError: () => setMessages(p => [...p, { role: "assistant", content: "Maaf, terjadi kesalahan. Silakan coba lagi." }]),
+    onError: () => setMessages(p => [...p, { role: "assistant", content: "Maaf, terjadi kendala. Coba lagi ya." }]),
   });
 
   const handleSend = (text?: string) => {
@@ -98,6 +98,7 @@ export default function AiAdvisorPage() {
     if (!msg || send.isPending) return;
     setMessages(p => [...p, { role: "user", content: msg }]);
     setInput("");
+    textareaRef.current?.focus();
     send.mutate(msg);
   };
 
@@ -110,112 +111,125 @@ export default function AiAdvisorPage() {
     ? Math.round(((budget!.monthlyIncome - budget!.totalSpent) / budget!.monthlyIncome) * 100)
     : null;
 
+  const chatStarted = messages.length > 0;
+
   return (
-    <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
+    <div className="flex flex-col min-h-screen">
 
-      {/* Header */}
-      <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-xl bg-violet-100 dark:bg-violet-500/20 flex items-center justify-center">
-          <Sparkles className="w-4 h-4 text-violet-600 dark:text-violet-400" />
-        </div>
-        <div>
-          <h1 className="text-[15px] font-semibold text-foreground leading-tight">AI Advisor</h1>
-          <p className="text-[11px] text-muted-foreground">Asisten keuangan pribadi</p>
-        </div>
-      </div>
+      {/* ── Top: header + context ── */}
+      <div className="px-4 pt-4 pb-2 space-y-3 shrink-0">
 
-      {/* Context summary */}
-      <div className="grid grid-cols-4 gap-2">
-        {hasData ? (
-          <>
-            {[
-              { label: "Total Aset", value: fmtRp(dashboard!.totalAssets), cls: "text-primary" },
-              { label: "Pemasukan", value: fmtRp(budget!.monthlyIncome), cls: "text-blue-600 dark:text-blue-400" },
-              { label: "Pengeluaran", value: fmtRp(budget!.totalSpent), cls: "text-red-600 dark:text-red-400" },
-              { label: "Saving Rate", value: savingRate !== null ? `${savingRate}%` : "—",
-                cls: savingRate !== null && savingRate >= 20 ? "text-emerald-600 dark:text-emerald-400" : "text-yellow-600 dark:text-yellow-400" },
-            ].map(c => (
-              <div key={c.label} className="rounded-xl bg-muted border border-border px-2.5 py-2">
-                <p className="text-[9px] text-muted-foreground mb-0.5 leading-tight">{c.label}</p>
-                <p className={`text-[10px] font-semibold font-mono leading-snug ${c.cls}`}>{c.value}</p>
-              </div>
-            ))}
-          </>
-        ) : (
-          [1,2,3,4].map(i => (
-            <div key={i} className="rounded-xl bg-muted border border-border p-2 space-y-1">
-              <Skeleton className="h-2 w-10" />
-              <Skeleton className="h-3 w-14" />
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Chat card */}
-      <Card className="rounded-2xl border border-border shadow-sm">
-        <CardContent className="p-4 space-y-3">
-
-          {/* Messages */}
-          <div className="space-y-2.5 min-h-[200px]">
-            {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center min-h-[180px] gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-500/15 border border-violet-200 dark:border-violet-500/20 flex items-center justify-center">
-                  <Bot className="w-6 h-6 text-violet-600 dark:text-violet-400" />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium text-foreground">Halo! Ada yang bisa saya bantu?</p>
-                  <p className="text-xs text-muted-foreground mt-1">Tanyakan apa saja tentang keuanganmu</p>
-                </div>
-                <div className="grid grid-cols-2 gap-2 w-full max-w-[300px]">
-                  {QUICK_PROMPTS.map(q => (
-                    <button key={q.label} onClick={() => handleSend(q.prompt)}
-                      className="text-left rounded-xl bg-muted hover:bg-accent border border-border px-3 py-2.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors leading-snug">
-                      {q.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <>
-                {messages.map((m, i) => <Bubble key={i} msg={m} />)}
-                {send.isPending && <Typing />}
-                <div ref={bottomRef} />
-              </>
-            )}
+        {/* Title */}
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-violet-100 dark:bg-violet-500/20 flex items-center justify-center">
+            <Sparkles className="w-4 h-4 text-violet-600 dark:text-violet-400" />
           </div>
+          <div>
+            <h1 className="text-[15px] font-semibold text-foreground leading-tight">AI Advisor</h1>
+            <p className="text-[11px] text-muted-foreground">Asisten keuangan pribadi</p>
+          </div>
+        </div>
 
-          {/* Quick chips (once chat started) */}
-          {messages.length > 0 && (
-            <div className="flex gap-1.5 overflow-x-auto scrollbar-none -mx-1 px-1 pb-0.5">
+        {/* Context grid */}
+        <div className="grid grid-cols-4 gap-2">
+          {hasData ? (
+            <>
+              {[
+                { label: "Total Aset", value: fmtRp(dashboard!.totalAssets), cls: "text-primary" },
+                { label: "Pemasukan", value: fmtRp(budget!.monthlyIncome), cls: "text-blue-600 dark:text-blue-400" },
+                { label: "Pengeluaran", value: fmtRp(budget!.totalSpent), cls: "text-red-600 dark:text-red-400" },
+                {
+                  label: "Saving Rate",
+                  value: savingRate !== null ? `${savingRate}%` : "—",
+                  cls: savingRate !== null && savingRate >= 20
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-yellow-600 dark:text-yellow-400",
+                },
+              ].map(c => (
+                <div key={c.label} className="rounded-xl bg-muted border border-border px-2.5 py-2">
+                  <p className="text-[9px] text-muted-foreground mb-0.5 leading-tight">{c.label}</p>
+                  <p className={`text-[10px] font-semibold font-mono leading-snug ${c.cls}`}>{c.value}</p>
+                </div>
+              ))}
+            </>
+          ) : (
+            [1, 2, 3, 4].map(i => (
+              <div key={i} className="rounded-xl bg-muted border border-border p-2 space-y-1">
+                <Skeleton className="h-2 w-10" />
+                <Skeleton className="h-3 w-14" />
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* ── Middle: messages ── */}
+      <div className="flex-1 px-4 py-3 space-y-2.5">
+        {!chatStarted ? (
+          /* Empty state */
+          <div className="flex flex-col items-center justify-center min-h-[200px] gap-4 pt-4">
+            <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-500/15 border border-violet-200 dark:border-violet-500/20 flex items-center justify-center">
+              <Bot className="w-6 h-6 text-violet-600 dark:text-violet-400" />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-medium text-foreground">Halo! Ada yang bisa saya bantu?</p>
+              <p className="text-xs text-muted-foreground mt-1">Tanya apa saja tentang keuanganmu</p>
+            </div>
+            {/* 2×2 quick prompts */}
+            <div className="grid grid-cols-2 gap-2 w-full max-w-[300px]">
               {QUICK_PROMPTS.map(q => (
-                <button key={q.label} onClick={() => handleSend(q.prompt)} disabled={send.isPending}
-                  className="shrink-0 text-[11px] text-muted-foreground bg-muted hover:bg-accent border border-border rounded-full px-3 py-1 transition-colors disabled:opacity-40 whitespace-nowrap">
+                <button key={q.label} onClick={() => handleSend(q.prompt)}
+                  className="text-left rounded-xl bg-muted hover:bg-accent border border-border px-3 py-2.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors leading-snug">
                   {q.label}
                 </button>
               ))}
             </div>
-          )}
-
-          {/* Input */}
-          <div className="flex items-end gap-2 bg-muted rounded-2xl border border-border px-3 py-2">
-            <Textarea
-              className="flex-1 border-0 bg-transparent text-[13px] resize-none min-h-[34px] max-h-[100px] focus-visible:ring-0 focus-visible:ring-offset-0 p-0 leading-relaxed placeholder:text-muted-foreground/50 text-foreground"
-              placeholder="Tanya tentang keuanganmu..."
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              rows={1}
-            />
-            <Button size="icon"
-              className="w-7 h-7 rounded-xl bg-primary hover:bg-primary/90 shrink-0"
-              onClick={() => handleSend()}
-              disabled={!input.trim() || send.isPending}>
-              <Send className="w-3 h-3" />
-            </Button>
           </div>
+        ) : (
+          <>
+            {messages.map((m, i) => <Bubble key={i} msg={m} />)}
+            {send.isPending && <Typing />}
+            <div ref={bottomRef} className="h-1" />
+          </>
+        )}
+      </div>
 
-        </CardContent>
-      </Card>
+      {/* ── Bottom: quick prompts + input (sticky above nav) ── */}
+      <div className="sticky bottom-0 z-10 bg-background border-t border-border px-4 pt-2.5 pb-20 space-y-2 shrink-0">
+
+        {/* Quick prompt grid (only when chat is active) */}
+        {chatStarted && (
+          <div className="grid grid-cols-2 gap-1.5">
+            {QUICK_PROMPTS.map(q => (
+              <button key={q.label} onClick={() => handleSend(q.prompt)} disabled={send.isPending}
+                className="text-left rounded-full bg-muted hover:bg-accent border border-border px-3 py-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 leading-snug truncate">
+                {q.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Input bar */}
+        <div className="flex items-end gap-2 bg-muted rounded-2xl border border-border px-3 py-2">
+          <Textarea
+            ref={textareaRef}
+            className="flex-1 border-0 bg-transparent text-[13px] resize-none min-h-[34px] max-h-[100px] focus-visible:ring-0 focus-visible:ring-offset-0 p-0 leading-relaxed placeholder:text-muted-foreground/50 text-foreground"
+            placeholder="Tanya tentang keuanganmu..."
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+            }}
+            rows={1}
+          />
+          <Button size="icon"
+            className="w-7 h-7 rounded-xl bg-primary hover:bg-primary/90 shrink-0"
+            onClick={() => handleSend()}
+            disabled={!input.trim() || send.isPending}>
+            <Send className="w-3 h-3" />
+          </Button>
+        </div>
+      </div>
 
     </div>
   );
