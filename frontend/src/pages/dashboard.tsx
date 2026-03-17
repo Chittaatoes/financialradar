@@ -1477,35 +1477,19 @@ function AssetInsightBadge({
   const current = isEmpty ? null : insights[idx % Math.max(insights.length, 1)];
 
   return (
-    <div className="border-t border-white/[0.07] pt-3">
-      {/* Section label */}
-      <div className="flex items-center gap-1.5 mb-2">
-        <Lightbulb
-          className="w-3.5 h-3.5 text-emerald-400 shrink-0"
-          style={{ filter: "drop-shadow(0 0 4px rgba(52,211,153,0.5))" }}
-        />
-        <span className="text-[10px] font-semibold text-white/40 uppercase tracking-widest">Insight Aset</span>
-      </div>
-
-      {/* Insight pill — fades + slides on change */}
-      <div
-        className="rounded-xl px-4 py-3 backdrop-blur-sm"
-        style={{
-          background: "linear-gradient(to right, rgba(255,255,255,0.06), rgba(255,255,255,0.01))",
-          opacity: visible ? 1 : 0,
-          transform: visible ? "translateY(0)" : "translateY(6px)",
-          transition: "opacity 380ms ease, transform 380ms ease",
-        }}
-      >
-        <div className="flex items-start gap-3">
-          <span className="text-base leading-none mt-0.5 shrink-0">
-            {isEmpty ? "💡" : current?.icon}
-          </span>
-          <span className="text-sm font-medium text-white/65 leading-relaxed line-clamp-2">
-            {isEmpty ? "Mulai catat aset untuk melihat insight kamu" : current?.text}
-          </span>
-        </div>
-      </div>
+    <div
+      className="border-t border-white/10 pt-3 mt-1 flex items-center gap-2"
+      style={{
+        opacity: visible ? 1 : 0,
+        transition: "opacity 200ms ease",
+      }}
+    >
+      <span className="text-sm opacity-70 shrink-0 leading-none">
+        {isEmpty ? "💡" : current?.icon}
+      </span>
+      <span className="text-xs text-white/60 leading-snug line-clamp-1 min-w-0">
+        {isEmpty ? "Mulai catat aset untuk lihat insight" : current?.text}
+      </span>
     </div>
   );
 }
