@@ -1501,7 +1501,7 @@ function AssetInsightBadge({
           <span className="text-base leading-none mt-0.5 shrink-0">
             {isEmpty ? "💡" : current?.icon}
           </span>
-          <span className="text-sm font-medium text-white/65 leading-relaxed">
+          <span className="text-sm font-medium text-white/65 leading-relaxed line-clamp-2">
             {isEmpty ? "Mulai catat aset untuk melihat insight kamu" : current?.text}
           </span>
         </div>
@@ -1587,13 +1587,13 @@ function FinancialSummaryCard({
 
   return (
     <Card
-      className="border-0 text-white overflow-hidden"
+      className="border-0 text-white overflow-hidden h-full"
       style={{ background: "linear-gradient(135deg, #133825 0%, #0c2318 100%)" }}
       data-testid="card-financial-summary"
     >
-      <CardContent className="p-5 space-y-4">
+      <CardContent className="flex flex-col h-full p-4 gap-3">
         {/* Header */}
-        <div className="flex items-center justify-between gap-2">
+        <div className="shrink-0 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <CalendarDays className="w-4 h-4 text-emerald-400/80" />
             <span className="text-sm font-semibold text-white/80">{t.dashboard.todaysBudget}</span>
@@ -1640,7 +1640,7 @@ function FinancialSummaryCard({
         )}
 
         {/* Big number: daily safe budget */}
-        <div>
+        <div className="shrink-0">
           <p className="text-[11px] text-white/45 mb-1 uppercase tracking-wide">{t.dashboard.dailySafeSpend}</p>
           {isLoading ? (
             <Skeleton className="h-9 w-40 bg-white/10" />
@@ -1690,8 +1690,9 @@ function FinancialSummaryCard({
           )}
         </div>
 
-        {/* Middle: two columns */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* ── Zone B: Middle (flex-grow) — income/expense grid ── */}
+        <div className="flex-grow min-h-0 flex items-center py-3">
+        <div className="grid grid-cols-2 gap-3 w-full">
           <div className="rounded-lg bg-white/8 p-3">
             <p className="text-[11px] text-white/45 mb-1">{t.dashboard.monthlyIncome}</p>
             {isLoading ? (
@@ -1727,9 +1728,10 @@ function FinancialSummaryCard({
             )}
           </div>
         </div>
+        </div>{/* end Zone B */}
 
-        {/* Bottom: remaining budget + progress */}
-        <div className="space-y-2">
+        {/* ── Zone C: Bottom (anchored) — remaining budget + progress ── */}
+        <div className="mt-auto shrink-0 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs text-white/50">{t.dashboard.monthlyRemaining}</span>
             {isLoading ? (
@@ -2092,7 +2094,7 @@ export default function Dashboard() {
         const dominantCat = categories.reduce((a, b) => (b.pct > a.pct ? b : a), categories[0]);
 
         const totalAssetsCard = (
-          <Card className="border-0 text-white h-full" style={{ background: "linear-gradient(135deg, #1E2F26 0%, #16221C 100%)" }} data-testid="card-total-assets">
+          <Card className="border-0 text-white h-full overflow-hidden" style={{ background: "linear-gradient(135deg, #1E2F26 0%, #16221C 100%)" }} data-testid="card-total-assets">
             <CardContent className={`flex flex-col h-full ${secondary ? "p-3.5 gap-2.5" : "p-4 gap-3"}`}>
 
               {/* ── Header row ── */}
@@ -2214,8 +2216,8 @@ export default function Dashboard() {
 
           return (
             <div className="space-y-2.5">
-              {/* Clip — hides overflow without scroll */}
-              <div className="overflow-hidden">
+              {/* Clip — fixed height locks both cards to the same visual height */}
+              <div className="overflow-hidden h-[330px]">
                 {/* Track — moves as a unit via transform, GPU-composited */}
                 <div
                   onTouchStart={onTouchStart}
@@ -2223,6 +2225,7 @@ export default function Dashboard() {
                   onTouchEnd={onTouchEnd}
                   style={{
                     display: "flex",
+                    height: "100%",
                     willChange: "transform",
                     transform: `translate3d(${-activeCard * 100}%, 0, 0)`,
                     transition: "transform 0.42s cubic-bezier(0.22, 1, 0.36, 1)",
@@ -2233,6 +2236,7 @@ export default function Dashboard() {
                     style={{
                       flexShrink: 0,
                       width: "100%",
+                      height: "100%",
                       transform: activeCard === 0 ? "scale(1)" : "scale(0.97)",
                       opacity: activeCard === 0 ? 1 : 0.65,
                       transition: "transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.42s ease",
@@ -2250,6 +2254,7 @@ export default function Dashboard() {
                     style={{
                       flexShrink: 0,
                       width: "100%",
+                      height: "100%",
                       transform: activeCard === 1 ? "scale(1)" : "scale(0.97)",
                       opacity: activeCard === 1 ? 1 : 0.65,
                       transition: "transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.42s ease",
