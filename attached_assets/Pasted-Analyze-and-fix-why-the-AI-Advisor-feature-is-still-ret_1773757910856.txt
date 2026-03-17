@@ -1,0 +1,101 @@
+Analyze and fix why the AI Advisor feature is still returning a static/template response instead of using the OpenRouter API response.
+
+GOAL:
+Ensure that ALL responses come directly from the OpenRouter AI model and NOT from any hardcoded or fallback template.
+
+----------------------------------------
+1. FIND THE ROOT CAUSE
+----------------------------------------
+
+Search the backend code (especially routes, controllers, or services related to AI Advisor) and identify:
+
+- Any hardcoded/template response like:
+  "Dari data kamu..."
+  or similar static text
+
+- Any conditional logic that overrides AI response, such as:
+  if (input === "halo") return template
+  if (!input) return template
+  fallback responses
+
+- Any place where AI response is generated BUT replaced afterward
+
+----------------------------------------
+2. VERIFY OPENROUTER INTEGRATION
+----------------------------------------
+
+Check if OpenRouter API is properly called:
+
+- Endpoint:
+  https://openrouter.ai/api/v1/chat/completions
+
+- Headers:
+  Authorization: Bearer API_KEY
+
+- Ensure:
+  - API key exists in environment variables
+  - Request is successful (status 200)
+  - Response is not empty
+
+Log the raw response:
+console.log("AI RAW RESPONSE:", data);
+
+----------------------------------------
+3. FIX RESPONSE FLOW (CRITICAL)
+----------------------------------------
+
+Ensure the backend returns ONLY AI response:
+
+Correct:
+return {
+  message: aiResponse.choices[0].message.content
+};
+
+Remove ANY of these:
+- hardcoded responses
+- fallback templates
+- duplicate return statements
+
+----------------------------------------
+4. REMOVE TEMPLATE OVERRIDE
+----------------------------------------
+
+Delete or disable:
+- template-based responses
+- mock data
+- default responses for short inputs like "halo"
+
+AI must handle ALL inputs dynamically.
+
+----------------------------------------
+5. ADD ERROR HANDLING (SAFE)
+----------------------------------------
+
+If API fails:
+- return a minimal fallback like:
+  "Terjadi kendala, coba lagi ya."
+
+BUT DO NOT use template financial response.
+
+----------------------------------------
+6. TEST CASES
+----------------------------------------
+
+Test these inputs:
+- "halo"
+- "apakah saya boros?"
+- "rekomendasi makan murah"
+
+Expected:
+- All responses are DIFFERENT
+- No repeated template
+- Natural, human-like answers
+
+----------------------------------------
+EXPECTED RESULT
+----------------------------------------
+
+- AI responses are dynamic and unique
+- No template or repeated output
+- OpenRouter is fully active
+- AI behaves like a real assistant

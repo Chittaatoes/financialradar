@@ -2251,11 +2251,21 @@ STYLE
 - Clear and direct
 - Avoid over-explaining`;
 
-      const messages = [
-        { role: "system", content: systemPrompt },
-        ...history.slice(-6).map((h) => ({ role: h.role, content: h.content })),
-        { role: "user", content: message },
-      ];
+      // Gemma (and many free models) don't support role:"system" — inject into first user message
+      const historyMessages = history.slice(-6).map((h) => ({ role: h.role as "user" | "assistant", content: h.content }));
+      let messages: Array<{ role: "user" | "assistant"; content: string }>;
+      if (historyMessages.length > 0) {
+        const [firstMsg, ...rest] = historyMessages;
+        messages = [
+          { role: "user" as const, content: `${systemPrompt}\n\n---\n${firstMsg.content}` },
+          ...rest,
+          { role: "user" as const, content: message },
+        ];
+      } else {
+        messages = [
+          { role: "user" as const, content: `${systemPrompt}\n\n---\n${message}` },
+        ];
+      }
 
       if (OPENROUTER_KEY) {
         try {
