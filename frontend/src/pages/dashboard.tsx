@@ -2079,10 +2079,10 @@ export default function Dashboard() {
 
         const totalAssetsCard = (
           <Card className="border-0 text-white h-full overflow-hidden" style={{ background: "linear-gradient(135deg, #1E2F26 0%, #16221C 100%)" }} data-testid="card-total-assets">
-            <CardContent className={`flex flex-col h-full ${secondary ? "p-3.5 gap-2.5" : "p-4 gap-3"}`}>
+            <CardContent className={`flex flex-col h-full ${secondary ? "p-3.5 gap-3" : "p-4 gap-4"}`}>
 
               {/* ── Header row ── */}
-              <div className="flex items-center justify-between">
+              <div className="shrink-0 flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <TrendingUp className="w-3.5 h-3.5 text-emerald-400/70" />
                   <p className="text-xs font-medium text-white/45 uppercase tracking-widest" data-testid="text-total-assets-label">
@@ -2107,31 +2107,28 @@ export default function Dashboard() {
               </div>
 
               {/* ── Big total number ── */}
-              <p
-                className="text-[2rem] font-bold font-mono tracking-tight leading-none"
-                data-testid="text-total-assets"
-                style={amtStyle}
-              >
-                {hidden ? MASKED_LONG : formatCurrency(totalAset)}
-              </p>
-
-              {/* ── Dominant category indicator ── */}
-              {totalAset > 0 && (
-                <div className="flex items-center gap-1" style={amtStyle}>
-                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${dominantCat.color}`} />
-                  <span className="text-[10px] text-white/40 font-medium">{dominantCat.label}</span>
-                  <span className="text-[10px] text-white/25 font-mono">{hidden ? "--" : `${dominantCat.pct}%`}</span>
-                </div>
-              )}
-
-              {/* ── Divider ── */}
-              <div className="border-t border-white/8" />
-
-              {/* ── Stacked bar ── */}
-              <StackedBar hidden={hidden} cashPct={cashPct} bankPct={bankPct} ePct={ePct} />
+              <div className="shrink-0 space-y-1.5">
+                <p
+                  className="text-[2rem] font-bold font-mono tracking-tight leading-none"
+                  data-testid="text-total-assets"
+                  style={amtStyle}
+                >
+                  {hidden ? MASKED_LONG : formatCurrency(totalAset)}
+                </p>
+                {/* Inline dominant category — replaces stacked bar */}
+                {totalAset > 0 && (
+                  <div className="flex items-center gap-1.5" style={amtStyle}>
+                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${dominantCat.color}`} />
+                    <span className="text-xs text-white/50 font-medium">
+                      {dominantCat.label} mendominasi{" "}
+                      <span className="font-mono">{hidden ? "–" : `${dominantCat.pct}%`}</span>
+                    </span>
+                  </div>
+                )}
+              </div>
 
               {/* ── Compact breakdown list ── */}
-              <div className="flex items-center justify-between gap-1">
+              <div className="shrink-0 flex items-center justify-between gap-1">
                 {categories.map(({ icon: Icon, label, val, testId, color }) => (
                   <div key={label} className="flex items-center gap-1.5 min-w-0">
                     <div className={`w-2 h-2 rounded-full shrink-0 ${color}`} />
@@ -2146,11 +2143,11 @@ export default function Dashboard() {
                 ))}
               </div>
 
-              {/* ── Savings goal progress ── */}
-              <div className="space-y-1.5">
+              {/* ── Savings goal progress — primary visual bar ── */}
+              <div className="flex-grow flex flex-col justify-end space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-white/40">{t.dashboard.savingsGoal}</span>
-                  <span className="text-[11px] font-mono font-semibold text-emerald-400/80" data-testid="text-goal-pct">{goalPct}%</span>
+                  <span className="text-[10px] text-white/40 uppercase tracking-wide font-medium">{t.dashboard.savingsGoal}</span>
+                  <span className="text-xs font-mono font-semibold text-emerald-400/80" data-testid="text-goal-pct">{goalPct}%</span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
                   <div
@@ -2162,7 +2159,7 @@ export default function Dashboard() {
               </div>
 
               {/* ── Insight Aset — anchored to bottom ── */}
-              <div className="mt-auto">
+              <div className="shrink-0">
                 <AssetInsightBadge
                   totalAset={totalAset}
                   cashPct={cashPct}
