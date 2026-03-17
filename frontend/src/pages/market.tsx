@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown, RefreshCw, ExternalLink } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLanguage } from "@/lib/i18n";
 
 interface MarketPrices {
   usdIdr: number; goldGram: number; bitcoin: number; ethereum: number;
@@ -32,23 +33,34 @@ function shortNum(n: number) {
   return n.toLocaleString("id-ID");
 }
 
-function timeAgo(iso: string) {
+function timeAgo(iso: string, lang: string) {
   const d = (Date.now() - new Date(iso).getTime()) / 60000;
+  if (lang === "en") {
+    if (d < 60) return `${Math.floor(d)}m ago`;
+    if (d < 1440) return `${Math.floor(d / 60)}h ago`;
+    return `${Math.floor(d / 1440)}d ago`;
+  }
   if (d < 60) return `${Math.floor(d)}m lalu`;
   if (d < 1440) return `${Math.floor(d / 60)}j lalu`;
   return `${Math.floor(d / 1440)}h lalu`;
 }
 
-function ImpactBadge({ v }: { v: NewsItem["impact"] }) {
-  const cfg = {
-    high:   { cls: "bg-red-100 text-red-700 border-red-200 dark:bg-red-500/15 dark:text-red-400 dark:border-red-500/20", label: "🔴 Tinggi" },
-    medium: { cls: "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-500/15 dark:text-yellow-400 dark:border-yellow-500/20", label: "🟡 Medium" },
-    low:    { cls: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/20", label: "🟢 Rendah" },
+function ImpactBadge({ v, lang }: { v: NewsItem["impact"]; lang: string }) {
+  const labels = lang === "en"
+    ? { high: "🔴 High", medium: "🟡 Medium", low: "🟢 Low" }
+    : { high: "🔴 Tinggi", medium: "🟡 Sedang", low: "🟢 Rendah" };
+  const cls = {
+    high:   "bg-red-100 text-red-700 border-red-200 dark:bg-red-500/15 dark:text-red-400 dark:border-red-500/20",
+    medium: "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-500/15 dark:text-yellow-400 dark:border-yellow-500/20",
+    low:    "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/20",
   }[v];
-  return <Badge className={`text-[10px] px-1.5 py-0 border ${cfg.cls} hover:opacity-90`}>{cfg.label}</Badge>;
+  return <Badge className={`text-[10px] px-1.5 py-0 border ${cls} hover:opacity-90`}>{labels[v]}</Badge>;
 }
 
 export default function MarketPage() {
+  const { language } = useLanguage();
+  const isEN = language === "en";
+
   const { data: p, isLoading: pl, refetch, isFetching } = useQuery<MarketPrices>({
     queryKey: ["/api/market/prices"],
     staleTime: 5 * 60_000,
@@ -57,18 +69,24 @@ export default function MarketPage() {
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
+
   const { data: news, isLoading: nl } = useQuery<MarketNews>({
-    queryKey: ["/api/market/news"],
+    queryKey: ["/api/market/news", language],
     staleTime: 8 * 60_000,
     gcTime: 0,
     retry: 3,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+    queryFn: async () => {
+      const res = await fetch(`/api/market/news?lang=${language}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch news");
+      return res.json();
+    },
   });
 
   const snapshots = p ? [
     { icon: "💵", label: "USD/IDR",   value: `Rp ${p.usdIdr.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`, chg: p.usdChange },
-    { icon: "🥇", label: "Emas/gram", value: `Rp ${shortNum(p.goldGram)}`,  chg: p.goldChange },
+    { icon: "🥇", label: isEN ? "Gold/gram" : "Emas/gram", value: `Rp ${shortNum(p.goldGram)}`,  chg: p.goldChange },
     { icon: "₿",  label: "Bitcoin",   value: `Rp ${shortNum(p.bitcoin)}`,   chg: p.btcChange },
     { icon: "Ξ",  label: "Ethereum",  value: `Rp ${shortNum(p.ethereum)}`,  chg: p.ethChange },
   ] : [];
@@ -80,7 +98,9 @@ export default function MarketPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Market</h1>
-          <p className="text-xs text-muted-foreground">Harga pasar & berita keuangan</p>
+          <p className="text-xs text-muted-foreground">
+            {isEN ? "Market prices & financial news" : "Harga pasar & berita keuangan"}
+          </p>
         </div>
         <button
           onClick={() => refetch()} disabled={isFetching}
@@ -93,7 +113,9 @@ export default function MarketPage() {
       {/* Snapshot grid */}
       <Card className="rounded-2xl border border-border shadow-sm">
         <CardContent className="p-4">
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-3">Snapshot Pasar</p>
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-3">
+            {isEN ? "Market Snapshot" : "Snapshot Pasar"}
+          </p>
           {pl ? (
             <div className="grid grid-cols-2 gap-2">
               {[1,2,3,4].map(i => (
@@ -119,7 +141,9 @@ export default function MarketPage() {
             </div>
           )}
           {p?.updatedAt && (
-            <p className="text-[10px] text-muted-foreground/60 mt-3 text-right">Diperbarui {timeAgo(p.updatedAt)}</p>
+            <p className="text-[10px] text-muted-foreground/60 mt-3 text-right">
+              {isEN ? `Updated ${timeAgo(p.updatedAt, language)}` : `Diperbarui ${timeAgo(p.updatedAt, language)}`}
+            </p>
           )}
         </CardContent>
       </Card>
@@ -127,7 +151,9 @@ export default function MarketPage() {
       {/* News */}
       <Card className="rounded-2xl border border-border shadow-sm">
         <CardContent className="p-4">
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-3">Berita Keuangan</p>
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-3">
+            {isEN ? "Financial News" : "Berita Keuangan"}
+          </p>
           {nl ? (
             <div className="space-y-3">
               {[1,2,3].map(i => (
@@ -143,8 +169,8 @@ export default function MarketPage() {
               {news.articles.map((item, i) => (
                 <div key={i} className="pb-3 mb-3 border-b border-border last:border-0 last:mb-0 last:pb-0">
                   <div className="flex items-center justify-between mb-1.5">
-                    <ImpactBadge v={item.impact} />
-                    <span className="text-[10px] text-muted-foreground/60">{timeAgo(item.publishedAt)}</span>
+                    <ImpactBadge v={item.impact} lang={language} />
+                    <span className="text-[10px] text-muted-foreground/60">{timeAgo(item.publishedAt, language)}</span>
                   </div>
                   <p className="text-[13px] text-foreground leading-snug line-clamp-2 mb-1.5">{item.title}</p>
                   <div className="flex items-center justify-between">
@@ -152,7 +178,7 @@ export default function MarketPage() {
                     {item.url && item.url !== "#" && (
                       <a href={item.url} target="_blank" rel="noopener noreferrer"
                         className="flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 transition-colors">
-                        Baca <ExternalLink className="w-2.5 h-2.5" />
+                        {isEN ? "Read" : "Baca"} <ExternalLink className="w-2.5 h-2.5" />
                       </a>
                     )}
                   </div>
@@ -160,7 +186,9 @@ export default function MarketPage() {
               ))}
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground text-center py-3">Tidak ada berita tersedia.</p>
+            <p className="text-xs text-muted-foreground text-center py-3">
+              {isEN ? "No news available." : "Tidak ada berita tersedia."}
+            </p>
           )}
         </CardContent>
       </Card>

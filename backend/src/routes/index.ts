@@ -2069,6 +2069,22 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
     return fn().then(data => { marketCache[key] = { data, ts: Date.now() }; return data; });
   }
 
+  const translationCache = new Map<string, string>();
+
+  async function translateToID(text: string): Promise<string> {
+    if (translationCache.has(text)) return translationCache.get(text)!;
+    try {
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=id&dt=t&q=${encodeURIComponent(text)}`;
+      const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(4000) });
+      const data = await r.json() as unknown[][];
+      const translated = (data[0] as unknown[][]).map((seg: unknown[]) => seg[0]).join("") || text;
+      translationCache.set(text, translated);
+      return translated;
+    } catch {
+      return text;
+    }
+  }
+
   // GET /api/market/prices — USD/IDR, Gold, BTC, ETH (all free, real-time)
   app.get("/api/market/prices", isAuthenticated, async (_req, res) => {
     try {
@@ -2118,8 +2134,9 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
   });
 
   // GET /api/market/news — financial news from CryptoCompare (free) + GNews
-  app.get("/api/market/news", isAuthenticated, async (_req, res) => {
+  app.get("/api/market/news", isAuthenticated, async (req, res) => {
     try {
+      const lang = (req.query.lang as string) || "id";
       const GNEWS_KEY = process.env.GNEWS_API_KEY;
 
       const detectImpact = (title: string, body = ""): "high" | "medium" | "low" => {
@@ -2141,8 +2158,10 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
         return "low";
       };
 
-      const data = await cached("market_news", async () => {
-        const articles: Array<{ title: string; source: string; url: string; publishedAt: string; impact: "high" | "medium" | "low" }> = [];
+      type NewsArticle = { title: string; source: string; url: string; publishedAt: string; impact: "high" | "medium" | "low"; fromCC?: boolean };
+
+      const rawData = await cached("market_news_raw", async () => {
+        const articles: Array<NewsArticle> = [];
 
         // ── Source 1: CryptoCompare (free, no key, crypto + gold + forex news) ──
         try {
@@ -2158,6 +2177,7 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
                 url: a.URL,
                 publishedAt: new Date(a.PUBLISHED_ON * 1000).toISOString(),
                 impact: detectImpact(a.TITLE, a.BODY),
+                fromCC: true,
               });
             }
           }
@@ -2212,7 +2232,21 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
         return { articles: unique.slice(0, 6) };
       });
 
-      res.json(data);
+      if (lang === "id") {
+        const translated = await cached(`market_news_id_${Math.floor(Date.now() / (30 * 60000))}`, async () => {
+          const translatedArticles = await Promise.all(
+            rawData.articles.map(async (a) => {
+              if (!a.fromCC) return a;
+              const translatedTitle = await translateToID(a.title);
+              return { ...a, title: translatedTitle };
+            })
+          );
+          return { articles: translatedArticles };
+        });
+        return res.json(translated);
+      }
+
+      res.json(rawData);
     } catch (err) {
       console.error("Market news error:", err);
       res.status(500).json({ message: "Failed to fetch news" });
