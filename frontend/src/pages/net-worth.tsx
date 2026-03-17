@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, TrendingDown, Minus, Wallet, Landmark, Smartphone, PiggyBank } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Wallet, Landmark, Smartphone, PiggyBank, BarChart2 } from "lucide-react";
 import { formatCurrency } from "@/lib/constants";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceDot,
@@ -22,6 +22,7 @@ interface DashboardData {
   totalBank: number;
   totalEwallet: number;
   totalSaving: number;
+  totalStock: number;
 }
 
 // ─── Y-axis compact formatter ─────────────────────────────────────────────────
@@ -102,6 +103,13 @@ export default function NetWorth() {
       value: dashboard?.totalSaving ?? 0,
       color: "text-amber-600 dark:text-amber-400",
       bg: "bg-amber-500/10",
+    },
+    {
+      label: language === "id" ? "Saham" : "Stocks",
+      icon: BarChart2,
+      value: dashboard?.totalStock ?? 0,
+      color: "text-rose-600 dark:text-rose-400",
+      bg: "bg-rose-500/10",
     },
   ].filter((item) => item.value > 0);
 

@@ -305,9 +305,13 @@ export async function registerRoutes(
 
       const activeGoals = allGoals.filter(g => parseFloat(String(g.currentAmount)) < parseFloat(String(g.targetAmount)));
       const totalSaving = allGoals.reduce((s, g) => s + parseFloat(String(g.currentAmount)), 0);
-      const totalAssets = totalCash + totalBank + totalEwallet + totalSaving;
       const totalTarget = allGoals.reduce((s, g) => s + parseFloat(String(g.targetAmount)), 0);
       const goalProgress = totalTarget > 0 ? Math.min((totalSaving / totalTarget) * 100, 100) : 0;
+
+      const holdings = await db.select().from(stockHoldings).where(eq(stockHoldings.userId, userId));
+      const totalStock = holdings.reduce((s, h) => s + Number(h.avgPrice) * Number(h.lots) * 100, 0);
+
+      const totalAssets = totalCash + totalBank + totalEwallet + totalSaving + totalStock;
 
       const lastActiveGoal = await storage.getLastActiveGoal(userId);
 
@@ -319,6 +323,7 @@ export async function registerRoutes(
         totalBank,
         totalEwallet,
         totalSaving,
+        totalStock,
         totalTarget,
         goalProgress,
         todayInteracted: !!existingLog,
@@ -2484,8 +2489,9 @@ STYLE
   app.post("/api/portfolio", isAuthenticated, async (req, res) => {
     try {
       const userId = (req.session as any)?.user?.id;
-      const { symbol, lots, avgPrice, buyDate } = req.body;
+      const { symbol, lots, avgPrice, buyDate, accountId } = req.body;
       if (!symbol || !lots || !avgPrice) return res.status(400).json({ message: "symbol, lots, avgPrice required" });
+      const totalCost = Number(lots) * Number(avgPrice) * 100;
 
       const sym = String(symbol).toUpperCase().trim();
       const withJK = sym.endsWith(".JK") ? sym : `${sym}.JK`;
@@ -2497,6 +2503,7 @@ STYLE
         .where(and(eq(stockHoldings.userId, userId), eq(stockHoldings.symbol, withJK)))
         .limit(1);
 
+      let result;
       if (existing.length > 0) {
         const prev = existing[0];
         const prevLots = Number(prev.lots);
@@ -2510,14 +2517,35 @@ STYLE
           .set({ lots: totalLots, avgPrice: String(mergedAvg.toFixed(2)), buyDate: buyDate || prev.buyDate })
           .where(eq(stockHoldings.id, prev.id))
           .returning();
-        return res.json(updated);
+        result = updated;
+      } else {
+        const [inserted] = await db
+          .insert(stockHoldings)
+          .values({ userId, symbol: withJK, lots: Number(lots), avgPrice: String(Number(avgPrice).toFixed(2)), buyDate: buyDate || null })
+          .returning();
+        result = inserted;
       }
 
-      const [inserted] = await db
-        .insert(stockHoldings)
-        .values({ userId, symbol: withJK, lots: Number(lots), avgPrice: String(Number(avgPrice).toFixed(2)), buyDate: buyDate || null })
-        .returning();
-      res.json(inserted);
+      if (accountId && totalCost > 0) {
+        try {
+          await storage.updateAccountBalance(Number(accountId), String(totalCost), "subtract");
+          const stockName = withJK.replace(".JK", "");
+          await storage.createTransaction({
+            userId,
+            type: "expense",
+            amount: String(totalCost),
+            date: buyDate || format(new Date(), "yyyy-MM-dd"),
+            fromAccountId: Number(accountId),
+            toAccountId: null,
+            category: "Investasi",
+            note: `Beli saham ${stockName} ${lots} lot @ Rp ${Number(avgPrice).toLocaleString("id-ID")}`,
+          });
+        } catch (e) {
+          console.error("[Portfolio] account deduction failed:", e);
+        }
+      }
+
+      res.json(result);
     } catch (err) {
       console.error("Portfolio POST error:", err);
       res.status(500).json({ message: "Failed to save holding" });

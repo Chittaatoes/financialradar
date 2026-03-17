@@ -74,7 +74,7 @@ import {
 } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import {
-  Wallet, Landmark, Smartphone,
+  Wallet, Landmark, Smartphone, BarChart2,
   Flame, TrendingUp, TrendingDown, Minus,
   CalendarOff, Crosshair, CheckCircle2, Circle,
   Eye, EyeOff, X, Lightbulb, Target,
@@ -114,6 +114,7 @@ interface DashboardData {
   totalBank: number;         // Sum of "bank" type accounts
   totalEwallet: number;      // Sum of "ewallet" type accounts
   totalSaving: number;       // Sum of all goal currentAmounts
+  totalStock: number;        // Sum of stock holdings (cost basis)
   totalTarget: number;       // Sum of all goal targetAmounts
   goalProgress: number;      // Percentage: totalSaving / totalTarget * 100
   todayInteracted: boolean;  // Whether user has a streak log entry for today
@@ -2093,10 +2094,14 @@ export default function Dashboard() {
 
         const secondary = !profileLoading && hasBudget;
 
+        const stockVal  = dashboard?.totalStock ?? 0;
+        const stockPct  = pctOf(stockVal);
+
         const categories = [
-          { icon: Wallet,     label: t.dashboard.cash,    val: dashboard?.totalCash    ?? 0, pct: cashPct, testId: "text-cash-amount",   color: "bg-amber-400/70"   },
-          { icon: Landmark,   label: t.dashboard.bank,    val: dashboard?.totalBank    ?? 0, pct: bankPct, testId: "text-bank-amount",   color: "bg-emerald-400/70" },
-          { icon: Smartphone, label: t.dashboard.ewallet, val: dashboard?.totalEwallet ?? 0, pct: ePct,    testId: "text-ewallet-amount", color: "bg-sky-400/70"     },
+          { icon: Wallet,     label: t.dashboard.cash,    val: dashboard?.totalCash    ?? 0, pct: cashPct,  testId: "text-cash-amount",   color: "bg-amber-400/70"   },
+          { icon: Landmark,   label: t.dashboard.bank,    val: dashboard?.totalBank    ?? 0, pct: bankPct,  testId: "text-bank-amount",   color: "bg-emerald-400/70" },
+          { icon: Smartphone, label: t.dashboard.ewallet, val: dashboard?.totalEwallet ?? 0, pct: ePct,     testId: "text-ewallet-amount", color: "bg-sky-400/70"     },
+          { icon: BarChart2,  label: language === "en" ? "Stocks" : "Saham", val: stockVal, pct: stockPct, testId: "text-stock-amount",  color: "bg-rose-400/70"    },
         ];
 
         const dominantCat = categories.reduce((a, b) => (b.pct > a.pct ? b : a), categories[0]);
@@ -2150,11 +2155,11 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* ── MIDDLE: 3-col asset breakdown grid ── */}
+              {/* ── MIDDLE: 2×2 asset breakdown grid ── */}
               <div className="flex-grow flex items-center">
-                <div className="grid grid-cols-3 gap-2 w-full">
+                <div className="grid grid-cols-2 gap-1.5 w-full">
                   {categories.map(({ icon: Icon, label, val, testId, color }) => (
-                    <div key={label} className="bg-white/[0.06] rounded-lg px-2 py-3 flex flex-col gap-1 min-w-0">
+                    <div key={label} className="bg-white/[0.06] rounded-lg px-2.5 py-2.5 flex flex-col gap-1 min-w-0">
                       <div className="flex items-center gap-1">
                         <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${color}`} />
                         <span className="text-[9px] text-white/40 font-medium truncate leading-none">{label}</span>
@@ -2287,7 +2292,7 @@ export default function Dashboard() {
           );
         }
 
-        return totalAssetsCard;
+        return <div className="h-[330px]">{totalAssetsCard}</div>;
       })()}
 
       {/* Menu Utama — horizontal scrollable quick access */}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { TrendingUp, TrendingDown, Plus, Trash2, Search, X, Lightbulb, CalendarDays, Layers } from "lucide-react";
+import { TrendingUp, TrendingDown, Plus, Trash2, Search, X, Lightbulb, CalendarDays, Layers, Landmark } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,9 @@ interface DBHolding {
 interface IHSGData {
   price: number; prevClose: number; change: number; changePct: number;
   points: { t: number; v: number }[];
+}
+interface Account {
+  id: number; name: string; type: "cash" | "bank" | "ewallet"; balance: string;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────
@@ -182,11 +185,22 @@ function AddStockSheet({
   const [lots, setLots] = useState("1");
   const [buyPrice, setBuyPrice] = useState(String(stock.price));
   const [buyDate, setBuyDate] = useState(today());
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  const { data: accounts } = useQuery<Account[]>({
+    queryKey: ["/api/accounts"],
+    staleTime: 60_000,
+  });
 
   const lembar = (Number(lots) || 0) * 100;
   const totalCost = lembar * (Number(buyPrice) || 0);
   const currentValue = lembar * stock.price;
+
+  const selectedAccount = accounts?.find(a => String(a.id) === selectedAccountId);
+  const hasEnoughBalance = selectedAccount
+    ? parseFloat(selectedAccount.balance) >= totalCost
+    : true;
 
   // Hide bottom nav while sheet is open
   useEffect(() => {
@@ -201,10 +215,19 @@ function AddStockSheet({
         lots: Number(lots),
         avgPrice: Number(buyPrice),
         buyDate,
+        ...(selectedAccountId ? { accountId: Number(selectedAccountId) } : {}),
       });
       return res.json();
     },
-    onSuccess: () => { onSaved(); onClose(); },
+    onSuccess: () => {
+      if (selectedAccountId) {
+        qc.invalidateQueries({ queryKey: ["/api/accounts"] });
+        qc.invalidateQueries({ queryKey: ["/api/transactions"] });
+        qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      }
+      onSaved();
+      onClose();
+    },
   });
 
   // Close on overlay click
@@ -250,6 +273,28 @@ function AddStockSheet({
               <CalendarDays className="w-3 h-3" /> Tanggal Beli
             </label>
             <Input type="date" className="h-10 text-sm" value={buyDate} onChange={e => setBuyDate(e.target.value)} max={today()} />
+          </div>
+
+          {/* Account selector */}
+          <div>
+            <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium mb-1.5">
+              <Landmark className="w-3 h-3" /> Potong dari Rekening <span className="text-muted-foreground/50">(opsional)</span>
+            </label>
+            <select
+              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              value={selectedAccountId}
+              onChange={e => setSelectedAccountId(e.target.value)}
+            >
+              <option value="">— Tidak dipotong dari rekening —</option>
+              {(accounts ?? []).map(a => (
+                <option key={a.id} value={String(a.id)}>
+                  {a.name} · Rp {parseFloat(a.balance).toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                </option>
+              ))}
+            </select>
+            {selectedAccount && !hasEnoughBalance && (
+              <p className="text-[10px] text-red-500 mt-1">Saldo tidak cukup. Tersedia: Rp {parseFloat(selectedAccount.balance).toLocaleString("id-ID", { maximumFractionDigits: 0 })}</p>
+            )}
           </div>
 
           {/* Lots + Price side by side */}
@@ -298,9 +343,13 @@ function AddStockSheet({
         <Button
           className="w-full h-11 mt-4 text-sm font-semibold rounded-2xl"
           onClick={() => save.mutate()}
-          disabled={!lots || !buyPrice || save.isPending}
+          disabled={!lots || !buyPrice || save.isPending || !hasEnoughBalance}
         >
-          {save.isPending ? "Menyimpan..." : `Tambah ${stock.symbol.replace(".JK", "")} ke Portofolio`}
+          {save.isPending
+            ? "Menyimpan..."
+            : selectedAccountId
+              ? `Tambah & Potong ${fmtRp(totalCost)} dari Rekening`
+              : `Tambah ${stock.symbol.replace(".JK", "")} ke Portofolio`}
         </Button>
       </div>
     </div>
