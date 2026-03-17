@@ -2216,40 +2216,54 @@ ATURAN RESPONS (wajib diikuti):
       ];
 
       if (OPENROUTER_KEY) {
-        const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${OPENROUTER_KEY}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://financialradar.app",
-          },
-          body: JSON.stringify({
-            model: "mistralai/mistral-7b-instruct:free",
-            messages,
-            max_tokens: 400,
-          }),
-        });
-        if (r.ok) {
-          const json = await r.json() as { choices: Array<{ message: { content: string } }> };
-          const reply = json.choices?.[0]?.message?.content ?? "Maaf, tidak bisa memproses.";
-          return res.json({ reply, configured: true });
+        try {
+          const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${OPENROUTER_KEY}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": "https://financialradar.app",
+              "X-Title": "Financial Radar",
+            },
+            body: JSON.stringify({
+              model: "google/gemma-3-4b-it:free",
+              messages,
+              max_tokens: 600,
+              temperature: 0.7,
+            }),
+          });
+          const json = await r.json() as { choices?: Array<{ message: { content: string } }>; error?: { message: string } };
+          if (!r.ok || json.error) {
+            console.error("[OpenRouter] Error:", json.error?.message ?? r.status);
+          } else {
+            const reply = json.choices?.[0]?.message?.content?.trim() ?? "";
+            if (reply) return res.json({ reply, configured: true });
+          }
+        } catch (err) {
+          console.error("[OpenRouter] Fetch failed:", err);
         }
       }
 
       if (HF_KEY) {
-        const r = await fetch("https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3", {
-          method: "POST",
-          headers: { "Authorization": `Bearer ${HF_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            inputs: messages.map(m => `${m.role === "user" ? "[INST]" : ""}${m.content}${m.role === "user" ? "[/INST]" : ""}`).join("\n"),
-            parameters: { max_new_tokens: 300 },
-          }),
-        });
-        if (r.ok) {
-          const json = await r.json() as Array<{ generated_text: string }>;
-          const raw = json[0]?.generated_text ?? "";
-          const reply = raw.split("[/INST]").pop()?.trim() ?? "Maaf, tidak bisa memproses.";
-          return res.json({ reply, configured: true });
+        try {
+          const r = await fetch("https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${HF_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              inputs: messages.map(m => `${m.role === "user" ? "[INST]" : ""}${m.content}${m.role === "user" ? "[/INST]" : ""}`).join("\n"),
+              parameters: { max_new_tokens: 400 },
+            }),
+          });
+          if (r.ok) {
+            const json = await r.json() as Array<{ generated_text: string }>;
+            const raw = json[0]?.generated_text ?? "";
+            const reply = raw.split("[/INST]").pop()?.trim() ?? "";
+            if (reply) return res.json({ reply, configured: true });
+          } else {
+            console.error("[HuggingFace] Error:", r.status);
+          }
+        } catch (err) {
+          console.error("[HuggingFace] Fetch failed:", err);
         }
       }
 
