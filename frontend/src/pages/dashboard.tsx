@@ -2126,18 +2126,18 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* ── MIDDLE: inline asset breakdown ── */}
-              <div className="flex-grow flex items-center py-2">
-                <div className="flex items-center justify-between w-full">
-                  {categories.map(({ label, val, testId, color }) => (
-                    <div key={label} className="flex items-center gap-1.5 min-w-0">
-                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${color}`} />
-                      <div className="min-w-0">
-                        <span className="text-[10px] text-white/50 block leading-none mb-0.5 truncate">{label}</span>
-                        <p className="text-[12px] font-mono font-medium leading-none truncate" data-testid={testId} style={amtStyle}>
-                          {hidden ? MASKED_SHORT : formatShort(val, language)}
-                        </p>
+              {/* ── MIDDLE: 3-col asset breakdown grid ── */}
+              <div className="flex-grow flex items-center">
+                <div className="grid grid-cols-3 gap-2 w-full">
+                  {categories.map(({ icon: Icon, label, val, testId, color }) => (
+                    <div key={label} className="bg-white/[0.06] rounded-lg px-2 py-3 flex flex-col gap-1 min-w-0">
+                      <div className="flex items-center gap-1">
+                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${color}`} />
+                        <span className="text-[9px] text-white/40 font-medium truncate leading-none">{label}</span>
                       </div>
+                      <p className="text-[12px] font-mono font-semibold leading-none truncate" data-testid={testId} style={amtStyle}>
+                        {hidden ? MASKED_SHORT : formatShort(val, language)}
+                      </p>
                     </div>
                   ))}
                 </div>
