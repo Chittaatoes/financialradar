@@ -119,8 +119,12 @@ function AddStockSheet({
   const lembar = (Number(lots) || 0) * 100;
   const totalCost = lembar * (Number(buyPrice) || 0);
   const currentValue = lembar * stock.price;
-  const estimatedPL = currentValue - totalCost;
-  const estimatedPLPct = totalCost > 0 ? (estimatedPL / totalCost) * 100 : 0;
+
+  // Hide bottom nav while sheet is open
+  useEffect(() => {
+    document.body.classList.add("sheet-open");
+    return () => document.body.classList.remove("sheet-open");
+  }, []);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -217,13 +221,6 @@ function AddStockSheet({
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Nilai saat ini ({lembar.toLocaleString()} × Rp {stock.price.toLocaleString("id-ID")})</span>
                 <span className="font-mono font-medium text-foreground">{fmtRp(currentValue)}</span>
-              </div>
-              <div className="border-t border-border pt-2 flex justify-between items-center">
-                <span className="text-muted-foreground font-medium">Estimasi Untung/Rugi</span>
-                <span className={`font-mono font-bold text-[13px] ${estimatedPL >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                  {estimatedPL >= 0 ? "+" : ""}{fmtRp(Math.abs(estimatedPL))}
-                  <span className="text-[10px] ml-1">({estimatedPLPct >= 0 ? "+" : ""}{estimatedPLPct.toFixed(2)}%)</span>
-                </span>
               </div>
             </div>
           </div>

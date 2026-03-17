@@ -428,3 +428,8 @@ input[type="date"] {
 input[type="date"]::-webkit-date-and-time-value {
   text-align: left;
 }
+
+/* Hide bottom nav while any bottom sheet is open */
+body.sheet-open [data-testid="mobile-bottom-nav"] {
+  display: none;
+}
