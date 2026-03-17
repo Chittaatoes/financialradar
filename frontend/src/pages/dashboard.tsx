@@ -1425,6 +1425,98 @@ function StackedBar({ hidden, cashPct, bankPct, ePct }: { hidden: boolean; cashP
   );
 }
 
+// Rotating data-driven insight badge for the Total Asset card.
+// Generates a pool of insights from asset composition, goal progress, and savings ratio,
+// then cycles through them every 4 seconds with a fade+slide animation.
+function AssetInsightBadge({
+  totalAset, cashPct, bankPct, ePct, goalPct, totalSaving, hidden,
+}: {
+  totalAset: number; cashPct: number; bankPct: number; ePct: number;
+  goalPct: number; totalSaving: number; hidden: boolean;
+}) {
+  const [idx, setIdx] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  const insights = useMemo(() => {
+    if (totalAset === 0) return [];
+    const pool: { icon: string; text: string }[] = [];
+    const savingPct = Math.round((totalSaving / totalAset) * 100);
+
+    if (bankPct >= 50)       pool.push({ icon: "🏦", text: `Bank mendominasi ${bankPct}% aset kamu` });
+    else if (cashPct >= 40)  pool.push({ icon: "💵", text: `Cash ${cashPct}% dari aset — pertimbangkan alihkan ke tabungan` });
+    else if (ePct >= 30)     pool.push({ icon: "📱", text: `E-Wallet ${ePct}% aset kamu — cukup likuid` });
+    else if (savingPct >= 50) pool.push({ icon: "🏆", text: `${savingPct}% aset kamu sudah di tabungan — luar biasa!` });
+    else                     pool.push({ icon: "✅", text: "Aset kamu terdiversifikasi dengan baik" });
+
+    if (cashPct > 50)              pool.push({ icon: "⚠️", text: "Terlalu banyak di cash, potensi kurang optimal" });
+    else if (bankPct >= 60)        pool.push({ icon: "👍", text: "Komposisi aset kamu cukup sehat" });
+    else if (ePct > 40)            pool.push({ icon: "💡", text: "E-Wallet tinggi, pertimbangkan pindah ke tabungan" });
+    else if (savingPct >= 30)      pool.push({ icon: "💚", text: `Alokasi tabungan ${savingPct}% — kamu di jalur yang tepat` });
+
+    if (goalPct < 30)       pool.push({ icon: "🎯", text: "Coba percepat kontribusi ke target dana daruratmu" });
+    else if (goalPct >= 50) pool.push({ icon: "🚀", text: `${goalPct}% menuju target! Terus pertahankan` });
+
+    if (cashPct > 30) pool.push({ icon: "💡", text: "Coba alokasikan sebagian cash ke rekening tabungan" });
+
+    return pool;
+  }, [totalAset, cashPct, bankPct, ePct, goalPct, totalSaving]);
+
+  useEffect(() => {
+    if (insights.length <= 1) return;
+    const timer = setInterval(() => {
+      setVisible(false);
+      const swap = setTimeout(() => { setIdx(i => (i + 1) % insights.length); setVisible(true); }, 350);
+      return () => clearTimeout(swap);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [insights.length]);
+
+  if (hidden) return null;
+
+  const isEmpty = totalAset === 0;
+  const current = isEmpty ? null : insights[idx % Math.max(insights.length, 1)];
+  const showDots = insights.length > 1;
+
+  return (
+    <div className="space-y-2 border-t border-white/[0.06] pt-2.5">
+      <div className="flex items-center gap-1.5">
+        <Lightbulb className="w-3 h-3 text-emerald-400/60 shrink-0" />
+        <span className="text-[9px] font-semibold text-white/30 uppercase tracking-widest">Insight Aset</span>
+      </div>
+      <div
+        className="rounded-lg px-3 py-2.5 bg-white/[0.04]"
+        style={{
+          opacity: visible ? 1 : 0,
+          transform: visible ? "translateY(0)" : "translateY(5px)",
+          transition: "opacity 350ms ease, transform 350ms ease",
+        }}
+      >
+        <div className="flex items-start gap-2">
+          <span className="text-sm leading-none mt-0.5 shrink-0">{isEmpty ? "💡" : current?.icon}</span>
+          <span className="text-[11px] text-white/60 leading-snug">
+            {isEmpty ? "Mulai catat aset untuk melihat insight kamu" : current?.text}
+          </span>
+        </div>
+      </div>
+      {showDots && (
+        <div className="flex justify-center items-center gap-1">
+          {insights.map((_, i) => (
+            <div
+              key={i}
+              className="rounded-full transition-all duration-300"
+              style={{
+                width: i === idx % insights.length ? 10 : 4,
+                height: 4,
+                background: i === idx % insights.length ? "rgba(52,211,153,0.5)" : "rgba(255,255,255,0.15)",
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Shows monthly budget overview: safe daily budget, income vs expense, progress bar, status.
 // Uses cycle-aware data when a custom budget cycle is active.
 function FinancialSummaryCard({
@@ -2003,7 +2095,6 @@ export default function Dashboard() {
         ];
 
         const dominantCat = categories.reduce((a, b) => (b.pct > a.pct ? b : a), categories[0]);
-        const insightText = t.dashboard.insightDominates(dominantCat.label, dominantCat.pct);
 
         const totalAssetsCard = (
           <Card className="border-0 text-white h-full" style={{ background: "linear-gradient(135deg, #1E2F26 0%, #16221C 100%)" }} data-testid="card-total-assets">
@@ -2089,13 +2180,16 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* ── Insight line ── */}
-              {totalAset > 0 && !hidden && (
-                <div className="flex items-center gap-1.5 pt-0.5 border-t border-white/[0.06]">
-                  <Lightbulb className="w-3 h-3 text-emerald-400/60 shrink-0" />
-                  <span className="text-[10px] text-white/45 leading-snug">{insightText}</span>
-                </div>
-              )}
+              {/* ── Insight Aset ── */}
+              <AssetInsightBadge
+                totalAset={totalAset}
+                cashPct={cashPct}
+                bankPct={bankPct}
+                ePct={ePct}
+                goalPct={goalPct}
+                totalSaving={dashboard?.totalSaving ?? 0}
+                hidden={hidden}
+              />
 
             </CardContent>
           </Card>
