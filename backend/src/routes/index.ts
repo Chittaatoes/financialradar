@@ -32,8 +32,8 @@ import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../db";
 import { users } from "../../shared/models/auth";
-import { userProfiles } from "../../shared/schema";
-import { eq, sql, count } from "drizzle-orm";
+import { userProfiles, stockHoldings } from "../../shared/schema";
+import { eq, sql, count, and } from "drizzle-orm";
 
 // === REQUEST VALIDATION SCHEMAS ===
 // Zod schemas for validating POST/PATCH request bodies before database operations.
@@ -2429,6 +2429,79 @@ STYLE
   // ══════════════════════════════════════════════════════
   // INVEST FEATURE — Stock quotes via Yahoo Finance
   // ══════════════════════════════════════════════════════
+
+  // GET /api/portfolio — list all stock holdings for user
+  app.get("/api/portfolio", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const holdings = await db
+        .select()
+        .from(stockHoldings)
+        .where(eq(stockHoldings.userId, userId))
+        .orderBy(stockHoldings.createdAt);
+      res.json(holdings);
+    } catch (err) {
+      console.error("Portfolio GET error:", err);
+      res.status(500).json({ message: "Failed to fetch portfolio" });
+    }
+  });
+
+  // POST /api/portfolio — add or update a holding
+  app.post("/api/portfolio", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const { symbol, lots, avgPrice, buyDate } = req.body;
+      if (!symbol || !lots || !avgPrice) return res.status(400).json({ message: "symbol, lots, avgPrice required" });
+
+      const sym = String(symbol).toUpperCase().trim();
+      const withJK = sym.endsWith(".JK") ? sym : `${sym}.JK`;
+
+      // Check if holding already exists → update (add lots, recalculate avg)
+      const existing = await db
+        .select()
+        .from(stockHoldings)
+        .where(and(eq(stockHoldings.userId, userId), eq(stockHoldings.symbol, withJK)))
+        .limit(1);
+
+      if (existing.length > 0) {
+        const prev = existing[0];
+        const prevLots = Number(prev.lots);
+        const prevAvg = Number(prev.avgPrice);
+        const newLots = Number(lots);
+        const newAvg = Number(avgPrice);
+        const totalLots = prevLots + newLots;
+        const mergedAvg = ((prevAvg * prevLots * 100) + (newAvg * newLots * 100)) / (totalLots * 100);
+        const [updated] = await db
+          .update(stockHoldings)
+          .set({ lots: totalLots, avgPrice: String(mergedAvg.toFixed(2)), buyDate: buyDate || prev.buyDate })
+          .where(eq(stockHoldings.id, prev.id))
+          .returning();
+        return res.json(updated);
+      }
+
+      const [inserted] = await db
+        .insert(stockHoldings)
+        .values({ userId, symbol: withJK, lots: Number(lots), avgPrice: String(Number(avgPrice).toFixed(2)), buyDate: buyDate || null })
+        .returning();
+      res.json(inserted);
+    } catch (err) {
+      console.error("Portfolio POST error:", err);
+      res.status(500).json({ message: "Failed to save holding" });
+    }
+  });
+
+  // DELETE /api/portfolio/:id — remove a holding
+  app.delete("/api/portfolio/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const id = Number(req.params.id);
+      await db.delete(stockHoldings).where(and(eq(stockHoldings.id, id), eq(stockHoldings.userId, userId)));
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("Portfolio DELETE error:", err);
+      res.status(500).json({ message: "Failed to delete holding" });
+    }
+  });
 
   app.get("/api/invest/quote/:ticker", isAuthenticated, async (req, res) => {
     const { ticker } = req.params;

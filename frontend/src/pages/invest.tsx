@@ -1,18 +1,23 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, TrendingDown, Plus, Trash2, Search, ChevronDown, ChevronUp, Lightbulb } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { TrendingUp, TrendingDown, Plus, Trash2, Search, X, Lightbulb, CalendarDays, Layers } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 
+// ── Types ──────────────────────────────────────────────────────────────
 interface StockQuote {
   symbol: string; name: string; price: number;
   change: number; changePct: number; currency: string; marketStatus: "open" | "closed";
 }
-interface PortfolioItem { symbol: string; shares: number; avgPrice: number }
+interface DBHolding {
+  id: number; userId: string; symbol: string;
+  lots: number; avgPrice: string; buyDate: string | null; createdAt: string;
+}
 
+// ── Constants ──────────────────────────────────────────────────────────
 const ALL_STOCKS = [
   { symbol: "BBCA.JK", name: "Bank Central Asia BCA" },
   { symbol: "BBRI.JK", name: "Bank Rakyat Indonesia BRI" },
@@ -29,15 +34,17 @@ const ALL_STOCKS = [
   { symbol: "PTBA.JK", name: "Bukit Asam Batu Bara" },
   { symbol: "MDKA.JK", name: "Merdeka Copper Gold" },
 ];
-
 const POPULAR = ALL_STOCKS.slice(0, 5);
 
+// ── Helpers ────────────────────────────────────────────────────────────
 function fmtRp(n: number) {
   if (n >= 1_000_000_000) return `Rp ${(n / 1_000_000_000).toFixed(2)}M`;
   if (n >= 1_000_000) return `Rp ${(n / 1_000_000).toFixed(2)}Jt`;
   return `Rp ${n.toLocaleString("id-ID")}`;
 }
+function today() { return new Date().toISOString().slice(0, 10); }
 
+// ── Sub-components ─────────────────────────────────────────────────────
 function ChangePill({ v }: { v: number }) {
   const up = v >= 0;
   return (
@@ -50,10 +57,8 @@ function ChangePill({ v }: { v: number }) {
 
 function StockRow({ symbol, onAdd, isLast }: { symbol: string; onAdd?: (q: StockQuote) => void; isLast?: boolean }) {
   const { data, isLoading } = useQuery<StockQuote>({
-    queryKey: [`/api/invest/quote/${symbol}`],
-    staleTime: 5 * 60_000, retry: 1, gcTime: 10 * 60_000,
+    queryKey: [`/api/invest/quote/${symbol}`], staleTime: 5 * 60_000, retry: 1,
   });
-
   if (isLoading) return (
     <div className={`flex items-center justify-between py-3 ${!isLast ? "border-b border-border" : ""}`}>
       <div className="flex items-center gap-2.5">
@@ -63,39 +68,34 @@ function StockRow({ symbol, onAdd, isLast }: { symbol: string; onAdd?: (q: Stock
       <Skeleton className="h-4 w-20" />
     </div>
   );
-
   if (!data) return (
     <div className={`flex items-center py-3 ${!isLast ? "border-b border-border" : ""}`}>
       <span className="text-xs text-muted-foreground">Data {symbol} tidak tersedia</span>
     </div>
   );
-
   const ticker = data.symbol.replace(".JK", "");
-  const up = data.changePct >= 0;
   return (
     <div className={`flex items-center justify-between py-3 ${!isLast ? "border-b border-border" : ""}`}>
       <div className="flex items-center gap-2.5">
         <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
-          <span className="text-[9px] font-bold text-muted-foreground leading-tight text-center px-0.5">{ticker}</span>
+          <span className="text-[9px] font-bold text-muted-foreground text-center px-0.5">{ticker}</span>
         </div>
         <div>
           <p className="text-[13px] font-medium text-foreground leading-tight">{data.name || ticker}</p>
           <div className="flex items-center gap-1.5 mt-0.5">
             <ChangePill v={data.changePct} />
-            <span className={`text-[10px] font-mono ${up ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-              {up ? "+" : ""}{data.change.toFixed(0)}
+            <span className={`text-[10px] font-mono ${data.changePct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+              {data.changePct >= 0 ? "+" : ""}{data.change.toFixed(0)}
             </span>
           </div>
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <p className="text-[13px] font-mono font-semibold text-foreground">
-          Rp {data.price.toLocaleString("id-ID")}
-        </p>
+        <p className="text-[13px] font-mono font-semibold text-foreground">Rp {data.price.toLocaleString("id-ID")}</p>
         {onAdd && (
           <button onClick={() => onAdd(data)}
-            className="w-7 h-7 rounded-lg bg-muted hover:bg-primary/10 transition-colors flex items-center justify-center">
-            <Plus className="w-3.5 h-3.5 text-muted-foreground" />
+            className="w-7 h-7 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors flex items-center justify-center">
+            <Plus className="w-3.5 h-3.5 text-primary" />
           </button>
         )}
       </div>
@@ -103,26 +103,157 @@ function StockRow({ symbol, onAdd, isLast }: { symbol: string; onAdd?: (q: Stock
   );
 }
 
-function InvestInsight({ portfolio, quotes }: { portfolio: PortfolioItem[]; quotes: Map<string, StockQuote> }) {
-  if (portfolio.length === 0) return null;
+// ── Add Stock Bottom Sheet ─────────────────────────────────────────────
+function AddStockSheet({
+  stock, onClose, onSaved,
+}: {
+  stock: StockQuote;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [lots, setLots] = useState("1");
+  const [buyPrice, setBuyPrice] = useState(String(stock.price));
+  const [buyDate, setBuyDate] = useState(today());
+  const overlayRef = useRef<HTMLDivElement>(null);
 
-  const totalValue = portfolio.reduce((s, i) => s + (quotes.get(i.symbol)?.price ?? i.avgPrice) * i.shares, 0);
-  const totalCost = portfolio.reduce((s, i) => s + i.avgPrice * i.shares, 0);
+  const lembar = (Number(lots) || 0) * 100;
+  const totalCost = lembar * (Number(buyPrice) || 0);
+  const currentValue = lembar * stock.price;
+  const estimatedPL = currentValue - totalCost;
+  const estimatedPLPct = totalCost > 0 ? (estimatedPL / totalCost) * 100 : 0;
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/portfolio", {
+        symbol: stock.symbol,
+        lots: Number(lots),
+        avgPrice: Number(buyPrice),
+        buyDate,
+      });
+      return res.json();
+    },
+    onSuccess: () => { onSaved(); onClose(); },
+  });
+
+  // Close on overlay click
+  const handleOverlay = (e: React.MouseEvent) => {
+    if (e.target === overlayRef.current) onClose();
+  };
+
+  return (
+    <div
+      ref={overlayRef}
+      onClick={handleOverlay}
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm"
+    >
+      <div className="w-full max-w-lg bg-card rounded-t-3xl border border-border shadow-2xl p-5 pb-8 animate-in slide-in-from-bottom duration-300">
+
+        {/* Handle */}
+        <div className="w-10 h-1 rounded-full bg-border mx-auto mb-4" />
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
+              <span className="text-[10px] font-bold text-muted-foreground">{stock.symbol.replace(".JK", "")}</span>
+            </div>
+            <div>
+              <p className="text-[14px] font-semibold text-foreground leading-tight">{stock.name}</p>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[12px] font-mono text-muted-foreground">Rp {stock.price.toLocaleString("id-ID")}</span>
+                <ChangePill v={stock.changePct} />
+              </div>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors">
+            <X className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        {/* Inputs */}
+        <div className="space-y-3">
+          {/* Date */}
+          <div>
+            <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium mb-1.5">
+              <CalendarDays className="w-3 h-3" /> Tanggal Beli
+            </label>
+            <Input type="date" className="h-10 text-sm" value={buyDate} onChange={e => setBuyDate(e.target.value)} max={today()} />
+          </div>
+
+          {/* Lots + Price side by side */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium mb-1.5">
+                <Layers className="w-3 h-3" /> Jumlah Lot
+              </label>
+              <Input type="number" min="1" className="h-10 text-sm font-mono"
+                placeholder="1" value={lots} onChange={e => setLots(e.target.value)} />
+              <p className="text-[10px] text-muted-foreground mt-1">= {lembar.toLocaleString("id-ID")} lembar</p>
+            </div>
+            <div>
+              <label className="text-[11px] text-muted-foreground font-medium mb-1.5 block">Harga Beli / Lembar</label>
+              <Input type="number" className="h-10 text-sm font-mono"
+                placeholder={String(stock.price)} value={buyPrice} onChange={e => setBuyPrice(e.target.value)} />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Harga pasar: Rp {stock.price.toLocaleString("id-ID")}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Estimasi rincian */}
+        {lembar > 0 && Number(buyPrice) > 0 && (
+          <div className="mt-4 rounded-2xl bg-muted border border-border p-4 space-y-2.5">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Estimasi Rincian</p>
+            <div className="space-y-1.5 text-[12px]">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{Number(lots)} lot × 100 lembar</span>
+                <span className="font-mono font-medium text-foreground">{lembar.toLocaleString("id-ID")} lbr</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Modal ({lembar.toLocaleString()} × Rp {Number(buyPrice).toLocaleString("id-ID")})</span>
+                <span className="font-mono font-semibold text-foreground">{fmtRp(totalCost)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Nilai saat ini ({lembar.toLocaleString()} × Rp {stock.price.toLocaleString("id-ID")})</span>
+                <span className="font-mono font-medium text-foreground">{fmtRp(currentValue)}</span>
+              </div>
+              <div className="border-t border-border pt-2 flex justify-between items-center">
+                <span className="text-muted-foreground font-medium">Estimasi Untung/Rugi</span>
+                <span className={`font-mono font-bold text-[13px] ${estimatedPL >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                  {estimatedPL >= 0 ? "+" : ""}{fmtRp(Math.abs(estimatedPL))}
+                  <span className="text-[10px] ml-1">({estimatedPLPct >= 0 ? "+" : ""}{estimatedPLPct.toFixed(2)}%)</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Save button */}
+        <Button
+          className="w-full h-11 mt-4 text-sm font-semibold rounded-2xl"
+          onClick={() => save.mutate()}
+          disabled={!lots || !buyPrice || save.isPending}
+        >
+          {save.isPending ? "Menyimpan..." : `Tambah ${stock.symbol.replace(".JK", "")} ke Portofolio`}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Insight ────────────────────────────────────────────────────────────
+function InvestInsight({ holdings, quotes }: { holdings: DBHolding[]; quotes: Map<string, StockQuote> }) {
+  if (holdings.length === 0) return null;
+  const totalValue = holdings.reduce((s, h) => s + (quotes.get(h.symbol)?.price ?? Number(h.avgPrice)) * h.lots * 100, 0);
+  const totalCost = holdings.reduce((s, h) => s + Number(h.avgPrice) * h.lots * 100, 0);
   const plPct = totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0;
-
   let msg = "";
-  if (portfolio.length === 1) {
-    msg = `Portofolio kamu hanya berisi 1 saham. Pertimbangkan diversifikasi ke sektor lain untuk mengurangi risiko.`;
-  } else if (plPct >= 15) {
-    msg = `Keuntungan kamu sudah ${plPct.toFixed(1)}% — pertimbangkan untuk sebagian profit taking atau tambah posisi di saham defensif.`;
-  } else if (plPct <= -10) {
-    msg = `Portofolio sedang merugi ${Math.abs(plPct).toFixed(1)}%. Evaluasi apakah ini koreksi sementara atau ada perubahan fundamental.`;
-  } else if (portfolio.length >= 5) {
-    msg = `Kamu sudah diversifikasi dengan ${portfolio.length} saham. Pastikan kamu rutin review kinerja masing-masing.`;
-  } else {
-    msg = `Kamu punya ${portfolio.length} saham. Kinerja portofolio ${plPct >= 0 ? "+" : ""}${plPct.toFixed(1)}% dari modal awal.`;
-  }
-
+  if (holdings.length === 1) msg = "Portofolio kamu hanya berisi 1 saham. Pertimbangkan diversifikasi ke sektor lain untuk kurangi risiko.";
+  else if (plPct >= 15) msg = `Keuntungan kamu sudah ${plPct.toFixed(1)}% — pertimbangkan profit taking atau tambah posisi di saham defensif.`;
+  else if (plPct <= -10) msg = `Portofolio merugi ${Math.abs(plPct).toFixed(1)}%. Evaluasi apakah ini koreksi sementara atau ada perubahan fundamental.`;
+  else if (holdings.length >= 5) msg = `Diversifikasi ${holdings.length} saham sudah bagus. Rutin review kinerja masing-masing setiap bulan.`;
+  else msg = `${holdings.length} saham di portofoliomu. Kinerja ${plPct >= 0 ? "+" : ""}${plPct.toFixed(1)}% dari modal awal.`;
   return (
     <div className="rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 px-3.5 py-3 flex gap-2.5">
       <Lightbulb className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
@@ -134,31 +265,35 @@ function InvestInsight({ portfolio, quotes }: { portfolio: PortfolioItem[]; quot
   );
 }
 
+// ── Main Page ──────────────────────────────────────────────────────────
 export default function InvestPage() {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [manualSearched, setManualSearched] = useState<string[]>([]);
-  const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
-  const [addSym, setAddSym] = useState("");
-  const [addShares, setAddShares] = useState("");
-  const [addPrice, setAddPrice] = useState("");
-  const [showManual, setShowManual] = useState(false);
+  const [addSheet, setAddSheet] = useState<StockQuote | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const quotes = new Map<string, StockQuote>();
-  portfolio.forEach(item => {
-    const q = queryClient.getQueryData<StockQuote>([`/api/invest/quote/${item.symbol}`]);
-    if (q) quotes.set(item.symbol, q);
+  // DB portfolio
+  const { data: holdings = [] } = useQuery<DBHolding[]>({
+    queryKey: ["/api/portfolio"], staleTime: 0, gcTime: 0, refetchOnMount: true,
   });
 
-  // Debounce search 300ms
+  // Prefetch quotes for portfolio holdings
+  const quotes = new Map<string, StockQuote>();
+  holdings.forEach(h => {
+    const q = qc.getQueryData<StockQuote>([`/api/invest/quote/${h.symbol}`]);
+    if (q) quotes.set(h.symbol, q);
+  });
+
+  // Debounce 300ms
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => setDebouncedSearch(search), 300);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [search]);
 
-  // Fuzzy search: partial match on ticker + name
+  // Fuzzy search
   const kw = debouncedSearch.toLowerCase().replace(/\s/g, "");
   const listMatches = kw.length >= 1
     ? ALL_STOCKS.filter(s =>
@@ -172,184 +307,164 @@ export default function InvestPage() {
       })
     : [];
 
-  // Manual ticker lookup (symbols not in the list)
-  const handleManualSearch = useCallback(() => {
+  const handleManualSearch = () => {
     const sym = search.trim().toUpperCase();
     if (!sym) return;
     const withJK = sym.endsWith(".JK") ? sym : `${sym}.JK`;
     const inList = ALL_STOCKS.find(s => s.symbol === withJK);
-    if (!inList) {
-      setManualSearched(p => p.includes(withJK) ? p : [...p, withJK]);
-    }
-    setSearch("");
-    setDebouncedSearch("");
-  }, [search]);
+    if (!inList) setManualSearched(p => p.includes(withJK) ? p : [...p, withJK]);
+    setSearch(""); setDebouncedSearch("");
+  };
 
   const isSearching = debouncedSearch.length >= 1;
 
-  const addToPortfolio = (q: StockQuote) => {
-    if (portfolio.find(p => p.symbol === q.symbol)) return;
-    setPortfolio(p => [...p, { symbol: q.symbol, shares: 100, avgPrice: q.price }]);
-  };
+  // Delete holding
+  const deleteHolding = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/portfolio/${id}`);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] }),
+  });
 
-  const addManual = () => {
-    const sym = addSym.toUpperCase().trim();
-    if (!sym || !addShares) return;
-    const withJK = sym.endsWith(".JK") ? sym : `${sym}.JK`;
-    setPortfolio(p => {
-      const idx = p.findIndex(i => i.symbol === withJK);
-      if (idx >= 0) {
-        const up = [...p];
-        up[idx] = { ...up[idx], shares: up[idx].shares + Number(addShares), avgPrice: Number(addPrice) || up[idx].avgPrice };
-        return up;
-      }
-      return [...p, { symbol: withJK, shares: Number(addShares), avgPrice: Number(addPrice) || 0 }];
-    });
-    setAddSym(""); setAddShares(""); setAddPrice("");
-    setShowManual(false);
-  };
-
-  const totalValue = portfolio.reduce((s, i) => s + (quotes.get(i.symbol)?.price ?? i.avgPrice) * i.shares, 0);
-  const totalCost = portfolio.reduce((s, i) => s + i.avgPrice * i.shares, 0);
+  // Portfolio totals
+  const totalValue = holdings.reduce((s, h) => s + (quotes.get(h.symbol)?.price ?? Number(h.avgPrice)) * h.lots * 100, 0);
+  const totalCost = holdings.reduce((s, h) => s + Number(h.avgPrice) * h.lots * 100, 0);
   const totalPL = totalValue - totalCost;
   const totalPLPct = totalCost > 0 ? (totalPL / totalCost) * 100 : 0;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
+    <>
+      <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
 
-      <div>
-        <h1 className="text-lg font-semibold text-foreground">Investasi</h1>
-        <p className="text-xs text-muted-foreground">Pantau harga saham Indonesia</p>
-      </div>
-
-      {/* Search */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-          <Input
-            className="pl-9 h-9 text-sm"
-            placeholder="Cari saham: BCA, Bank, Telkom…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleManualSearch()}
-          />
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Investasi</h1>
+          <p className="text-xs text-muted-foreground">Pantau harga saham Indonesia</p>
         </div>
-        <Button size="sm" className="h-9 px-4 text-xs shrink-0" onClick={handleManualSearch}>Cari</Button>
-      </div>
 
-      {/* Search results — fuzzy match from list + manual lookups */}
-      {isSearching && (
-        <Card className="rounded-2xl border border-border shadow-sm">
-          <CardContent className="px-4 py-2">
-            {listMatches.length > 0 ? (
-              <>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide pt-2 pb-1">
-                  Hasil untuk &ldquo;{debouncedSearch}&rdquo;
-                </p>
-                {listMatches.map((s, i) => (
-                  <StockRow key={s.symbol} symbol={s.symbol} onAdd={addToPortfolio} isLast={i === listMatches.length - 1} />
-                ))}
-              </>
-            ) : (
-              <div className="py-3 space-y-1">
-                <p className="text-[12px] text-muted-foreground">
-                  Tidak ditemukan untuk &ldquo;{debouncedSearch}&rdquo; di daftar saham.
-                </p>
-                <p className="text-[11px] text-muted-foreground/60">
-                  Tekan <strong>Cari</strong> untuk lookup langsung ke bursa.
-                </p>
-              </div>
-            )}
-            {/* Manual lookups that aren't in the list */}
-            {manualSearched.length > 0 && (
-              <>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide pt-3 pb-1">Pencarian manual</p>
-                {manualSearched.map((s, i) => (
-                  <StockRow key={s} symbol={s} onAdd={addToPortfolio} isLast={i === manualSearched.length - 1} />
-                ))}
-              </>
-            )}
-          </CardContent>
-        </Card>
-      )}
+        {/* Search */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+            <Input className="pl-9 h-9 text-sm"
+              placeholder="Cari saham: BCA, Bank, Telkom…"
+              value={search} onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleManualSearch()} />
+          </div>
+          <Button size="sm" className="h-9 px-4 text-xs shrink-0" onClick={handleManualSearch}>Cari</Button>
+        </div>
 
-      {/* Popular stocks — hidden when search is active */}
-      {!isSearching && (
-        <Card className="rounded-2xl border border-border shadow-sm">
-          <CardContent className="px-4 py-2">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wide pt-2 pb-1">Saham Populer IDX</p>
-            {POPULAR.map((s, i) => (
-              <StockRow key={s.symbol} symbol={s.symbol} onAdd={addToPortfolio} isLast={i === POPULAR.length - 1} />
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Portfolio */}
-      <Card className="rounded-2xl border border-border shadow-sm">
-        <CardContent className="px-4 pt-4 pb-4 space-y-3">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Portofolio Saya</p>
-
-          {portfolio.length > 0 && (
-            <>
-              {/* P&L summary */}
-              <div className={`rounded-xl border p-3.5 ${totalPL >= 0 ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20" : "bg-red-50 border-red-200 dark:bg-red-500/10 dark:border-red-500/20"}`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[10px] text-muted-foreground mb-0.5">Nilai Portofolio</p>
-                    <p className="text-xl font-bold font-mono text-foreground">{fmtRp(totalValue)}</p>
-                  </div>
-                  {totalCost > 0 && (
-                    <div className="text-right">
-                      <p className="text-[10px] text-muted-foreground mb-0.5">Untung / Rugi</p>
-                      <p className={`text-[15px] font-bold font-mono ${totalPL >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                        {totalPL >= 0 ? "+" : "-"}{fmtRp(Math.abs(totalPL))}
-                      </p>
-                      <p className={`text-[11px] font-semibold ${totalPL >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                        {totalPLPct >= 0 ? "▲" : "▼"} {totalPLPct >= 0 ? "+" : ""}{totalPLPct.toFixed(2)}%
-                      </p>
-                    </div>
-                  )}
+        {/* Search results */}
+        {isSearching && (
+          <Card className="rounded-2xl border border-border shadow-sm">
+            <CardContent className="px-4 py-2">
+              {listMatches.length > 0 ? (
+                <>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wide pt-2 pb-1">
+                    Hasil untuk &ldquo;{debouncedSearch}&rdquo;
+                  </p>
+                  {listMatches.map((s, i) => (
+                    <StockRow key={s.symbol} symbol={s.symbol} isLast={i === listMatches.length - 1}
+                      onAdd={q => setAddSheet(q)} />
+                  ))}
+                </>
+              ) : (
+                <div className="py-3">
+                  <p className="text-[12px] text-muted-foreground">Tidak ditemukan untuk &ldquo;{debouncedSearch}&rdquo;</p>
+                  <p className="text-[11px] text-muted-foreground/60 mt-0.5">Tekan Cari untuk lookup langsung ke bursa.</p>
                 </div>
-              </div>
+              )}
+              {manualSearched.length > 0 && (
+                <>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wide pt-3 pb-1">Pencarian manual</p>
+                  {manualSearched.map((s, i) => (
+                    <StockRow key={s} symbol={s} isLast={i === manualSearched.length - 1}
+                      onAdd={q => setAddSheet(q)} />
+                  ))}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
-              {/* Insight */}
-              <InvestInsight portfolio={portfolio} quotes={quotes} />
+        {/* Popular stocks — hidden while searching */}
+        {!isSearching && (
+          <Card className="rounded-2xl border border-border shadow-sm">
+            <CardContent className="px-4 py-2">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide pt-2 pb-1">Saham Populer IDX</p>
+              {POPULAR.map((s, i) => (
+                <StockRow key={s.symbol} symbol={s.symbol} isLast={i === POPULAR.length - 1}
+                  onAdd={q => setAddSheet(q)} />
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
-              {/* Holdings */}
-              <div>
-                {portfolio.map((item, idx) => {
-                  const q = quotes.get(item.symbol);
-                  const cur = q?.price ?? item.avgPrice;
-                  const val = cur * item.shares;
-                  const pl = item.avgPrice > 0 ? (cur - item.avgPrice) * item.shares : 0;
-                  const plp = item.avgPrice > 0 ? ((cur - item.avgPrice) / item.avgPrice) * 100 : 0;
-                  const isUp = plp >= 0;
-                  const isLast = idx === portfolio.length - 1;
+        {/* Portfolio */}
+        <Card className="rounded-2xl border border-border shadow-sm">
+          <CardContent className="px-4 pt-4 pb-4 space-y-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Portofolio Saya</p>
+
+            {holdings.length > 0 ? (
+              <>
+                {/* P&L Summary */}
+                <div className={`rounded-xl border p-3.5 ${totalPL >= 0 ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20" : "bg-red-50 border-red-200 dark:bg-red-500/10 dark:border-red-500/20"}`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Nilai Portofolio</p>
+                      <p className="text-xl font-bold font-mono text-foreground">{fmtRp(totalValue)}</p>
+                    </div>
+                    {totalCost > 0 && (
+                      <div className="text-right">
+                        <p className="text-[10px] text-muted-foreground mb-0.5">Untung / Rugi</p>
+                        <p className={`text-[15px] font-bold font-mono ${totalPL >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                          {totalPL >= 0 ? "+" : "-"}{fmtRp(Math.abs(totalPL))}
+                        </p>
+                        <p className={`text-[11px] font-semibold ${totalPL >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                          {totalPLPct >= 0 ? "▲" : "▼"} {totalPLPct >= 0 ? "+" : ""}{totalPLPct.toFixed(2)}%
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <InvestInsight holdings={holdings} quotes={quotes} />
+
+                {/* Holdings list */}
+                {holdings.map((h, idx) => {
+                  const q = quotes.get(h.symbol);
+                  const cur = q?.price ?? Number(h.avgPrice);
+                  const lembar = h.lots * 100;
+                  const val = cur * lembar;
+                  const avgP = Number(h.avgPrice);
+                  const pl = avgP > 0 ? (cur - avgP) * lembar : 0;
+                  const plp = avgP > 0 ? ((cur - avgP) / avgP) * 100 : 0;
+                  const isLast = idx === holdings.length - 1;
                   return (
-                    <div key={item.symbol} className={`flex items-center justify-between py-3 ${!isLast ? "border-b border-border" : ""}`}>
+                    <div key={h.id} className={`flex items-center justify-between py-3 ${!isLast ? "border-b border-border" : ""}`}>
                       <div className="flex items-center gap-2.5">
                         <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
-                          <span className="text-[9px] font-bold text-muted-foreground leading-tight text-center px-0.5">{item.symbol.replace(".JK","")}</span>
+                          <span className="text-[9px] font-bold text-muted-foreground text-center px-0.5">{h.symbol.replace(".JK", "")}</span>
                         </div>
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[13px] font-semibold text-foreground">{item.symbol.replace(".JK","")}</span>
+                            <span className="text-[13px] font-semibold text-foreground">{h.symbol.replace(".JK", "")}</span>
                             {q && <ChangePill v={q.changePct} />}
                           </div>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">{item.shares} lbr · avg Rp {item.avgPrice.toLocaleString("id-ID")}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {h.lots} lot · {lembar.toLocaleString("id-ID")} lbr · avg Rp {avgP.toLocaleString("id-ID")}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="text-right">
                           <p className="text-[13px] font-mono font-semibold text-foreground">{fmtRp(val)}</p>
-                          {item.avgPrice > 0 && (
-                            <p className={`text-[10px] font-mono ${isUp ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                              {isUp ? "▲" : "▼"} {isUp ? "+" : ""}{fmtRp(Math.abs(pl))} ({plp >= 0 ? "+" : ""}{plp.toFixed(1)}%)
+                          {avgP > 0 && (
+                            <p className={`text-[10px] font-mono ${plp >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                              {plp >= 0 ? "▲ +" : "▼ "}{fmtRp(Math.abs(pl))} ({plp >= 0 ? "+" : ""}{plp.toFixed(1)}%)
                             </p>
                           )}
                         </div>
-                        <button onClick={() => setPortfolio(p => p.filter(x => x.symbol !== item.symbol))}
+                        <button onClick={() => deleteHolding.mutate(h.id)}
                           className="w-6 h-6 rounded-md hover:bg-red-100 dark:hover:bg-red-500/15 transition-colors flex items-center justify-center group">
                           <Trash2 className="w-3 h-3 text-muted-foreground group-hover:text-red-600 dark:group-hover:text-red-400" />
                         </button>
@@ -357,61 +472,29 @@ export default function InvestPage() {
                     </div>
                   );
                 })}
-              </div>
-            </>
-          )}
-
-          {portfolio.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-2">
-              Belum ada saham. Tambahkan via (+) dari daftar atau isi manual di bawah.
-            </p>
-          )}
-
-          {/* Add manually — collapsible */}
-          <div className="border-t border-border pt-3">
-            <button
-              onClick={() => setShowManual(p => !p)}
-              className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors w-full"
-            >
-              <Plus className="w-3 h-3" />
-              <span>Tambah Manual</span>
-              {showManual ? <ChevronUp className="w-3 h-3 ml-auto" /> : <ChevronDown className="w-3 h-3 ml-auto" />}
-            </button>
-
-            {showManual && (
-              <div className="mt-3 rounded-xl border border-border bg-muted/50 p-3 space-y-3">
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <p className="text-[10px] text-muted-foreground mb-1">Kode</p>
-                    <Input className="h-8 text-xs font-mono uppercase"
-                      placeholder="BBCA" value={addSym} onChange={e => setAddSym(e.target.value.toUpperCase())} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground mb-1">Lembar</p>
-                    <Input className="h-8 text-xs font-mono"
-                      type="number" placeholder="100" value={addShares} onChange={e => setAddShares(e.target.value)} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground mb-1">Harga beli</p>
-                    <Input className="h-8 text-xs font-mono"
-                      type="number" placeholder="9500" value={addPrice} onChange={e => setAddPrice(e.target.value)} />
-                  </div>
-                </div>
-                <Button size="sm" variant="outline"
-                  className="w-full h-8 text-xs"
-                  onClick={addManual} disabled={!addSym || !addShares}>
-                  <Plus className="w-3 h-3 mr-1" /> Tambah ke Portofolio
-                </Button>
+              </>
+            ) : (
+              <div className="text-center py-6 space-y-2">
+                <p className="text-sm text-muted-foreground">Portofolio masih kosong</p>
+                <p className="text-xs text-muted-foreground/60">Tap tombol <span className="font-semibold text-primary">+</span> di samping saham untuk menambahkan</p>
               </div>
             )}
-          </div>
+          </CardContent>
+        </Card>
 
-        </CardContent>
-      </Card>
+        <p className="text-[10px] text-muted-foreground/60 text-center pb-2">
+          Data via Yahoo Finance · Mungkin tertunda 15 menit · Bukan rekomendasi investasi
+        </p>
+      </div>
 
-      <p className="text-[10px] text-muted-foreground/60 text-center pb-2">
-        Data via Yahoo Finance · Mungkin tertunda 15 menit · Bukan rekomendasi investasi
-      </p>
-    </div>
+      {/* Bottom Sheet */}
+      {addSheet && (
+        <AddStockSheet
+          stock={addSheet}
+          onClose={() => setAddSheet(null)}
+          onSaved={() => qc.invalidateQueries({ queryKey: ["/api/portfolio"] })}
+        />
+      )}
+    </>
   );
 }

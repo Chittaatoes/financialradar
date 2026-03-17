@@ -317,3 +317,19 @@ export const budgetPlans = pgTable("budget_plans", {
 export const insertBudgetPlanSchema = createInsertSchema(budgetPlans).omit({ id: true, createdAt: true });
 export type BudgetPlan = typeof budgetPlans.$inferSelect;
 export type InsertBudgetPlan = z.infer<typeof insertBudgetPlanSchema>;
+
+// === STOCK HOLDINGS TABLE ===
+// Portfolio: each row is one holding entry. 1 lot = 100 lembar (IDX convention).
+export const stockHoldings = pgTable("stock_holdings", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  symbol: text("symbol").notNull(),
+  lots: integer("lots").notNull().default(1),
+  avgPrice: numeric("avg_price", { precision: 15, scale: 2 }).notNull().default("0"),
+  buyDate: date("buy_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStockHoldingSchema = createInsertSchema(stockHoldings).omit({ id: true, createdAt: true });
+export type StockHolding = typeof stockHoldings.$inferSelect;
+export type InsertStockHolding = z.infer<typeof insertStockHoldingSchema>;

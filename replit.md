@@ -235,6 +235,7 @@ Browser → Vite dev server (port 5000, /api proxy) → Express API (port 5001) 
 - `/api/market/news` — Indonesian financial news (GNews if `GNEWS_API_KEY` set, else curated fallback)
 - `/api/ai/chat` — AI financial chat (OpenRouter if `OPENROUTER_API_KEY` set, HuggingFace fallback, then rule-based)
 - `/api/invest/quote/:ticker` — IDX stock quotes via Yahoo Finance (no key required)
+- `/api/portfolio` (GET/POST/DELETE) — Stock holdings CRUD, stored in `stock_holdings` DB table
 
 ## Explore Section (New Pages v1.2)
 Four new pages added under the "Explore" sidebar section:
@@ -266,9 +267,12 @@ Four new pages added under the "Explore" sidebar section:
 - Optional API keys: `OPENROUTER_API_KEY` (Mistral-7B free), `HUGGINGFACE_API_KEY`
 
 ### Invest Page
-- Compact search bar + 5 popular IDX stocks (BBCA, BBRI, TLKM, ASII, BMRI)
-- Portfolio tracker: add via (+) button or manual form (symbol, lembar, harga beli)
-- P&L summary banner per holding + total portfolio value
+- Fuzzy search: partial match (BCA→BBCA, bank→BBCA/BBRI/BMRI), 14 IDX stocks, debounced 300ms
+- Popular stocks hidden while searching, no duplicate sections
+- **Bottom sheet** to add stocks: date, lots input (1 lot = 100 lembar), buy price, real-time P&L estimate
+- Portfolio stored in `stock_holdings` DB table — persistent across sessions
+- P&L summary with ▲/▼ indicators per holding + total portfolio value
+- Investment insight card (diversification, profit-taking advice)
 - Data via Yahoo Finance (15-min delay, no API key needed)
 
 ## Optional API Keys (Explore features)
