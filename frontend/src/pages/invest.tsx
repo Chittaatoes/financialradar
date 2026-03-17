@@ -130,7 +130,7 @@ function ChangePill({ v }: { v: number }) {
   return (
     <span className={`flex items-center gap-0.5 text-[11px] font-semibold tabular-nums ${up ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
       {up ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-      {up ? "+" : ""}{v.toFixed(2)}%
+      {Math.abs(v).toFixed(2)}%
     </span>
   );
 }
@@ -161,7 +161,7 @@ function StockRow({ symbol, onAdd, isLast }: { symbol: string; onAdd?: (q: Stock
           <div className="flex items-center gap-1.5 mt-0.5">
             <ChangePill v={data.changePct} />
             <span className={`text-[10px] font-mono ${data.changePct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-              {data.changePct >= 0 ? "+" : ""}{data.change.toFixed(0)}
+              {Math.abs(data.change).toFixed(0)}
             </span>
           </div>
         </div>
@@ -589,7 +589,7 @@ function IHSGBanner() {
         <div className="flex items-center gap-1.5 mt-0.5">
           {up ? <TrendingUp className={`w-3 h-3 ${color}`} /> : <TrendingDown className={`w-3 h-3 ${color}`} />}
           <span className={`text-[12px] font-semibold tabular-nums ${color}`}>
-            {up ? "+" : ""}{data.change.toFixed(2)} ({up ? "+" : ""}{data.changePct.toFixed(2)}%)
+            {Math.abs(data.change).toFixed(2)} ({Math.abs(data.changePct).toFixed(2)}%)
           </span>
         </div>
       </div>

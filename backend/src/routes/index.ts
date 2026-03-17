@@ -2004,18 +2004,15 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
   });
 
   app.get("/api/macro-radar/indicators", async (req, res) => {
-    const NULL_RESPONSE = {
-      interestRate: null,
-      inflation:    null,
-      moneySupply:  null,
-      unemployment: null,
+    // Hardcoded recent values as fallback (updated quarterly – data changes slowly)
+    const FALLBACK_RESPONSE = {
+      interestRate: { id: "FEDFUNDS", value: 4.33,    prevValue: 4.33,    date: "2025-02-01", isFallback: true },
+      inflation:    { id: "CPIAUCSL", value: 315.605, prevValue: 314.175, date: "2025-02-01", isFallback: true },
+      moneySupply:  { id: "M2SL",     value: 21634.3, prevValue: 21558.0, date: "2025-02-01", isFallback: true },
+      unemployment: { id: "UNRATE",   value: 4.1,     prevValue: 4.0,     date: "2025-02-01", isFallback: true },
     };
 
     const FRED_KEY = process.env.FRED_API_KEY ?? "77095150d0e19bd97aab68640aef28d5";
-
-    if (!FRED_KEY) {
-      return res.status(200).json(NULL_RESPONSE);
-    }
 
     try {
       const ids = ["FEDFUNDS", "CPIAUCSL", "M2SL", "UNRATE"];
@@ -2025,27 +2022,30 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
             const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${FRED_KEY}&file_type=json&sort_order=desc&limit=3`;
             const data = await _macroFetch(`fred_${id}`, url) as any;
             const obs: any[] = (data?.observations ?? []).filter((o: any) => o.value !== ".");
+            if (!obs.length) return null;
             return {
               id,
               value:     obs[0] ? parseFloat(obs[0].value) : null,
               prevValue: obs[1] ? parseFloat(obs[1].value) : null,
               date:      obs[0]?.date ?? null,
+              isFallback: false,
             };
           } catch (seriesErr: any) {
             console.error(`FRED fetch error for ${id}:`, seriesErr.message);
-            return { id, value: null, prevValue: null, date: null };
+            return null;
           }
         })
       );
-      res.status(200).json({
-        interestRate: results.find((r) => r.id === "FEDFUNDS") ?? null,
-        inflation:    results.find((r) => r.id === "CPIAUCSL") ?? null,
-        moneySupply:  results.find((r) => r.id === "M2SL") ?? null,
-        unemployment: results.find((r) => r.id === "UNRATE") ?? null,
-      });
+
+      const interestRate = results.find((r) => r?.id === "FEDFUNDS") ?? FALLBACK_RESPONSE.interestRate;
+      const inflation    = results.find((r) => r?.id === "CPIAUCSL") ?? FALLBACK_RESPONSE.inflation;
+      const moneySupply  = results.find((r) => r?.id === "M2SL")     ?? FALLBACK_RESPONSE.moneySupply;
+      const unemployment = results.find((r) => r?.id === "UNRATE")   ?? FALLBACK_RESPONSE.unemployment;
+
+      res.status(200).json({ interestRate, inflation, moneySupply, unemployment });
     } catch (err: any) {
       console.error("macro-radar/indicators:", err.message);
-      res.status(200).json(NULL_RESPONSE);
+      res.status(200).json(FALLBACK_RESPONSE);
     }
   });
 
@@ -2120,42 +2120,74 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
     }
   }
 
-  // GET /api/market/prices — USD/IDR, Gold, BTC, ETH (all free, real-time)
+  // GET /api/market/prices — USD/IDR, Gold, BTC, ETH (CoinGecko primary, Binance fallback)
   app.get("/api/market/prices", isAuthenticated, async (_req, res) => {
     try {
-      // Cache key rotates every 5 minutes so prices auto-refresh
       const bucket = Math.floor(Date.now() / (5 * 60_000));
       const data = await cached(`market_prices_${bucket}`, async () => {
-        // Single CoinGecko call: BTC + ETH + PAXG (1 PAXG = 1 troy oz gold, real-time)
-        // Frankfurter.app: USD/IDR current + yesterday for 24h change (free, unlimited)
         const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-        const [cryptoRes, fxRes, fxYestRes] = await Promise.all([
-          fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,pax-gold&vs_currencies=usd,idr&include_24hr_change=true"),
-          fetch("https://api.frankfurter.app/latest?from=USD&to=IDR"),
-          fetch(`https://api.frankfurter.app/${yesterday}?from=USD&to=IDR`),
+        const TO = 6_000;
+
+        const [cryptoRes, fxRes, fxYestRes, binBtcRes, binEthRes, metalsRes] = await Promise.all([
+          fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,pax-gold&vs_currencies=usd,idr&include_24hr_change=true", { signal: AbortSignal.timeout(TO) }).catch(() => null),
+          fetch("https://api.frankfurter.app/latest?from=USD&to=IDR",           { signal: AbortSignal.timeout(TO) }).catch(() => null),
+          fetch(`https://api.frankfurter.app/${yesterday}?from=USD&to=IDR`,     { signal: AbortSignal.timeout(TO) }).catch(() => null),
+          fetch("https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT",    { signal: AbortSignal.timeout(TO) }).catch(() => null),
+          fetch("https://api.binance.com/api/v3/ticker/24hr?symbol=ETHUSDT",    { signal: AbortSignal.timeout(TO) }).catch(() => null),
+          fetch("https://api.metals.live/v1/spot/gold",                         { signal: AbortSignal.timeout(TO) }).catch(() => null),
         ]);
 
-        const crypto = cryptoRes.ok ? await cryptoRes.json() as Record<string, Record<string, number>> : null;
-        const fx = fxRes.ok ? await fxRes.json() as { rates?: { IDR?: number } } : null;
-        const fxYest = fxYestRes.ok ? await fxYestRes.json() as { rates?: { IDR?: number } } : null;
+        // USD/IDR
+        const fx      = fxRes?.ok      ? await fxRes.json()      as { rates?: { IDR?: number } } : null;
+        const fxYest  = fxYestRes?.ok  ? await fxYestRes.json()  as { rates?: { IDR?: number } } : null;
+        const usdIdr  = fx?.rates?.IDR ?? 16_800;
+        const usdYest = fxYest?.rates?.IDR ?? usdIdr;
+        const usdChange = usdYest ? ((usdIdr - usdYest) / usdYest) * 100 : 0;
 
-        // USD/IDR with 24h change
-        const usdIdr = fx?.rates?.IDR ?? crypto?.tether?.idr ?? 16800;
-        const usdIdrYest = fxYest?.rates?.IDR ?? usdIdr;
-        const usdChange = usdIdrYest ? ((usdIdr - usdIdrYest) / usdIdrYest) * 100 : 0;
+        // ── CoinGecko (primary) ──────────────────────────────────────────────
+        const crypto = cryptoRes?.ok ? await cryptoRes.json() as Record<string, Record<string, number>> : null;
 
-        // Gold: PAXG IDR / 31.1035 (troy oz → gram)
-        const paxgIdr = crypto?.["pax-gold"]?.idr ?? 0;
-        const goldGram = paxgIdr > 0 ? Math.round(paxgIdr / 31.1035) : 0;
-        const goldChange = crypto?.["pax-gold"]?.idr_24h_change ?? 0;
+        let btcIdr     = Math.round(crypto?.bitcoin?.idr     ?? 0);
+        let ethIdr     = Math.round(crypto?.ethereum?.idr    ?? 0);
+        let btcChange  = crypto?.bitcoin?.idr_24h_change     ?? 0;
+        let ethChange  = crypto?.ethereum?.idr_24h_change    ?? 0;
+        const paxgIdr  = crypto?.["pax-gold"]?.idr           ?? 0;
+        let goldGram   = paxgIdr > 0 ? Math.round(paxgIdr / 31.1035) : 0;
+        let goldChange = crypto?.["pax-gold"]?.idr_24h_change ?? 0;
+
+        // ── Binance fallback for BTC/ETH ─────────────────────────────────────
+        if (btcIdr === 0) {
+          const b = binBtcRes?.ok ? await binBtcRes.json() as { lastPrice?: string; priceChangePercent?: string } : null;
+          if (b?.lastPrice) {
+            btcIdr    = Math.round(parseFloat(b.lastPrice) * usdIdr);
+            btcChange = parseFloat(b.priceChangePercent ?? "0");
+          }
+        }
+        if (ethIdr === 0) {
+          const b = binEthRes?.ok ? await binEthRes.json() as { lastPrice?: string; priceChangePercent?: string } : null;
+          if (b?.lastPrice) {
+            ethIdr    = Math.round(parseFloat(b.lastPrice) * usdIdr);
+            ethChange = parseFloat(b.priceChangePercent ?? "0");
+          }
+        }
+
+        // ── metals.live fallback for Gold ─────────────────────────────────────
+        if (goldGram === 0) {
+          const m = metalsRes?.ok ? await metalsRes.json() as Array<{ gold?: number }> | { price?: number } : null;
+          const goldUsd: number = Array.isArray(m) ? (m[0]?.gold ?? 0) : ((m as any)?.price ?? 0);
+          if (goldUsd > 0) {
+            goldGram   = Math.round((goldUsd * usdIdr) / 31.1035);
+            goldChange = 0;
+          }
+        }
 
         return {
           usdIdr: Math.round(usdIdr),
           goldGram,
-          bitcoin: Math.round(crypto?.bitcoin?.idr ?? 0),
-          ethereum: Math.round(crypto?.ethereum?.idr ?? 0),
-          btcChange: crypto?.bitcoin?.idr_24h_change ?? 0,
-          ethChange: crypto?.ethereum?.idr_24h_change ?? 0,
+          bitcoin: btcIdr,
+          ethereum: ethIdr,
+          btcChange,
+          ethChange,
           goldChange,
           usdChange: parseFloat(usdChange.toFixed(3)),
           updatedAt: new Date().toISOString(),
@@ -2711,11 +2743,21 @@ STYLE
         };
 
         if (json.chart?.error) throw new Error(json.chart.error.message);
-        const meta = json.chart?.result?.[0]?.meta;
-        if (!meta) throw new Error("No data");
+        const result = json.chart?.result?.[0];
+        if (!result) throw new Error("No data");
+        const meta = result.meta;
 
-        const price = meta.regularMarketPrice ?? 0;
-        const prev = meta.previousClose ?? price;
+        // Use daily OHLC to find yesterday's actual close (most reliable for IDX)
+        const closes: (number | null)[] = result.indicators?.quote?.[0]?.close ?? [];
+        const validCloses = closes.filter((c): c is number => c !== null && c > 0);
+
+        const price = meta.regularMarketPrice ?? validCloses[validCloses.length - 1] ?? 0;
+        // Priority: chartPreviousClose (actual trading session) > second-to-last OHLC > previousClose
+        const prev =
+          (meta.chartPreviousClose && meta.chartPreviousClose > 0 ? meta.chartPreviousClose : null) ??
+          (validCloses.length >= 2 ? validCloses[validCloses.length - 2] : null) ??
+          (meta.previousClose && meta.previousClose > 0 ? meta.previousClose : null) ??
+          price;
         const change = price - prev;
         const changePct = prev > 0 ? (change / prev) * 100 : 0;
 

@@ -21,7 +21,7 @@ function ChangePill({ v }: { v: number }) {
   return (
     <span className={`flex items-center gap-0.5 text-[11px] font-semibold tabular-nums ${up ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
       {up ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-      {up ? "+" : ""}{v.toFixed(2)}%
+      {Math.abs(v).toFixed(2)}%
     </span>
   );
 }
@@ -84,11 +84,12 @@ export default function MarketPage() {
     },
   });
 
+  const NA = isEN ? "Unavailable" : "Tidak tersedia";
   const snapshots = p ? [
-    { icon: "💵", label: "USD/IDR",   value: `Rp ${p.usdIdr.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`, chg: p.usdChange },
-    { icon: "🥇", label: isEN ? "Gold/gram" : "Emas/gram", value: `Rp ${shortNum(p.goldGram)}`,  chg: p.goldChange },
-    { icon: "₿",  label: "Bitcoin",   value: `Rp ${shortNum(p.bitcoin)}`,   chg: p.btcChange },
-    { icon: "Ξ",  label: "Ethereum",  value: `Rp ${shortNum(p.ethereum)}`,  chg: p.ethChange },
+    { icon: "💵", label: "USD/IDR",   value: p.usdIdr  > 0 ? `Rp ${p.usdIdr.toLocaleString("id-ID", { maximumFractionDigits: 0 })}` : NA, chg: p.usdChange,  unavail: p.usdIdr  === 0 },
+    { icon: "🥇", label: isEN ? "Gold/gram" : "Emas/gram", value: p.goldGram > 0 ? `Rp ${shortNum(p.goldGram)}` : NA,                    chg: p.goldChange, unavail: p.goldGram === 0 },
+    { icon: "₿",  label: "Bitcoin",   value: p.bitcoin  > 0 ? `Rp ${shortNum(p.bitcoin)}`  : NA,                                         chg: p.btcChange,  unavail: p.bitcoin  === 0 },
+    { icon: "Ξ",  label: "Ethereum",  value: p.ethereum > 0 ? `Rp ${shortNum(p.ethereum)}` : NA,                                         chg: p.ethChange,  unavail: p.ethereum === 0 },
   ] : [];
 
   return (
@@ -134,8 +135,13 @@ export default function MarketPage() {
                     <span className="text-base leading-none">{s.icon}</span>
                     <span className="text-[11px] text-muted-foreground">{s.label}</span>
                   </div>
-                  <p className="text-sm font-semibold font-mono text-foreground leading-tight">{s.value}</p>
-                  <div className="mt-0.5"><ChangePill v={s.chg} /></div>
+                  <p className={`text-sm font-semibold font-mono leading-tight ${s.unavail ? "text-muted-foreground/60 text-xs" : "text-foreground"}`}>{s.value}</p>
+                  <div className="mt-0.5">
+                    {s.unavail
+                      ? <span className="text-[10px] text-muted-foreground/50">{isEN ? "Tap refresh to retry" : "Tap refresh untuk coba lagi"}</span>
+                      : <ChangePill v={s.chg} />
+                    }
+                  </div>
                 </div>
               ))}
             </div>

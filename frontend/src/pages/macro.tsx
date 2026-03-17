@@ -26,6 +26,7 @@ interface IndicatorPoint {
   value: number | null;
   prevValue: number | null;
   date: string | null;
+  isFallback?: boolean;
 }
 
 interface MacroIndicators {
@@ -897,20 +898,27 @@ export default function MacroRadarPage() {
           <p className="text-sm text-emerald-900 dark:text-emerald-200 leading-relaxed">{fredInsight}</p>
 
           {indicators && (
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { label: m.fedFundsRate,      val: indicators.interestRate?.value, unit: "%" },
-                { label: m.unemploymentLabel, val: indicators.unemployment?.value,  unit: "%" },
-                { label: m.m2Supply,          val: indicators.moneySupply?.value,   unit: "B" },
-                { label: m.cpiIndex,          val: indicators.inflation?.value,     unit: "" },
-              ].map(({ label, val, unit }) => (
-                <div key={label} className="rounded-lg bg-emerald-500/10 px-3 py-2">
-                  <p className="text-[10px] text-emerald-700/70 dark:text-emerald-400/70 uppercase tracking-wider">{label}</p>
-                  <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300 mt-0.5">
-                    {val != null ? `${val.toFixed(unit === "B" ? 0 : 2)}${unit}` : "—"}
-                  </p>
-                </div>
-              ))}
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: m.fedFundsRate,      val: indicators.interestRate?.value, unit: "%" },
+                  { label: m.unemploymentLabel, val: indicators.unemployment?.value,  unit: "%" },
+                  { label: m.m2Supply,          val: indicators.moneySupply?.value,   unit: "B" },
+                  { label: m.cpiIndex,          val: indicators.inflation?.value,     unit: "" },
+                ].map(({ label, val, unit }) => (
+                  <div key={label} className="rounded-lg bg-emerald-500/10 px-3 py-2">
+                    <p className="text-[10px] text-emerald-700/70 dark:text-emerald-400/70 uppercase tracking-wider">{label}</p>
+                    <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300 mt-0.5">
+                      {val != null ? `${val.toFixed(unit === "B" ? 0 : 2)}${unit}` : "—"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              {(indicators.interestRate as any)?.isFallback && (
+                <p className="text-[10px] text-emerald-700/50 dark:text-emerald-400/40 text-right">
+                  {isID ? "* Data referensi Feb 2025 · Diperbarui berkala" : "* Reference data Feb 2025 · Updated periodically"}
+                </p>
+              )}
             </div>
           )}
 
