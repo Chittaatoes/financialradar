@@ -2069,33 +2069,44 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
     return fn().then(data => { marketCache[key] = { data, ts: Date.now() }; return data; });
   }
 
-  // GET /api/market/prices — USD/IDR, Gold, BTC, ETH (no API keys needed)
+  // GET /api/market/prices — USD/IDR, Gold, BTC, ETH (all free, real-time)
   app.get("/api/market/prices", isAuthenticated, async (_req, res) => {
     try {
-      const data = await cached("market_prices", async () => {
-        const [fxRes, cryptoRes] = await Promise.all([
-          fetch("https://api.exchangerate-api.com/v4/latest/USD"),
-          fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=idr&include_24hr_change=true"),
+      // Cache key rotates every 5 minutes so prices auto-refresh
+      const bucket = Math.floor(Date.now() / (5 * 60_000));
+      const data = await cached(`market_prices_${bucket}`, async () => {
+        // Single CoinGecko call: BTC + ETH + PAXG (1 PAXG = 1 troy oz gold, real-time)
+        // Frankfurter.app: USD/IDR current + yesterday for 24h change (free, unlimited)
+        const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+        const [cryptoRes, fxRes, fxYestRes] = await Promise.all([
+          fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,pax-gold&vs_currencies=usd,idr&include_24hr_change=true"),
+          fetch("https://api.frankfurter.app/latest?from=USD&to=IDR"),
+          fetch(`https://api.frankfurter.app/${yesterday}?from=USD&to=IDR`),
         ]);
 
-        const fx = fxRes.ok ? await fxRes.json() : null;
-        const crypto = cryptoRes.ok ? await cryptoRes.json() : null;
+        const crypto = cryptoRes.ok ? await cryptoRes.json() as Record<string, Record<string, number>> : null;
+        const fx = fxRes.ok ? await fxRes.json() as { rates?: { IDR?: number } } : null;
+        const fxYest = fxYestRes.ok ? await fxYestRes.json() as { rates?: { IDR?: number } } : null;
 
-        const usdIdr = fx?.rates?.IDR ?? 16000;
+        // USD/IDR with 24h change
+        const usdIdr = fx?.rates?.IDR ?? crypto?.tether?.idr ?? 16800;
+        const usdIdrYest = fxYest?.rates?.IDR ?? usdIdr;
+        const usdChange = usdIdrYest ? ((usdIdr - usdIdrYest) / usdIdrYest) * 100 : 0;
 
-        // Gold estimate: XAU/USD ≈ 3200 USD (static fallback, updated periodically)
-        const xauUsd = 3200;
-        const goldPerGram = (xauUsd / 31.1035) * usdIdr;
+        // Gold: PAXG IDR / 31.1035 (troy oz → gram)
+        const paxgIdr = crypto?.["pax-gold"]?.idr ?? 0;
+        const goldGram = paxgIdr > 0 ? Math.round(paxgIdr / 31.1035) : 0;
+        const goldChange = crypto?.["pax-gold"]?.idr_24h_change ?? 0;
 
         return {
-          usdIdr,
-          goldGram: Math.round(goldPerGram),
-          bitcoin: crypto?.bitcoin?.idr ?? 0,
-          ethereum: crypto?.ethereum?.idr ?? 0,
+          usdIdr: Math.round(usdIdr),
+          goldGram,
+          bitcoin: Math.round(crypto?.bitcoin?.idr ?? 0),
+          ethereum: Math.round(crypto?.ethereum?.idr ?? 0),
           btcChange: crypto?.bitcoin?.idr_24h_change ?? 0,
           ethChange: crypto?.ethereum?.idr_24h_change ?? 0,
-          goldChange: 0,
-          usdChange: 0,
+          goldChange,
+          usdChange: parseFloat(usdChange.toFixed(3)),
           updatedAt: new Date().toISOString(),
         };
       });
