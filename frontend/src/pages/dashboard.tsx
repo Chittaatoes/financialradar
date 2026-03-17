@@ -1397,6 +1397,34 @@ function BudgetExpiredModal({ open, onClose }: { open: boolean; onClose: () => v
   );
 }
 
+// Horizontal stacked bar showing proportional asset breakdown (cash / bank / e-wallet).
+// Animates from 0% to target widths on mount via a useEffect-driven flag.
+function StackedBar({ hidden, cashPct, bankPct, ePct }: { hidden: boolean; cashPct: number; bankPct: number; ePct: number }) {
+  const [filled, setFilled] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setFilled(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  const segments = [
+    { pct: cashPct,  color: "bg-amber-400/70"   },
+    { pct: bankPct,  color: "bg-emerald-400/70" },
+    { pct: ePct,     color: "bg-sky-400/70"     },
+  ];
+
+  return (
+    <div className="flex h-2 rounded-full overflow-hidden bg-white/10 gap-px">
+      {segments.map((seg, i) => (
+        <div
+          key={i}
+          className={`h-full ${seg.color} transition-all duration-500 ease-out`}
+          style={{ width: hidden || !filled ? "0%" : `${seg.pct}%` }}
+        />
+      ))}
+    </div>
+  );
+}
+
 // Shows monthly budget overview: safe daily budget, income vs expense, progress bar, status.
 // Uses cycle-aware data when a custom budget cycle is active.
 function FinancialSummaryCard({
@@ -1966,9 +1994,20 @@ export default function Dashboard() {
           transition: "opacity 180ms ease-in-out, transform 180ms ease-in-out",
         };
 
+        const secondary = !profileLoading && hasBudget;
+
+        const categories = [
+          { icon: Wallet,     label: t.dashboard.cash,    val: dashboard?.totalCash    ?? 0, pct: cashPct, testId: "text-cash-amount",   color: "bg-amber-400/70"   },
+          { icon: Landmark,   label: t.dashboard.bank,    val: dashboard?.totalBank    ?? 0, pct: bankPct, testId: "text-bank-amount",   color: "bg-emerald-400/70" },
+          { icon: Smartphone, label: t.dashboard.ewallet, val: dashboard?.totalEwallet ?? 0, pct: ePct,    testId: "text-ewallet-amount", color: "bg-sky-400/70"     },
+        ];
+
+        const dominantCat = categories.reduce((a, b) => (b.pct > a.pct ? b : a), categories[0]);
+        const insightText = t.dashboard.insightDominates(dominantCat.label, dominantCat.pct);
+
         const totalAssetsCard = (
           <Card className="border-0 text-white h-full" style={{ background: "linear-gradient(135deg, #1E2F26 0%, #16221C 100%)" }} data-testid="card-total-assets">
-            <CardContent className="p-4 space-y-3">
+            <CardContent className={`${secondary ? "p-3.5 space-y-2.5" : "p-4 space-y-3"}`}>
 
               {/* ── Header row ── */}
               <div className="flex items-center justify-between">
@@ -2004,34 +2043,32 @@ export default function Dashboard() {
                 {hidden ? MASKED_LONG : formatCurrency(totalAset)}
               </p>
 
+              {/* ── Dominant category indicator ── */}
+              {totalAset > 0 && (
+                <div className="flex items-center gap-1" style={amtStyle}>
+                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${dominantCat.color}`} />
+                  <span className="text-[10px] text-white/40 font-medium">{dominantCat.label}</span>
+                  <span className="text-[10px] text-white/25 font-mono">{hidden ? "--" : `${dominantCat.pct}%`}</span>
+                </div>
+              )}
+
               {/* ── Divider ── */}
               <div className="border-t border-white/8" />
 
-              {/* ── Breakdown grid — 3 cols ── */}
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { icon: Wallet,    label: t.dashboard.cash,    val: dashboard?.totalCash    ?? 0, pct: cashPct, testId: "text-cash-amount" },
-                  { icon: Landmark,  label: t.dashboard.bank,    val: dashboard?.totalBank    ?? 0, pct: bankPct, testId: "text-bank-amount" },
-                  { icon: Smartphone,label: t.dashboard.ewallet, val: dashboard?.totalEwallet ?? 0, pct: ePct,    testId: "text-ewallet-amount" },
-                ].map(({ icon: Icon, label, val, pct, testId }) => (
-                  <div key={label} className="rounded-lg bg-white/[0.07] p-2.5 space-y-1.5">
-                    <div className="flex items-center gap-1">
-                      <Icon className="w-3 h-3 text-white/40 shrink-0" />
-                      <span className="text-[10px] text-white/40 font-medium truncate">{label}</span>
-                    </div>
-                    <p className="text-[13px] font-mono font-semibold leading-none" data-testid={testId} style={amtStyle}>
-                      {hidden ? MASKED_SHORT : formatShort(val, language)}
-                    </p>
-                    <div className="flex items-center gap-1.5">
-                      <div className="flex-1 h-1 rounded-full bg-white/10 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-emerald-400/60 transition-all duration-500"
-                          style={{ width: hidden ? "0%" : `${pct}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] text-white/30 font-mono shrink-0" style={amtStyle}>
-                        {hidden ? "--" : `${pct}%`}
-                      </span>
+              {/* ── Stacked bar ── */}
+              <StackedBar hidden={hidden} cashPct={cashPct} bankPct={bankPct} ePct={ePct} />
+
+              {/* ── Compact breakdown list ── */}
+              <div className="flex items-center justify-between gap-1">
+                {categories.map(({ icon: Icon, label, val, testId, color }) => (
+                  <div key={label} className="flex items-center gap-1.5 min-w-0">
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${color}`} />
+                    <Icon className="w-3 h-3 text-white/35 shrink-0" />
+                    <div className="min-w-0">
+                      <span className="text-[9px] text-white/35 font-medium block truncate leading-none mb-0.5">{label}</span>
+                      <p className="text-[12px] font-mono font-semibold leading-none truncate" data-testid={testId} style={amtStyle}>
+                        {hidden ? MASKED_SHORT : formatShort(val, language)}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -2051,6 +2088,14 @@ export default function Dashboard() {
                   />
                 </div>
               </div>
+
+              {/* ── Insight line ── */}
+              {totalAset > 0 && !hidden && (
+                <div className="flex items-center gap-1.5 pt-0.5 border-t border-white/[0.06]">
+                  <Lightbulb className="w-3 h-3 text-emerald-400/60 shrink-0" />
+                  <span className="text-[10px] text-white/45 leading-snug">{insightText}</span>
+                </div>
+              )}
 
             </CardContent>
           </Card>
