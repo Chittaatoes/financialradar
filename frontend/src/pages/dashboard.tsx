@@ -2079,35 +2079,34 @@ export default function Dashboard() {
 
         const totalAssetsCard = (
           <Card className="border-0 text-white h-full overflow-hidden" style={{ background: "linear-gradient(135deg, #1E2F26 0%, #16221C 100%)" }} data-testid="card-total-assets">
-            <CardContent className={`flex flex-col h-full ${secondary ? "p-3.5 gap-3" : "p-4 gap-4"}`}>
+            <CardContent className={`flex flex-col justify-between h-full ${secondary ? "p-3.5" : "p-4"}`}>
 
-              {/* ── Header row ── */}
-              <div className="shrink-0 flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <TrendingUp className="w-3.5 h-3.5 text-emerald-400/70" />
-                  <p className="text-xs font-medium text-white/45 uppercase tracking-widest" data-testid="text-total-assets-label">
-                    {t.dashboard.totalAssets}
-                  </p>
-                </div>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className={`w-7 h-7 transition-all duration-180 ease-in-out ${hidden ? "text-white/55" : "text-white/35"} hover:brightness-125`}
-                  onClick={toggle}
-                  data-testid="button-toggle-amounts"
-                  aria-label={hidden ? "Show amounts" : "Hide amounts"}
-                >
-                  <span
-                    className="inline-flex transition-transform duration-180 ease-in-out"
-                    style={{ transform: animating ? "rotate(-8deg)" : "rotate(0deg)" }}
+              {/* ── TOP: header + value + dominant indicator ── */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <TrendingUp className="w-3.5 h-3.5 text-emerald-400/70" />
+                    <p className="text-xs font-medium text-white/45 uppercase tracking-widest" data-testid="text-total-assets-label">
+                      {t.dashboard.totalAssets}
+                    </p>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className={`w-7 h-7 transition-all duration-180 ease-in-out ${hidden ? "text-white/55" : "text-white/35"} hover:brightness-125`}
+                    onClick={toggle}
+                    data-testid="button-toggle-amounts"
+                    aria-label={hidden ? "Show amounts" : "Hide amounts"}
                   >
-                    {hidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </span>
-                </Button>
-              </div>
+                    <span
+                      className="inline-flex transition-transform duration-180 ease-in-out"
+                      style={{ transform: animating ? "rotate(-8deg)" : "rotate(0deg)" }}
+                    >
+                      {hidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </span>
+                  </Button>
+                </div>
 
-              {/* ── Big total number ── */}
-              <div className="shrink-0 space-y-1.5">
                 <p
                   className="text-[2rem] font-bold font-mono tracking-tight leading-none"
                   data-testid="text-total-assets"
@@ -2115,7 +2114,7 @@ export default function Dashboard() {
                 >
                   {hidden ? MASKED_LONG : formatCurrency(totalAset)}
                 </p>
-                {/* Inline dominant category — replaces stacked bar */}
+
                 {totalAset > 0 && (
                   <div className="flex items-center gap-1.5" style={amtStyle}>
                     <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${dominantCat.color}`} />
@@ -2127,39 +2126,37 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* ── Compact breakdown list ── */}
-              <div className="shrink-0 flex items-center justify-between gap-1">
+              {/* ── MIDDLE: 3-col asset breakdown grid ── */}
+              <div className="grid grid-cols-3 gap-2">
                 {categories.map(({ icon: Icon, label, val, testId, color }) => (
-                  <div key={label} className="flex items-center gap-1.5 min-w-0">
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${color}`} />
-                    <Icon className="w-3 h-3 text-white/35 shrink-0" />
-                    <div className="min-w-0">
-                      <span className="text-[9px] text-white/35 font-medium block truncate leading-none mb-0.5">{label}</span>
-                      <p className="text-[12px] font-mono font-semibold leading-none truncate" data-testid={testId} style={amtStyle}>
-                        {hidden ? MASKED_SHORT : formatShort(val, language)}
-                      </p>
+                  <div key={label} className="bg-white/[0.06] rounded-lg px-2 py-2 flex flex-col gap-1 min-w-0">
+                    <div className="flex items-center gap-1">
+                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${color}`} />
+                      <span className="text-[9px] text-white/40 font-medium truncate leading-none">{label}</span>
                     </div>
+                    <p className="text-[12px] font-mono font-semibold leading-none truncate" data-testid={testId} style={amtStyle}>
+                      {hidden ? MASKED_SHORT : formatShort(val, language)}
+                    </p>
                   </div>
                 ))}
               </div>
 
-              {/* ── Savings goal progress — primary visual bar ── */}
-              <div className="flex-grow flex flex-col justify-end space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-white/40 uppercase tracking-wide font-medium">{t.dashboard.savingsGoal}</span>
-                  <span className="text-xs font-mono font-semibold text-emerald-400/80" data-testid="text-goal-pct">{goalPct}%</span>
+              {/* ── BOTTOM: savings goal bar + insight ── */}
+              <div className="space-y-2.5">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-white/40 uppercase tracking-wide font-medium">{t.dashboard.savingsGoal}</span>
+                    <span className="text-xs font-mono font-semibold text-emerald-400/80" data-testid="text-goal-pct">{goalPct}%</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-emerald-500/70 transition-all duration-500"
+                      style={{ width: `${goalPct}%` }}
+                      data-testid="progress-savings-goal"
+                    />
+                  </div>
                 </div>
-                <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-emerald-500/70 transition-all duration-500"
-                    style={{ width: `${goalPct}%` }}
-                    data-testid="progress-savings-goal"
-                  />
-                </div>
-              </div>
 
-              {/* ── Insight Aset — anchored to bottom ── */}
-              <div className="shrink-0">
                 <AssetInsightBadge
                   totalAset={totalAset}
                   cashPct={cashPct}
