@@ -1442,19 +1442,19 @@ function AssetInsightBadge({
     const pool: { icon: string; text: string }[] = [];
     const savingPct = Math.round((totalSaving / totalAset) * 100);
 
-    if (bankPct >= 50)       pool.push({ icon: "🏦", text: `Bank mendominasi ${bankPct}% aset kamu` });
-    else if (cashPct >= 40)  pool.push({ icon: "💵", text: `Cash ${cashPct}% dari aset — pertimbangkan alihkan ke tabungan` });
-    else if (ePct >= 30)     pool.push({ icon: "📱", text: `E-Wallet ${ePct}% aset kamu — cukup likuid` });
+    if (bankPct >= 50)        pool.push({ icon: "🏦", text: `Bank mendominasi ${bankPct}% aset kamu` });
+    else if (cashPct >= 40)   pool.push({ icon: "💵", text: `Cash ${cashPct}% dari aset — pertimbangkan alihkan ke tabungan` });
+    else if (ePct >= 30)      pool.push({ icon: "📱", text: `E-Wallet ${ePct}% aset kamu — cukup likuid` });
     else if (savingPct >= 50) pool.push({ icon: "🏆", text: `${savingPct}% aset kamu sudah di tabungan — luar biasa!` });
-    else                     pool.push({ icon: "✅", text: "Aset kamu terdiversifikasi dengan baik" });
+    else                      pool.push({ icon: "✅", text: "Aset kamu terdiversifikasi dengan baik" });
 
-    if (cashPct > 50)              pool.push({ icon: "⚠️", text: "Terlalu banyak di cash, potensi kurang optimal" });
-    else if (bankPct >= 60)        pool.push({ icon: "👍", text: "Komposisi aset kamu cukup sehat" });
-    else if (ePct > 40)            pool.push({ icon: "💡", text: "E-Wallet tinggi, pertimbangkan pindah ke tabungan" });
-    else if (savingPct >= 30)      pool.push({ icon: "💚", text: `Alokasi tabungan ${savingPct}% — kamu di jalur yang tepat` });
+    if (cashPct > 50)         pool.push({ icon: "⚠️", text: "Terlalu banyak di cash, potensi kurang optimal" });
+    else if (bankPct >= 60)   pool.push({ icon: "👍", text: "Komposisi aset kamu cukup sehat" });
+    else if (ePct > 40)       pool.push({ icon: "💡", text: "E-Wallet tinggi, pertimbangkan pindah ke tabungan" });
+    else if (savingPct >= 30) pool.push({ icon: "💚", text: `Alokasi tabungan ${savingPct}% — kamu di jalur yang tepat` });
 
-    if (goalPct < 30)       pool.push({ icon: "🎯", text: "Coba percepat kontribusi ke target dana daruratmu" });
-    else if (goalPct >= 50) pool.push({ icon: "🚀", text: `${goalPct}% menuju target! Terus pertahankan` });
+    if (goalPct < 30)         pool.push({ icon: "🎯", text: "Coba percepat kontribusi ke target dana daruratmu" });
+    else if (goalPct >= 50)   pool.push({ icon: "🚀", text: `${goalPct}% menuju target! Terus pertahankan` });
 
     if (cashPct > 30) pool.push({ icon: "💡", text: "Coba alokasikan sebagian cash ke rekening tabungan" });
 
@@ -1465,9 +1465,9 @@ function AssetInsightBadge({
     if (insights.length <= 1) return;
     const timer = setInterval(() => {
       setVisible(false);
-      const swap = setTimeout(() => { setIdx(i => (i + 1) % insights.length); setVisible(true); }, 350);
+      const swap = setTimeout(() => { setIdx(i => (i + 1) % insights.length); setVisible(true); }, 380);
       return () => clearTimeout(swap);
-    }, 4000);
+    }, 4500);
     return () => clearInterval(timer);
   }, [insights.length]);
 
@@ -1475,44 +1475,37 @@ function AssetInsightBadge({
 
   const isEmpty = totalAset === 0;
   const current = isEmpty ? null : insights[idx % Math.max(insights.length, 1)];
-  const showDots = insights.length > 1;
 
   return (
-    <div className="space-y-2 border-t border-white/[0.06] pt-2.5">
-      <div className="flex items-center gap-1.5">
-        <Lightbulb className="w-3 h-3 text-emerald-400/60 shrink-0" />
-        <span className="text-[9px] font-semibold text-white/30 uppercase tracking-widest">Insight Aset</span>
+    <div className="border-t border-white/[0.07] pt-3">
+      {/* Section label */}
+      <div className="flex items-center gap-1.5 mb-2">
+        <Lightbulb
+          className="w-3.5 h-3.5 text-emerald-400 shrink-0"
+          style={{ filter: "drop-shadow(0 0 4px rgba(52,211,153,0.5))" }}
+        />
+        <span className="text-[10px] font-semibold text-white/40 uppercase tracking-widest">Insight Aset</span>
       </div>
+
+      {/* Insight pill — fades + slides on change */}
       <div
-        className="rounded-lg px-3 py-2.5 bg-white/[0.04]"
+        className="rounded-xl px-4 py-3 backdrop-blur-sm"
         style={{
+          background: "linear-gradient(to right, rgba(255,255,255,0.06), rgba(255,255,255,0.01))",
           opacity: visible ? 1 : 0,
-          transform: visible ? "translateY(0)" : "translateY(5px)",
-          transition: "opacity 350ms ease, transform 350ms ease",
+          transform: visible ? "translateY(0)" : "translateY(6px)",
+          transition: "opacity 380ms ease, transform 380ms ease",
         }}
       >
-        <div className="flex items-start gap-2">
-          <span className="text-sm leading-none mt-0.5 shrink-0">{isEmpty ? "💡" : current?.icon}</span>
-          <span className="text-[11px] text-white/60 leading-snug">
+        <div className="flex items-start gap-3">
+          <span className="text-base leading-none mt-0.5 shrink-0">
+            {isEmpty ? "💡" : current?.icon}
+          </span>
+          <span className="text-sm font-medium text-white/65 leading-relaxed">
             {isEmpty ? "Mulai catat aset untuk melihat insight kamu" : current?.text}
           </span>
         </div>
       </div>
-      {showDots && (
-        <div className="flex justify-center items-center gap-1">
-          {insights.map((_, i) => (
-            <div
-              key={i}
-              className="rounded-full transition-all duration-300"
-              style={{
-                width: i === idx % insights.length ? 10 : 4,
-                height: 4,
-                background: i === idx % insights.length ? "rgba(52,211,153,0.5)" : "rgba(255,255,255,0.15)",
-              }}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -2100,7 +2093,7 @@ export default function Dashboard() {
 
         const totalAssetsCard = (
           <Card className="border-0 text-white h-full" style={{ background: "linear-gradient(135deg, #1E2F26 0%, #16221C 100%)" }} data-testid="card-total-assets">
-            <CardContent className={`${secondary ? "p-3.5 space-y-2.5" : "p-4 space-y-3"}`}>
+            <CardContent className={`flex flex-col h-full ${secondary ? "p-3.5 gap-2.5" : "p-4 gap-3"}`}>
 
               {/* ── Header row ── */}
               <div className="flex items-center justify-between">
@@ -2182,16 +2175,18 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* ── Insight Aset ── */}
-              <AssetInsightBadge
-                totalAset={totalAset}
-                cashPct={cashPct}
-                bankPct={bankPct}
-                ePct={ePct}
-                goalPct={goalPct}
-                totalSaving={dashboard?.totalSaving ?? 0}
-                hidden={hidden}
-              />
+              {/* ── Insight Aset — anchored to bottom ── */}
+              <div className="mt-auto">
+                <AssetInsightBadge
+                  totalAset={totalAset}
+                  cashPct={cashPct}
+                  bankPct={bankPct}
+                  ePct={ePct}
+                  goalPct={goalPct}
+                  totalSaving={dashboard?.totalSaving ?? 0}
+                  hidden={hidden}
+                />
+              </div>
 
             </CardContent>
           </Card>
