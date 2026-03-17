@@ -23,6 +23,11 @@ interface IHSGData {
 interface Account {
   id: number; name: string; type: "cash" | "bank" | "ewallet"; balance: string;
 }
+interface PortfolioTx {
+  id: number; userId: string; type: string; amount: string; date: string;
+  fromAccountId: number | null; toAccountId: number | null;
+  category: string | null; note: string | null; createdAt: string;
+}
 
 // ── Constants ──────────────────────────────────────────────────────────
 interface StockEntry { symbol: string; name: string; aliases: string[]; }
@@ -220,6 +225,7 @@ function AddStockSheet({
       return res.json();
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/portfolio/transactions"] });
       if (selectedAccountId) {
         qc.invalidateQueries({ queryKey: ["/api/accounts"] });
         qc.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -397,6 +403,7 @@ function SellStockSheet({ holding, onClose, onSaved }: {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/portfolio"] });
+      qc.invalidateQueries({ queryKey: ["/api/portfolio/transactions"] });
       if (selectedAccountId) {
         qc.invalidateQueries({ queryKey: ["/api/accounts"] });
         qc.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -659,7 +666,31 @@ export default function InvestPage() {
     mutationFn: async (id: number) => {
       await apiRequest("DELETE", `/api/portfolio/${id}`);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/portfolio/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    },
+  });
+
+  // Portfolio transaction history
+  const { data: portfolioTxsRaw } = useQuery<PortfolioTx[] | null>({
+    queryKey: ["/api/portfolio/transactions"], staleTime: 0, gcTime: 0, refetchOnMount: true,
+  });
+  const portfolioTxs: PortfolioTx[] = Array.isArray(portfolioTxsRaw) ? portfolioTxsRaw : [];
+
+  // Delete individual portfolio transaction
+  const deleteTx = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/transactions/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/portfolio/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    },
   });
 
   // Portfolio totals
@@ -829,6 +860,52 @@ export default function InvestPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Investment Transaction History */}
+        {portfolioTxs.length > 0 && (
+          <Card>
+            <CardContent className="p-5">
+              <h3 className="font-semibold text-sm mb-4 flex items-center gap-2">
+                <Layers className="w-4 h-4 text-muted-foreground" />
+                Riwayat Transaksi Saham
+              </h3>
+              <div className="space-y-0">
+                {portfolioTxs.map((tx, idx) => {
+                  const isBuy = tx.type === "investment";
+                  const symbolMatch = tx.note?.match(/(?:Beli|Jual) saham (\S+)/);
+                  const symbol = symbolMatch ? symbolMatch[1] : "—";
+                  const isLast = idx === portfolioTxs.length - 1;
+                  return (
+                    <div key={tx.id} className={`flex items-center gap-3 py-3 ${!isLast ? "border-b border-border" : ""}`}>
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isBuy ? "bg-violet-500/10" : "bg-emerald-500/10"}`}>
+                        {isBuy
+                          ? <TrendingUp className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+                          : <TrendingDown className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-medium text-foreground">{isBuy ? "Beli" : "Jual"} {symbol}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">{tx.date} · {tx.note?.split("@")[1]?.trim() ?? ""}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className={`text-[13px] font-mono font-semibold ${isBuy ? "text-violet-600 dark:text-violet-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                          {isBuy ? "-" : "+"}{fmtRp(Math.abs(Number(tx.amount)))}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => deleteTx.mutate(tx.id)}
+                        disabled={deleteTx.isPending}
+                        className="w-6 h-6 rounded-md hover:bg-red-100 dark:hover:bg-red-500/15 transition-colors flex items-center justify-center group shrink-0"
+                        title="Hapus transaksi"
+                      >
+                        <Trash2 className="w-3 h-3 text-muted-foreground group-hover:text-red-600 dark:group-hover:text-red-400" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <p className="text-[10px] text-muted-foreground/60 text-center pb-2">
           Data via Yahoo Finance · Mungkin tertunda 15 menit · Bukan rekomendasi investasi

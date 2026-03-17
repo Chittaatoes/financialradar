@@ -32,8 +32,8 @@ import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../db";
 import { users } from "../../shared/models/auth";
-import { userProfiles, stockHoldings } from "../../shared/schema";
-import { eq, sql, count, and } from "drizzle-orm";
+import { userProfiles, stockHoldings, transactions } from "../../shared/schema";
+import { eq, sql, count, and, like } from "drizzle-orm";
 
 // === REQUEST VALIDATION SCHEMAS ===
 // Zod schemas for validating POST/PATCH request bodies before database operations.
@@ -2552,12 +2552,47 @@ STYLE
     }
   });
 
-  // DELETE /api/portfolio/:id — remove a holding
+  // GET /api/portfolio/transactions — all Investasi category transactions for the user
+  app.get("/api/portfolio/transactions", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.session as any)?.user?.id;
+      const txs = await db.select().from(transactions)
+        .where(and(eq(transactions.userId, userId), eq(transactions.category, "Investasi")))
+        .orderBy(sql`${transactions.date} desc, ${transactions.createdAt} desc`);
+      res.json(txs);
+    } catch (err) {
+      console.error("Portfolio transactions error:", err);
+      res.status(500).json({ message: "Failed to fetch portfolio transactions" });
+    }
+  });
+
+  // DELETE /api/portfolio/:id — remove a holding and its related investment transactions
   app.delete("/api/portfolio/:id", isAuthenticated, async (req, res) => {
     try {
       const userId = (req.session as any)?.user?.id;
       const id = Number(req.params.id);
-      await db.delete(stockHoldings).where(and(eq(stockHoldings.id, id), eq(stockHoldings.userId, userId)));
+
+      const [holding] = await db.select().from(stockHoldings).where(and(eq(stockHoldings.id, id), eq(stockHoldings.userId, userId))).limit(1);
+      if (!holding) return res.status(404).json({ message: "Holding not found" });
+
+      const symbolShort = holding.symbol.replace(".JK", "");
+
+      // Reverse balance for any "investment" buy transactions linked to this symbol
+      const relatedBuys = await db.select().from(transactions).where(
+        and(eq(transactions.userId, userId), eq(transactions.category, "Investasi"), eq(transactions.type, "investment"), like(transactions.note, `Beli saham ${symbolShort}%`))
+      );
+      for (const tx of relatedBuys) {
+        if (tx.fromAccountId) {
+          await storage.updateAccountBalance(tx.fromAccountId, String(tx.amount), "add");
+        }
+      }
+
+      // Delete those related buy transactions
+      await db.delete(transactions).where(
+        and(eq(transactions.userId, userId), eq(transactions.category, "Investasi"), eq(transactions.type, "investment"), like(transactions.note, `Beli saham ${symbolShort}%`))
+      );
+
+      await db.delete(stockHoldings).where(eq(stockHoldings.id, id));
       res.json({ ok: true });
     } catch (err) {
       console.error("Portfolio DELETE error:", err);
