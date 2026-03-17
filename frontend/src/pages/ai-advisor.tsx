@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Send, Bot, User, Sparkles } from "lucide-react";
+import { Send, Bot, User, Sparkles, ChevronUp, ChevronDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,7 +56,7 @@ function Typing() {
         <Bot className="w-3 h-3 text-muted-foreground" />
       </div>
       <div className="bg-muted rounded-2xl rounded-tl-sm px-3 py-2.5 flex items-center gap-1">
-        {[0,1,2].map(i => (
+        {[0, 1, 2].map(i => (
           <div key={i} className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce"
             style={{ animationDelay: `${i * 150}ms` }} />
         ))}
@@ -68,7 +68,9 @@ function Typing() {
 export default function AiAdvisorPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [promptsExpanded, setPromptsExpanded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const msgContainerRef = useRef<HTMLDivElement>(null);
 
   const { data: profile } = useQuery<UserProfile>({ queryKey: ["/api/profile"] });
   const { data: dashboard } = useQuery<DashboardData>({ queryKey: ["/api/dashboard"] });
@@ -89,7 +91,10 @@ export default function AiAdvisorPage() {
       });
       return res.json() as Promise<ChatResponse>;
     },
-    onSuccess: (data) => setMessages(p => [...p, { role: "assistant", content: data.reply }]),
+    onSuccess: (data) => {
+      setMessages(p => [...p, { role: "assistant", content: data.reply }]);
+      setPromptsExpanded(false);
+    },
     onError: () => setMessages(p => [...p, { role: "assistant", content: "Maaf, terjadi kesalahan. Silakan coba lagi." }]),
   });
 
@@ -98,6 +103,7 @@ export default function AiAdvisorPage() {
     if (!msg || send.isPending) return;
     setMessages(p => [...p, { role: "user", content: msg }]);
     setInput("");
+    setPromptsExpanded(false);
     send.mutate(msg);
   };
 
@@ -109,6 +115,9 @@ export default function AiAdvisorPage() {
   const savingRate = hasData && budget!.monthlyIncome > 0
     ? Math.round(((budget!.monthlyIncome - budget!.totalSpent) / budget!.monthlyIncome) * 100)
     : null;
+
+  const chatStarted = messages.length > 0;
+  const visiblePrompts = promptsExpanded ? QUICK_PROMPTS : QUICK_PROMPTS.slice(0, 1);
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
@@ -132,8 +141,13 @@ export default function AiAdvisorPage() {
               { label: "Total Aset", value: fmtRp(dashboard!.totalAssets), cls: "text-primary" },
               { label: "Pemasukan", value: fmtRp(budget!.monthlyIncome), cls: "text-blue-600 dark:text-blue-400" },
               { label: "Pengeluaran", value: fmtRp(budget!.totalSpent), cls: "text-red-600 dark:text-red-400" },
-              { label: "Saving Rate", value: savingRate !== null ? `${savingRate}%` : "—",
-                cls: savingRate !== null && savingRate >= 20 ? "text-emerald-600 dark:text-emerald-400" : "text-yellow-600 dark:text-yellow-400" },
+              {
+                label: "Saving Rate",
+                value: savingRate !== null ? `${savingRate}%` : "—",
+                cls: savingRate !== null && savingRate >= 20
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-yellow-600 dark:text-yellow-400",
+              },
             ].map(c => (
               <div key={c.label} className="rounded-xl bg-muted border border-border px-2.5 py-2">
                 <p className="text-[9px] text-muted-foreground mb-0.5 leading-tight">{c.label}</p>
@@ -142,7 +156,7 @@ export default function AiAdvisorPage() {
             ))}
           </>
         ) : (
-          [1,2,3,4].map(i => (
+          [1, 2, 3, 4].map(i => (
             <div key={i} className="rounded-xl bg-muted border border-border p-2 space-y-1">
               <Skeleton className="h-2 w-10" />
               <Skeleton className="h-3 w-14" />
@@ -151,14 +165,18 @@ export default function AiAdvisorPage() {
         )}
       </div>
 
-      {/* Chat card — stretches to near bottom nav */}
-      <Card className="rounded-2xl border border-border shadow-sm" style={{ minHeight: "calc(100dvh - 220px)" }}>
-        <CardContent className="p-4 flex flex-col gap-3 h-full" style={{ minHeight: "calc(100dvh - 220px)" }}>
+      {/* Chat card — fixed height, messages scroll inside */}
+      <Card className="rounded-2xl border border-border shadow-sm overflow-hidden">
+        <CardContent className="p-4 flex flex-col gap-3" style={{ height: "calc(100dvh - 240px)" }}>
 
-          {/* Messages — grows to fill space */}
-          <div className="flex-1 space-y-2.5">
-            {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center min-h-[180px] gap-4">
+          {/* Messages — scrollable, no scrollbar visible */}
+          <div
+            ref={msgContainerRef}
+            className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+          >
+            {!chatStarted ? (
+              /* Empty state */
+              <div className="flex flex-col items-center justify-center h-full gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-500/15 border border-violet-200 dark:border-violet-500/20 flex items-center justify-center">
                   <Bot className="w-6 h-6 text-violet-600 dark:text-violet-400" />
                 </div>
@@ -176,28 +194,37 @@ export default function AiAdvisorPage() {
                 </div>
               </div>
             ) : (
-              <>
+              <div className="space-y-2.5 pb-1">
                 {messages.map((m, i) => <Bubble key={i} msg={m} />)}
                 {send.isPending && <Typing />}
                 <div ref={bottomRef} />
-              </>
+              </div>
             )}
           </div>
 
-          {/* Quick prompts — vertical stack, no scroll */}
-          {messages.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              {QUICK_PROMPTS.map(q => (
+          {/* Quick prompts — collapsed (1 item) or expanded (all), only when chatting */}
+          {chatStarted && (
+            <div className="space-y-1.5 shrink-0">
+              {visiblePrompts.map(q => (
                 <button key={q.label} onClick={() => handleSend(q.prompt)} disabled={send.isPending}
-                  className="text-left text-[11px] text-muted-foreground bg-muted hover:bg-accent border border-border rounded-xl px-3 py-2 transition-colors disabled:opacity-40 leading-snug">
+                  className="w-full text-left text-[11px] text-muted-foreground bg-muted hover:bg-accent border border-border rounded-xl px-3 py-2 transition-colors disabled:opacity-40 leading-snug">
                   {q.label}
                 </button>
               ))}
+              {/* Toggle arrow */}
+              <button
+                onClick={() => setPromptsExpanded(p => !p)}
+                className="w-full flex items-center justify-center py-0.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+              >
+                {promptsExpanded
+                  ? <ChevronDown className="w-4 h-4" />
+                  : <ChevronUp className="w-4 h-4" />}
+              </button>
             </div>
           )}
 
           {/* Input */}
-          <div className="flex items-end gap-2 bg-muted rounded-2xl border border-border px-3 py-2">
+          <div className="flex items-end gap-2 bg-muted rounded-2xl border border-border px-3 py-2 shrink-0">
             <Textarea
               className="flex-1 border-0 bg-transparent text-[13px] resize-none min-h-[34px] max-h-[100px] focus-visible:ring-0 focus-visible:ring-offset-0 p-0 leading-relaxed placeholder:text-muted-foreground/50 text-foreground"
               placeholder="Tanya tentang keuanganmu..."
