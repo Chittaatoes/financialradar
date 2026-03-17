@@ -2106,54 +2106,101 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
     }
   });
 
-  // GET /api/market/news — financial news (GNews if key set, else curated fallback)
+  // GET /api/market/news — financial news from CryptoCompare (free) + GNews
   app.get("/api/market/news", isAuthenticated, async (_req, res) => {
     try {
       const GNEWS_KEY = process.env.GNEWS_API_KEY;
+
+      const detectImpact = (title: string, body = ""): "high" | "medium" | "low" => {
+        const t = (title + " " + body).toLowerCase();
+        const HIGH = [
+          "crash", "collapse", "surge", "soar", "plunge", "pump", "dump", "all-time high", "ath",
+          "record", "ban", "etf approved", "sec", "federal reserve", "rate hike", "rate cut",
+          "naik tajam", "turun drastis", "krisis", "suku bunga", "inflasi tinggi", "resesi",
+          "breakout", "breakdown", "liquidation", "halving", "hack", "exploit", "sanctions",
+          "war", "geopolit", "perang", "gold rally", "emas naik", "bitcoin rally",
+        ];
+        const MED = [
+          "bitcoin", "btc", "ethereum", "eth", "gold", "emas", "dollar", "usd", "idr", "rupiah",
+          "forex", "crypto", "blockchain", "defi", "nft", "market", "trading", "investasi",
+          "saham", "obligasi", "inflation", "gdp", "economy", "bank", "fed", "interest",
+        ];
+        if (HIGH.some(k => t.includes(k))) return "high";
+        if (MED.some(k => t.includes(k))) return "medium";
+        return "low";
+      };
+
       const data = await cached("market_news", async () => {
+        const articles: Array<{ title: string; source: string; url: string; publishedAt: string; impact: "high" | "medium" | "low" }> = [];
+
+        // ── Source 1: CryptoCompare (free, no key, crypto + gold + forex news) ──
+        try {
+          const ccUrl = "https://data-api.cryptocompare.com/news/v1/article/list?lang=EN&limit=10&categories=BTC,ETH,XAU,MARKET,FOREX";
+          const ccRes = await fetch(ccUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
+          if (ccRes.ok) {
+            const ccJson = await ccRes.json() as { Data?: Array<{ TITLE: string; URL: string; SOURCE_INFO?: { NAME?: string }; PUBLISHED_ON: number; BODY?: string }> };
+            const ccItems = (ccJson.Data || []).slice(0, 6);
+            for (const a of ccItems) {
+              articles.push({
+                title: a.TITLE,
+                source: a.SOURCE_INFO?.NAME || "CryptoCompare",
+                url: a.URL,
+                publishedAt: new Date(a.PUBLISHED_ON * 1000).toISOString(),
+                impact: detectImpact(a.TITLE, a.BODY),
+              });
+            }
+          }
+        } catch (e) {
+          console.error("[News] CryptoCompare failed:", e);
+        }
+
+        // ── Source 2: GNews (focused on gold, dollar, forex, rupiah) ──
         if (GNEWS_KEY) {
-          const url = `https://gnews.io/api/v4/search?q=inflasi+ekonomi+rupiah+Indonesia&lang=id&max=5&token=${GNEWS_KEY}`;
-          const r = await fetch(url);
-          if (r.ok) {
-            const json = await r.json() as { articles: Array<{ title: string; source: { name: string }; url: string; publishedAt: string }> };
-            const HIGH_KWORDS = ["naik", "turun", "crisis", "inflasi tinggi", "suku bunga", "resesi"];
-            const MED_KWORDS = ["ekonomi", "rupiah", "dolar", "investasi", "saham"];
-            const articles = (json.articles || []).slice(0, 3).map((a) => {
-              const t = (a.title || "").toLowerCase();
-              const impact = HIGH_KWORDS.some(k => t.includes(k)) ? "high"
-                : MED_KWORDS.some(k => t.includes(k)) ? "medium" : "low";
-              return { title: a.title, source: a.source?.name || "GNews", url: a.url, publishedAt: a.publishedAt, impact };
-            });
-            return { articles };
+          try {
+            const queries = [
+              `emas+gold+harga`,
+              `bitcoin+cryptocurrency+market`,
+              `dollar+rupiah+forex`,
+            ];
+            const query = queries[Math.floor(Date.now() / (10 * 60000)) % queries.length];
+            const gnUrl = `https://gnews.io/api/v4/search?q=${query}&lang=id&max=4&sortby=publishedAt&token=${GNEWS_KEY}`;
+            const gnRes = await fetch(gnUrl);
+            if (gnRes.ok) {
+              const gnJson = await gnRes.json() as { articles?: Array<{ title: string; source: { name: string }; url: string; publishedAt: string; content?: string }> };
+              for (const a of (gnJson.articles || []).slice(0, 4)) {
+                articles.push({
+                  title: a.title,
+                  source: a.source?.name || "GNews",
+                  url: a.url,
+                  publishedAt: a.publishedAt,
+                  impact: detectImpact(a.title, a.content),
+                });
+              }
+            }
+          } catch (e) {
+            console.error("[News] GNews failed:", e);
           }
         }
-        // Curated fallback news
-        return {
-          articles: [
-            {
-              title: "Bank Indonesia Pertahankan Suku Bunga Acuan di 6,25% untuk Jaga Stabilitas Rupiah",
-              source: "Kontan",
-              url: "https://investasi.kontan.co.id",
-              publishedAt: new Date(Date.now() - 2 * 3600000).toISOString(),
-              impact: "high",
-            },
-            {
-              title: "Inflasi Indonesia Terkendali di 2,8%, Konsumsi Domestik Jadi Motor Pertumbuhan",
-              source: "Kompas",
-              url: "https://money.kompas.com",
-              publishedAt: new Date(Date.now() - 5 * 3600000).toISOString(),
-              impact: "medium",
-            },
-            {
-              title: "OJK Dorong Literasi Keuangan Digital Masyarakat Indonesia Naik 10% di 2025",
-              source: "Bisnis.com",
-              url: "https://finansial.bisnis.com",
-              publishedAt: new Date(Date.now() - 24 * 3600000).toISOString(),
-              impact: "low",
-            },
-          ],
-        };
+
+        // ── Sort: high impact first, then by date ──
+        const ORDER = { high: 0, medium: 1, low: 2 };
+        articles.sort((a, b) => {
+          if (ORDER[a.impact] !== ORDER[b.impact]) return ORDER[a.impact] - ORDER[b.impact];
+          return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+        });
+
+        // ── Deduplicate by title similarity ──
+        const seen = new Set<string>();
+        const unique = articles.filter(a => {
+          const key = a.title.slice(0, 40).toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+
+        return { articles: unique.slice(0, 6) };
       });
+
       res.json(data);
     } catch (err) {
       console.error("Market news error:", err);
