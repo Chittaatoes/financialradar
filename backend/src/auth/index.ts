@@ -278,13 +278,21 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/logout", (req, res) => {
     const frontendUrl = process.env.FRONTEND_URL || "";
-    req.session.destroy(() => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error("[logout] session.destroy error:", err);
+      }
+      res.clearCookie("connect.sid", { path: "/" });
       res.redirect(frontendUrl || "/");
     });
   });
 
   app.post("/api/auth/logout", (req, res) => {
-    req.session.destroy(() => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error("[logout] session.destroy error:", err);
+      }
+      res.clearCookie("connect.sid", { path: "/" });
       res.json({ ok: true });
     });
   });

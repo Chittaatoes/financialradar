@@ -88,16 +88,16 @@ export function useAuth() {
   const logoutMutation = useMutation({
     mutationFn: logout,
     onSuccess: async () => {
-      queryClient.clear();
-      if ("caches" in window) {
-        const names = await caches.keys();
-        await Promise.all(
-          names
-            .filter((n) => n.startsWith("api-"))
-            .map((n) => caches.delete(n)),
-        );
+      try {
+        queryClient.clear();
+        if ("caches" in window) {
+          const names = await caches.keys();
+          await Promise.all(names.map((n) => caches.delete(n)));
+        }
+      } catch (_) {
+      } finally {
+        window.location.href = "/";
       }
-      window.location.href = "/";
     },
   });
 
