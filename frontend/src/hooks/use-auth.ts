@@ -89,13 +89,12 @@ export function useAuth() {
     queryKey: ["user"],
     queryFn: fetchUser,
     retry: false,
-    // staleTime: 0 ensures the auth state is ALWAYS re-validated on mount.
-    // This prevents the "app renders with old user after logout" flash.
-    // During the background re-fetch, the cached value is shown seamlessly
-    // (isLoading stays false), so there is no visible loading spinner.
-    staleTime: 0,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    // 10-minute staleTime — auth state is stable; logout always calls queryClient.clear()
+    // so stale data can never persist after logout.
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {

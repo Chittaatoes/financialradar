@@ -103,6 +103,26 @@ const BADGE_SEED_DATA = [
   { name: "category_master", description: "Use 5+ different expense categories", category: "smart_money", icon: "layout-grid", unlockConditionType: "milestone", unlockConditionValue: "expense_categories_5", sortOrder: 19 },
 ];
 
+// ── Simple per-user server-side cache ──────────────────────────────────
+// Avoids hammering Supabase with the same expensive query within a short window.
+const serverCache = new Map<string, { data: unknown; ts: number }>();
+const SERVER_CACHE_TTL = 30_000; // 30 seconds
+
+function getCached<T>(key: string): T | null {
+  const hit = serverCache.get(key);
+  if (hit && Date.now() - hit.ts < SERVER_CACHE_TTL) return hit.data as T;
+  return null;
+}
+function setCached(key: string, data: unknown) {
+  serverCache.set(key, { data, ts: Date.now() });
+}
+function burstCacheForUser(userId: string) {
+  for (const k of serverCache.keys()) {
+    if (k.startsWith(`${userId}:`)) serverCache.delete(k);
+  }
+}
+// ───────────────────────────────────────────────────────────────────────
+
 export async function registerRoutes(
   app: Express
 ): Promise<void> {
@@ -295,6 +315,10 @@ export async function registerRoutes(
   app.get("/api/dashboard", isAuthenticated, async (req, res) => {
     try {
       const userId = getUserId(req);
+      const cKey = `${userId}:dashboard`;
+      const cached = getCached<object>(cKey);
+      if (cached) return res.json(cached);
+
       const accts = await storage.getAccountsByUser(userId);
       const allGoals = await storage.getGoalsByUser(userId);
       const today = format(new Date(), "yyyy-MM-dd");
@@ -317,7 +341,7 @@ export async function registerRoutes(
 
       const existingLog = await storage.getStreakLogForDate(userId, today);
 
-      res.json({
+      const result = {
         totalAssets,
         totalCash,
         totalBank,
@@ -328,7 +352,9 @@ export async function registerRoutes(
         goalProgress,
         todayInteracted: !!existingLog,
         lastActiveGoal: lastActiveGoal || null,
-      });
+      };
+      setCached(cKey, result);
+      res.json(result);
     } catch (error) {
       console.error("Error fetching dashboard:", error);
       res.status(500).json({ message: "Failed to fetch dashboard" });
@@ -389,6 +415,7 @@ export async function registerRoutes(
         ...(note !== undefined && { note }),
       });
       if (!updated) return res.status(404).json({ message: "Account not found" });
+      burstCacheForUser(userId);
       res.json(updated);
     } catch (error) {
       console.error("Error updating account:", error);
@@ -401,6 +428,7 @@ export async function registerRoutes(
       const userId = getUserId(req);
       const id = parseInt(req.params.id);
       await storage.deleteAccount(id, userId);
+      burstCacheForUser(userId);
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting account:", error);
@@ -436,6 +464,7 @@ export async function registerRoutes(
       }
 
       await storage.deleteTransaction(id, userId);
+      burstCacheForUser(userId);
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting transaction:", error);
@@ -509,6 +538,7 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
       if (category && note) xp += 3;
       await processInteraction(userId, xp, "transaction");
       await checkAndAwardBadges(userId);
+      burstCacheForUser(userId);
 
       res.json(tx);
     } catch (error) {
@@ -2545,6 +2575,7 @@ STYLE
         }
       }
 
+      burstCacheForUser(userId);
       res.json(result);
     } catch (err) {
       console.error("Portfolio POST error:", err);
@@ -2593,6 +2624,7 @@ STYLE
       );
 
       await db.delete(stockHoldings).where(eq(stockHoldings.id, id));
+      burstCacheForUser(userId);
       res.json({ ok: true });
     } catch (err) {
       console.error("Portfolio DELETE error:", err);
@@ -2643,6 +2675,7 @@ STYLE
         }
       }
 
+      burstCacheForUser(userId);
       res.json({ ok: true, sold: lots, remaining: Number(holding.lots) - lots });
     } catch (err) {
       console.error("Portfolio SELL error:", err);

@@ -244,7 +244,7 @@ export async function setupAuth(app: Express) {
         }
       }
 
-      (req.session as any).user = { id: user.id };
+      (req.session as any).user = user;
       (req.session as any).isGuest = false;
       delete (req.session as any).guestId;
 
@@ -264,16 +264,17 @@ export async function setupAuth(app: Express) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, sessionUser.id));
-
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
+    // If full user data is already in session (new format), return it directly
+    if (sessionUser.email !== undefined || sessionUser.isGuest !== undefined) {
+      return res.json(sessionUser);
     }
 
-    res.json(user);
+    // Legacy: session only has { id } — fetch from DB once and update session
+    const [user] = await db.select().from(users).where(eq(users.id, sessionUser.id));
+    if (!user) return res.status(401).json({ message: "User not found" });
+
+    (req.session as any).user = user;
+    return res.json(user);
   });
 
   app.get("/api/logout", (req, res) => {

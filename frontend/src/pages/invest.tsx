@@ -611,7 +611,7 @@ export default function InvestPage() {
 
   // DB portfolio
   const { data: holdingsRaw } = useQuery<DBHolding[] | null>({
-    queryKey: ["/api/portfolio"], staleTime: 0, gcTime: 0, refetchOnMount: true,
+    queryKey: ["/api/portfolio"], staleTime: 30_000,
   });
   const holdings: DBHolding[] = Array.isArray(holdingsRaw) ? holdingsRaw : [];
 
@@ -676,7 +676,7 @@ export default function InvestPage() {
 
   // Portfolio transaction history
   const { data: portfolioTxsRaw } = useQuery<PortfolioTx[] | null>({
-    queryKey: ["/api/portfolio/transactions"], staleTime: 0, gcTime: 0, refetchOnMount: true,
+    queryKey: ["/api/portfolio/transactions"], staleTime: 30_000,
   });
   const portfolioTxs: PortfolioTx[] = Array.isArray(portfolioTxsRaw) ? portfolioTxsRaw : [];
 
