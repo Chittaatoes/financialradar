@@ -2138,12 +2138,12 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
           const ccUrl = "https://data-api.cryptocompare.com/news/v1/article/list?lang=EN&limit=10&categories=BTC,ETH,XAU,MARKET,FOREX";
           const ccRes = await fetch(ccUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
           if (ccRes.ok) {
-            const ccJson = await ccRes.json() as { Data?: Array<{ TITLE: string; URL: string; SOURCE_INFO?: { NAME?: string }; PUBLISHED_ON: number; BODY?: string }> };
+            const ccJson = await ccRes.json() as { Data?: Array<{ TITLE: string; URL: string; SOURCE_DATA?: { NAME?: string }; PUBLISHED_ON: number; BODY?: string }> };
             const ccItems = (ccJson.Data || []).slice(0, 6);
             for (const a of ccItems) {
               articles.push({
                 title: a.TITLE,
-                source: a.SOURCE_INFO?.NAME || "CryptoCompare",
+                source: a.SOURCE_DATA?.NAME || "CryptoNews",
                 url: a.URL,
                 publishedAt: new Date(a.PUBLISHED_ON * 1000).toISOString(),
                 impact: detectImpact(a.TITLE, a.BODY),

@@ -50,10 +50,20 @@ function ImpactBadge({ v }: { v: NewsItem["impact"] }) {
 
 export default function MarketPage() {
   const { data: p, isLoading: pl, refetch, isFetching } = useQuery<MarketPrices>({
-    queryKey: ["/api/market/prices"], staleTime: 5 * 60_000, retry: 1,
+    queryKey: ["/api/market/prices"],
+    staleTime: 5 * 60_000,
+    gcTime: 0,
+    retry: 3,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
   const { data: news, isLoading: nl } = useQuery<MarketNews>({
-    queryKey: ["/api/market/news"], staleTime: 10 * 60_000, retry: 1,
+    queryKey: ["/api/market/news"],
+    staleTime: 8 * 60_000,
+    gcTime: 0,
+    retry: 3,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const snapshots = p ? [
