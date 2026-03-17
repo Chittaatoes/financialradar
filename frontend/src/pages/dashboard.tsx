@@ -1803,8 +1803,10 @@ export default function Dashboard() {
   const prevLevelRef = useRef<number | null>(null);
   const menuSliderRef = useRef<HTMLDivElement | null>(null);
   const [menuPage, setMenuPage] = useState(0);
-  const cardSliderRef = useRef<HTMLDivElement | null>(null);
   const [activeCard, setActiveCard] = useState(0);
+  const touchStartXRef = useRef(0);
+  const touchCurrentXRef = useRef(0);
+  const isDraggingRef = useRef(false);
 
   const { data: accounts } = useQuery<Account[]>({
     queryKey: ["/api/accounts"],
@@ -2196,45 +2198,81 @@ export default function Dashboard() {
         );
 
         if (!profileLoading && hasBudget) {
+          const CARD_COUNT = 2;
+
+          const onTouchStart = (e: React.TouchEvent) => {
+            touchStartXRef.current = e.touches[0].clientX;
+            touchCurrentXRef.current = e.touches[0].clientX;
+            isDraggingRef.current = true;
+          };
+          const onTouchMove = (e: React.TouchEvent) => {
+            if (!isDraggingRef.current) return;
+            touchCurrentXRef.current = e.touches[0].clientX;
+          };
+          const onTouchEnd = () => {
+            if (!isDraggingRef.current) return;
+            isDraggingRef.current = false;
+            const delta = touchStartXRef.current - touchCurrentXRef.current;
+            if (delta > 50 && activeCard < CARD_COUNT - 1) setActiveCard(c => c + 1);
+            else if (delta < -50 && activeCard > 0) setActiveCard(c => c - 1);
+          };
+
           return (
             <div className="space-y-2.5">
-              {/* Swipeable slider */}
-              <div
-                ref={cardSliderRef}
-                className="flex overflow-x-auto snap-x snap-mandatory"
-                style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
-                onScroll={(e) => {
-                  const el = e.currentTarget;
-                  const idx = Math.round(el.scrollLeft / el.offsetWidth);
-                  setActiveCard(idx);
-                }}
-              >
-                {/* Card 1: Budget */}
-                <div className="w-full flex-none snap-center">
-                  <FinancialSummaryCard
-                    hidden={hidden}
-                    animating={animating}
-                    periodStatus={budgetPeriodStatus}
-                    daysRemaining={budgetDaysRemaining}
-                  />
-                </div>
-                {/* Card 2: Total Assets */}
-                <div className="w-full flex-none snap-center">
-                  {totalAssetsCard}
+              {/* Clip — hides overflow without scroll */}
+              <div className="overflow-hidden">
+                {/* Track — moves as a unit via transform, GPU-composited */}
+                <div
+                  onTouchStart={onTouchStart}
+                  onTouchMove={onTouchMove}
+                  onTouchEnd={onTouchEnd}
+                  style={{
+                    display: "flex",
+                    willChange: "transform",
+                    transform: `translate3d(${-activeCard * 100}%, 0, 0)`,
+                    transition: "transform 0.42s cubic-bezier(0.22, 1, 0.36, 1)",
+                  }}
+                >
+                  {/* Card 1: Budget */}
+                  <div
+                    style={{
+                      flexShrink: 0,
+                      width: "100%",
+                      transform: activeCard === 0 ? "scale(1)" : "scale(0.97)",
+                      opacity: activeCard === 0 ? 1 : 0.65,
+                      transition: "transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.42s ease",
+                    }}
+                  >
+                    <FinancialSummaryCard
+                      hidden={hidden}
+                      animating={animating}
+                      periodStatus={budgetPeriodStatus}
+                      daysRemaining={budgetDaysRemaining}
+                    />
+                  </div>
+                  {/* Card 2: Total Assets */}
+                  <div
+                    style={{
+                      flexShrink: 0,
+                      width: "100%",
+                      transform: activeCard === 1 ? "scale(1)" : "scale(0.97)",
+                      opacity: activeCard === 1 ? 1 : 0.65,
+                      transition: "transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.42s ease",
+                    }}
+                  >
+                    {totalAssetsCard}
+                  </div>
                 </div>
               </div>
               {/* Dot indicators */}
               <div className="flex justify-center items-center gap-2">
-                {[0, 1].map((idx) => (
+                {[0, 1].map((i) => (
                   <button
-                    key={idx}
-                    aria-label={`Card ${idx + 1}`}
-                    onClick={() => {
-                      cardSliderRef.current?.scrollTo({ left: idx * cardSliderRef.current.offsetWidth, behavior: "smooth" });
-                      setActiveCard(idx);
-                    }}
+                    key={i}
+                    aria-label={`Card ${i + 1}`}
+                    onClick={() => setActiveCard(i)}
                     className={`rounded-full transition-all duration-300 ${
-                      activeCard === idx
+                      activeCard === i
                         ? "w-5 h-1.5 bg-emerald-500"
                         : "w-1.5 h-1.5 bg-foreground/20 hover:bg-foreground/35"
                     }`}
