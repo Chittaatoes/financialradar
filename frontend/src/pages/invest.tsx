@@ -18,23 +18,91 @@ interface DBHolding {
 }
 
 // ── Constants ──────────────────────────────────────────────────────────
-const ALL_STOCKS = [
-  { symbol: "BBCA.JK", name: "Bank Central Asia BCA" },
-  { symbol: "BBRI.JK", name: "Bank Rakyat Indonesia BRI" },
-  { symbol: "TLKM.JK", name: "Telkom Indonesia Telekomunikasi" },
-  { symbol: "ASII.JK", name: "Astra International" },
-  { symbol: "BMRI.JK", name: "Bank Mandiri" },
-  { symbol: "GOTO.JK", name: "GoTo Gojek Tokopedia" },
-  { symbol: "BYAN.JK", name: "Bayan Resources Batu Bara" },
-  { symbol: "UNVR.JK", name: "Unilever Indonesia" },
-  { symbol: "ICBP.JK", name: "Indofood CBP Sukses Makmur" },
-  { symbol: "INDF.JK", name: "Indofood Sukses Makmur" },
-  { symbol: "KLBF.JK", name: "Kalbe Farma" },
-  { symbol: "ANTM.JK", name: "Aneka Tambang Emas" },
-  { symbol: "PTBA.JK", name: "Bukit Asam Batu Bara" },
-  { symbol: "MDKA.JK", name: "Merdeka Copper Gold" },
+interface StockEntry { symbol: string; name: string; aliases: string[]; }
+
+const ALL_STOCKS: StockEntry[] = [
+  // ── Perbankan ──────────────────────────────────────────────────────
+  { symbol: "BBCA.JK", name: "Bank Central Asia Tbk", aliases: ["bca","central asia","bank bca"] },
+  { symbol: "BBRI.JK", name: "Bank Rakyat Indonesia Tbk", aliases: ["bri","rakyat","bank bri"] },
+  { symbol: "BMRI.JK", name: "Bank Mandiri Tbk", aliases: ["mandiri","bank mandiri"] },
+  { symbol: "BBNI.JK", name: "Bank Negara Indonesia Tbk", aliases: ["bni","negara","bank bni"] },
+  { symbol: "BRIS.JK", name: "Bank Syariah Indonesia Tbk", aliases: ["bsi","syariah","bank syariah","bris"] },
+  { symbol: "BNGA.JK", name: "Bank CIMB Niaga Tbk", aliases: ["cimb","niaga","cimb niaga"] },
+  { symbol: "MEGA.JK", name: "Bank Mega Tbk", aliases: ["mega","bank mega"] },
+  { symbol: "PNBN.JK", name: "Bank Pan Indonesia Tbk", aliases: ["panin","pan","bank panin"] },
+  { symbol: "BTPS.JK", name: "Bank BTPN Syariah Tbk", aliases: ["btpn","btps"] },
+  // ── Teknologi & Telekomunikasi ─────────────────────────────────────
+  { symbol: "TLKM.JK", name: "Telkom Indonesia Tbk", aliases: ["telkom","telecom","telekomunikasi"] },
+  { symbol: "ISAT.JK", name: "Indosat Ooredoo Hutchison Tbk", aliases: ["indosat","im3","ooredoo","hutchison"] },
+  { symbol: "EXCL.JK", name: "XL Axiata Tbk", aliases: ["xl","axiata","xlaxiata"] },
+  { symbol: "MTEL.JK", name: "Dayamitra Telekomunikasi (Mitratel) Tbk", aliases: ["mitratel","tower","menara"] },
+  { symbol: "TOWR.JK", name: "Sarana Menara Nusantara Tbk", aliases: ["menara","tower","protelindo"] },
+  { symbol: "GOTO.JK", name: "GoTo Gojek Tokopedia Tbk", aliases: ["gojek","tokopedia","ojek","gofood","gopay"] },
+  { symbol: "EMTK.JK", name: "Elang Mahkota Teknologi Tbk", aliases: ["emtek","sctv","okezone","vidio"] },
+  // ── Otomotif & Industri ────────────────────────────────────────────
+  { symbol: "ASII.JK", name: "Astra International Tbk", aliases: ["astra","auto"] },
+  { symbol: "AUTO.JK", name: "Astra Otoparts Tbk", aliases: ["otoparts","spare part","sparepart"] },
+  { symbol: "HEXA.JK", name: "Hexindo Adiperkasa Tbk", aliases: ["hexindo","komatsu"] },
+  // ── Energi & Tambang ──────────────────────────────────────────────
+  { symbol: "ADRO.JK", name: "Adaro Andalan Indonesia Tbk", aliases: ["adaro","batu bara"] },
+  { symbol: "BYAN.JK", name: "Bayan Resources Tbk", aliases: ["bayan","batu bara"] },
+  { symbol: "PTBA.JK", name: "Bukit Asam Tbk", aliases: ["bukit asam","batu bara"] },
+  { symbol: "ITMG.JK", name: "Indo Tambangraya Megah Tbk", aliases: ["tambangraya","itm","batu bara"] },
+  { symbol: "ANTM.JK", name: "Aneka Tambang Tbk", aliases: ["antam","emas","tambang","nikel"] },
+  { symbol: "MDKA.JK", name: "Merdeka Copper Gold Tbk", aliases: ["merdeka","copper","gold","emas"] },
+  { symbol: "AMMN.JK", name: "Amman Mineral Internasional Tbk", aliases: ["amman","mineral","nikel","tembaga"] },
+  { symbol: "PGEO.JK", name: "Pertamina Geothermal Energy Tbk", aliases: ["pertamina","geothermal","pge"] },
+  { symbol: "PGAS.JK", name: "Perusahaan Gas Negara Tbk", aliases: ["pgn","gas","gas negara"] },
+  { symbol: "ELSA.JK", name: "Elnusa Tbk", aliases: ["elnusa","migas"] },
+  // ── Consumer & FMCG ──────────────────────────────────────────────
+  { symbol: "UNVR.JK", name: "Unilever Indonesia Tbk", aliases: ["unilever","sabun","pepsodent"] },
+  { symbol: "ICBP.JK", name: "Indofood CBP Sukses Makmur Tbk", aliases: ["indofood cbp","indomie","mie"] },
+  { symbol: "INDF.JK", name: "Indofood Sukses Makmur Tbk", aliases: ["indofood","bogasari"] },
+  { symbol: "MYOR.JK", name: "Mayora Indah Tbk", aliases: ["mayora","biscuit","biskuit","kopiko"] },
+  { symbol: "SIDO.JK", name: "Industri Jamu Sido Muncul Tbk", aliases: ["sido muncul","jamu","tolak angin"] },
+  { symbol: "GGRM.JK", name: "Gudang Garam Tbk", aliases: ["gudang garam","rokok","surya"] },
+  { symbol: "HMSP.JK", name: "HM Sampoerna Tbk", aliases: ["sampoerna","a mild","rokok"] },
+  { symbol: "CPIN.JK", name: "Charoen Pokphand Indonesia Tbk", aliases: ["charoen","pokphand","ayam","pakan"] },
+  // ── Farmasi & Kesehatan ───────────────────────────────────────────
+  { symbol: "KLBF.JK", name: "Kalbe Farma Tbk", aliases: ["kalbe","farma","obat","farmasi"] },
+  { symbol: "KAEF.JK", name: "Kimia Farma Tbk", aliases: ["kimia farma","apotik","apotek","obat"] },
+  { symbol: "MIKA.JK", name: "Mitra Keluarga Karyasehat Tbk", aliases: ["mika","rumah sakit","rs mitra"] },
+  // ── Properti & Konstruksi ─────────────────────────────────────────
+  { symbol: "BSDE.JK", name: "Bumi Serpong Damai Tbk", aliases: ["bsd","serpong","damai"] },
+  { symbol: "CTRA.JK", name: "Ciputra Development Tbk", aliases: ["ciputra","perumahan","citra"] },
+  { symbol: "SMRA.JK", name: "Summarecon Agung Tbk", aliases: ["summarecon","kelapa gading"] },
+  { symbol: "PWON.JK", name: "Pakuwon Jati Tbk", aliases: ["pakuwon","pakuon","pakuwon mall"] },
+  { symbol: "WIKA.JK", name: "Wijaya Karya Tbk", aliases: ["wijaya karya","konstruksi"] },
+  { symbol: "WSKT.JK", name: "Waskita Karya Tbk", aliases: ["waskita","konstruksi","tol"] },
+  { symbol: "PTPP.JK", name: "PP Presisi Tbk", aliases: ["pp","pembangunan perumahan","konstruksi"] },
+  // ── Retail & Ritel ────────────────────────────────────────────────
+  { symbol: "ACES.JK", name: "Ace Hardware Indonesia Tbk", aliases: ["ace","hardware","ace hardware"] },
+  { symbol: "MAPI.JK", name: "Mitra Adiperkasa Tbk", aliases: ["mapi","zara","starbucks","sport station"] },
+  { symbol: "ERAA.JK", name: "Erajaya Swasembada Tbk", aliases: ["erajaya","ibox","iphone","samsung store"] },
+  // ── Semen & Material ─────────────────────────────────────────────
+  { symbol: "SMGR.JK", name: "Semen Indonesia Tbk", aliases: ["semen indonesia","semen","gresik"] },
+  { symbol: "INTP.JK", name: "Indocement Tunggal Prakarsa Tbk", aliases: ["indocement","semen","tiga roda"] },
 ];
+
 const POPULAR = ALL_STOCKS.slice(0, 5);
+
+function scoreStock(s: StockEntry, raw: string): number {
+  const kw = raw.toLowerCase().trim();
+  if (!kw) return 0;
+  const kwNoSpace = kw.replace(/\s+/g, "");
+  const sym = s.symbol.replace(".JK", "").toLowerCase();
+  const nameLow = s.name.toLowerCase();
+
+  if (sym === kwNoSpace) return 100;
+  if (sym.startsWith(kwNoSpace)) return 85;
+  if (s.aliases.some(a => a === kw)) return 80;
+  if (s.aliases.some(a => a.startsWith(kw))) return 70;
+  if (sym.includes(kwNoSpace)) return 65;
+  if (nameLow.split(" ").some(w => w.startsWith(kw))) return 55;
+  if (nameLow.includes(kw)) return 45;
+  if (s.aliases.some(a => a.includes(kw))) return 40;
+  return 0;
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────
 function fmtRp(n: number) {
@@ -291,18 +359,14 @@ export default function InvestPage() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [search]);
 
-  // Fuzzy search
-  const kw = debouncedSearch.toLowerCase().replace(/\s/g, "");
-  const listMatches = kw.length >= 1
-    ? ALL_STOCKS.filter(s =>
-        s.symbol.toLowerCase().replace(".jk", "").startsWith(kw) ||
-        s.symbol.toLowerCase().replace(".jk", "").includes(kw) ||
-        s.name.toLowerCase().replace(/\s/g, "").includes(kw)
-      ).sort((a, b) => {
-        const as = a.symbol.toLowerCase().replace(".jk", "").startsWith(kw) ? 0 : 1;
-        const bs = b.symbol.toLowerCase().replace(".jk", "").startsWith(kw) ? 0 : 1;
-        return as - bs;
-      })
+  // Scored search
+  const listMatches = debouncedSearch.trim().length >= 1
+    ? ALL_STOCKS
+        .map(s => ({ s, score: scoreStock(s, debouncedSearch) }))
+        .filter(x => x.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 12)
+        .map(x => x.s)
     : [];
 
   const handleManualSearch = () => {
@@ -310,8 +374,13 @@ export default function InvestPage() {
     if (!sym) return;
     const withJK = sym.endsWith(".JK") ? sym : `${sym}.JK`;
     const inList = ALL_STOCKS.find(s => s.symbol === withJK);
-    if (!inList) setManualSearched(p => p.includes(withJK) ? p : [...p, withJK]);
-    setSearch(""); setDebouncedSearch("");
+    if (inList) {
+      setSearch(sym.replace(".JK", ""));
+      setDebouncedSearch(sym.replace(".JK", ""));
+    } else {
+      setManualSearched(p => p.includes(withJK) ? p : [...p, withJK]);
+      setSearch(""); setDebouncedSearch("");
+    }
   };
 
   const isSearching = debouncedSearch.length >= 1;

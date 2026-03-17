@@ -1,0 +1,139 @@
+Implement a full language system (ID / EN) across the app and ensure dynamic content (like news) follows the selected language.
+
+----------------------------------------
+🎯 GOAL
+----------------------------------------
+
+- User can switch language (ID / EN) in Profile
+- All UI and dynamic content follow selected language
+- News titles automatically translate when language = ID
+- Clean, scalable implementation
+
+----------------------------------------
+1. 🌐 GLOBAL LANGUAGE STATE
+----------------------------------------
+
+1. Store language preference:
+   - Use localStorage OR database (user settings)
+
+Example:
+localStorage.setItem("lang", "id");
+
+2. Create global state (React):
+- useContext OR Zustand OR global store
+
+Example:
+lang = "id" | "en"
+
+3. Default:
+- "id"
+
+----------------------------------------
+2. 🔄 APPLY LANGUAGE TO UI
+----------------------------------------
+
+Create dictionary:
+
+const translations = {
+  id: {
+    profile: "Profil",
+    settings: "Pengaturan",
+  },
+  en: {
+    profile: "Profile",
+    settings: "Settings",
+  }
+};
+
+Usage:
+translations[lang].profile
+
+----------------------------------------
+3. 📰 NEWS AUTO TRANSLATION (IMPORTANT)
+----------------------------------------
+
+Condition:
+IF lang === "id"
+→ translate news title to Indonesian
+
+IF lang === "en"
+→ use original title
+
+----------------------------------------
+4. 🧠 BACKEND IMPLEMENTATION
+----------------------------------------
+
+1. Update news API response:
+
+Input:
+- lang from request
+
+Example:
+GET /api/news?lang=id
+
+---
+
+2. Logic:
+
+if (lang === "id") {
+  translate title
+} else {
+  return original
+}
+
+---
+
+3. Translation function:
+
+Use:
+https://translate.googleapis.com/translate_a/single
+
+Example:
+
+async function translateToID(text) {
+  const res = await fetch(
+    `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=id&dt=t&q=${encodeURIComponent(text)}`
+  );
+  const data = await res.json();
+  return data[0][0][0];
+}
+
+---
+
+4. Optimize:
+- Cache translated titles (Map or Redis)
+- Avoid repeated calls
+
+----------------------------------------
+5. ⚡ FRONTEND INTEGRATION
+----------------------------------------
+
+1. Send lang when fetching:
+
+fetch(`/api/news?lang=${lang}`)
+
+2. No need to translate in frontend
+
+----------------------------------------
+6. 🧩 FALLBACK HANDLING
+----------------------------------------
+
+If translation fails:
+→ use original title
+
+----------------------------------------
+7. 🎨 OPTIONAL UI IMPROVEMENT
+----------------------------------------
+
+Show indicator:
+- 🇮🇩 when translated
+- or small label "(ID)"
+
+----------------------------------------
+EXPECTED RESULT
+----------------------------------------
+
+- Language toggle works globally
+- News auto translate when ID active
+- English stays original
+- Smooth UX, no flicker
