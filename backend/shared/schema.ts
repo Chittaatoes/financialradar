@@ -29,7 +29,7 @@ import { users } from "./models/auth";
 
 // === ENUM TYPES ===
 export const accountTypeEnum = pgEnum("account_type", ["cash", "bank", "ewallet"]);
-export const transactionTypeEnum = pgEnum("transaction_type", ["income", "expense", "transfer"]);
+export const transactionTypeEnum = pgEnum("transaction_type", ["income", "expense", "transfer", "investment"]);
 
 // === ACCOUNTS TABLE ===
 // Types: cash, bank, ewallet. Balance auto-updated on transaction create/delete.

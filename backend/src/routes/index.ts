@@ -44,7 +44,7 @@ const accountSchema = z.object({
 });
 
 const transactionSchema = z.object({
-  type: z.enum(["income", "expense", "transfer"]),
+  type: z.enum(["income", "expense", "transfer", "investment"]),
   amount: z.union([z.string(), z.number()]).transform(String),
   date: z.string().min(1, "Date is required"),
   fromAccountId: z.number().nullable().optional(),
@@ -417,7 +417,7 @@ export async function registerRoutes(
       const tx = await storage.getTransaction(id, userId);
       if (!tx) return res.status(404).json({ message: "Transaction not found" });
 
-      if (tx.type === "expense" && tx.fromAccountId) {
+      if ((tx.type === "expense" || tx.type === "investment") && tx.fromAccountId) {
         await storage.updateAccountBalance(tx.fromAccountId, String(tx.amount), "add");
       } else if (tx.type === "income" && tx.toAccountId) {
         await storage.updateAccountBalance(tx.toAccountId, String(tx.amount), "subtract");
@@ -466,8 +466,8 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
         return res.status(400).json({ message: "Amount must be positive" });
       }
 
-      if ((type === "expense" || type === "transfer") && !fromAccountId) {
-        return res.status(400).json({ message: "Source account is required for expense and transfer transactions" });
+      if ((type === "expense" || type === "transfer" || type === "investment") && !fromAccountId) {
+        return res.status(400).json({ message: "Source account is required for expense, transfer, and investment transactions" });
       }
       if ((type === "income" || type === "transfer") && !toAccountId) {
         return res.status(400).json({ message: "Destination account is required for income and transfer transactions" });
@@ -476,7 +476,7 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
       if (fromAccountId) {
         const fromAcct = await storage.getAccount(fromAccountId, userId);
         if (!fromAcct) return res.status(403).json({ message: "From account not found or not owned by you" });
-        if ((type === "expense" || type === "transfer") && parseFloat(String(fromAcct.balance)) < parseFloat(amount)) {
+        if ((type === "expense" || type === "transfer" || type === "investment") && parseFloat(String(fromAcct.balance)) < parseFloat(amount)) {
           return res.status(400).json({ message: "Insufficient balance", insufficientBalance: true, available: fromAcct.balance, accountName: fromAcct.name });
         }
       }
@@ -498,7 +498,7 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
 
       if (type === "income" && toAccountId) {
         await storage.updateAccountBalance(toAccountId, String(amount), "add");
-      } else if (type === "expense" && fromAccountId) {
+      } else if ((type === "expense" || type === "investment") && fromAccountId) {
         await storage.updateAccountBalance(fromAccountId, String(amount), "subtract");
       } else if (type === "transfer" && fromAccountId && toAccountId) {
         await storage.updateAccountBalance(fromAccountId, String(amount), "subtract");
@@ -2532,7 +2532,7 @@ STYLE
           const stockName = withJK.replace(".JK", "");
           await storage.createTransaction({
             userId,
-            type: "expense",
+            type: "investment",
             amount: String(totalCost),
             date: buyDate || format(new Date(), "yyyy-MM-dd"),
             fromAccountId: Number(accountId),
@@ -2562,6 +2562,56 @@ STYLE
     } catch (err) {
       console.error("Portfolio DELETE error:", err);
       res.status(500).json({ message: "Failed to delete holding" });
+    }
+  });
+
+  // POST /api/portfolio/sell — sell (partial or full) holding
+  app.post("/api/portfolio/sell", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.session as any)?.user?.id;
+      const { holdingId, lotsToSell, sellPrice, accountId, sellDate } = req.body;
+      if (!holdingId || !lotsToSell || !sellPrice) return res.status(400).json({ message: "holdingId, lotsToSell, sellPrice required" });
+
+      const [holding] = await db.select().from(stockHoldings).where(and(eq(stockHoldings.id, Number(holdingId)), eq(stockHoldings.userId, userId))).limit(1);
+      if (!holding) return res.status(404).json({ message: "Holding not found" });
+
+      const lots = Number(lotsToSell);
+      if (lots <= 0 || lots > Number(holding.lots)) return res.status(400).json({ message: `Cannot sell more than ${holding.lots} lots` });
+
+      const saleAmount = lots * Number(sellPrice) * 100;
+      const stockName = holding.symbol.replace(".JK", "");
+      const txDate = sellDate || format(new Date(), "yyyy-MM-dd");
+
+      if (lots >= Number(holding.lots)) {
+        await db.delete(stockHoldings).where(eq(stockHoldings.id, holding.id));
+      } else {
+        await db.update(stockHoldings)
+          .set({ lots: Number(holding.lots) - lots })
+          .where(eq(stockHoldings.id, holding.id));
+      }
+
+      if (accountId && saleAmount > 0) {
+        try {
+          await storage.updateAccountBalance(Number(accountId), String(saleAmount), "add");
+          await storage.createTransaction({
+            userId,
+            type: "income",
+            amount: String(saleAmount),
+            date: txDate,
+            fromAccountId: null,
+            toAccountId: Number(accountId),
+            category: "Investasi",
+            note: `Jual saham ${stockName} ${lots} lot @ Rp ${Number(sellPrice).toLocaleString("id-ID")}`,
+          });
+        } catch (e) {
+          console.error("[Portfolio] sell credit failed:", e);
+        }
+      }
+
+      res.json({ ok: true, sold: lots, remaining: Number(holding.lots) - lots });
+    } catch (err) {
+      console.error("Portfolio SELL error:", err);
+      res.status(500).json({ message: "Failed to sell holding" });
     }
   });
 

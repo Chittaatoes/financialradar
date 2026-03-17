@@ -356,6 +356,170 @@ function AddStockSheet({
   );
 }
 
+// ── Sell Stock Bottom Sheet ────────────────────────────────────────────
+function SellStockSheet({ holding, onClose, onSaved }: {
+  holding: DBHolding;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [lotsToSell, setLotsToSell] = useState("1");
+  const [sellPrice, setSellPrice] = useState(String(Math.round(Number(holding.avgPrice))));
+  const [sellDate, setSellDate] = useState(today());
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  const { data: accounts } = useQuery<Account[]>({ queryKey: ["/api/accounts"], staleTime: 60_000 });
+
+  const lots = Number(lotsToSell) || 0;
+  const price = Number(sellPrice) || 0;
+  const lembar = lots * 100;
+  const saleAmount = lembar * price;
+  const costBasis = lots * Number(holding.avgPrice) * 100;
+  const plAmount = saleAmount - costBasis;
+  const plPct = costBasis > 0 ? (plAmount / costBasis) * 100 : 0;
+  const maxLots = holding.lots;
+
+  useEffect(() => {
+    document.body.classList.add("sheet-open");
+    return () => document.body.classList.remove("sheet-open");
+  }, []);
+
+  const sell = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/portfolio/sell", {
+        holdingId: holding.id,
+        lotsToSell: lots,
+        sellPrice: price,
+        sellDate,
+        ...(selectedAccountId ? { accountId: Number(selectedAccountId) } : {}),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/portfolio"] });
+      if (selectedAccountId) {
+        qc.invalidateQueries({ queryKey: ["/api/accounts"] });
+        qc.invalidateQueries({ queryKey: ["/api/transactions"] });
+        qc.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      }
+      onSaved();
+      onClose();
+    },
+  });
+
+  const handleOverlay = (e: React.MouseEvent) => {
+    if (e.target === overlayRef.current) onClose();
+  };
+
+  const canSubmit = lots >= 1 && lots <= maxLots && price > 0 && !sell.isPending;
+
+  return (
+    <div ref={overlayRef} onClick={handleOverlay} className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm">
+      <div className="w-full max-w-lg bg-card rounded-t-3xl border border-border shadow-2xl p-5 pb-8 animate-in slide-in-from-bottom duration-300">
+        <div className="w-10 h-1 rounded-full bg-border mx-auto mb-4" />
+
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
+              <span className="text-[10px] font-bold text-muted-foreground">{holding.symbol.replace(".JK", "")}</span>
+            </div>
+            <div>
+              <p className="text-[14px] font-semibold text-foreground">Jual {holding.symbol.replace(".JK", "")}</p>
+              <p className="text-[11px] text-muted-foreground">Posisi: {holding.lots} lot · avg Rp {Number(holding.avgPrice).toLocaleString("id-ID")}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors">
+            <X className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium mb-1.5">
+              <CalendarDays className="w-3 h-3" /> Tanggal Jual
+            </label>
+            <Input type="date" className="h-10 text-sm" value={sellDate} onChange={e => setSellDate(e.target.value)} max={today()} />
+          </div>
+
+          <div>
+            <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium mb-1.5">
+              <Landmark className="w-3 h-3" /> Masuk ke Rekening <span className="text-muted-foreground/50">(opsional)</span>
+            </label>
+            <select
+              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              value={selectedAccountId}
+              onChange={e => setSelectedAccountId(e.target.value)}
+            >
+              <option value="">— Tidak masuk ke rekening —</option>
+              {(accounts ?? []).map(a => (
+                <option key={a.id} value={String(a.id)}>
+                  {a.name} · Rp {parseFloat(a.balance).toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium mb-1.5">
+                <Layers className="w-3 h-3" /> Lot Dijual
+              </label>
+              <Input type="number" min="1" max={maxLots} className="h-10 text-sm font-mono"
+                placeholder="1" value={lotsToSell} onChange={e => setLotsToSell(e.target.value)} />
+              <p className="text-[10px] text-muted-foreground mt-1">Maks: {maxLots} lot</p>
+              {lots > maxLots && <p className="text-[10px] text-red-500 mt-0.5">Melebihi posisi</p>}
+            </div>
+            <div>
+              <label className="text-[11px] text-muted-foreground font-medium mb-1.5 block">Harga Jual / Lembar</label>
+              <Input type="number" className="h-10 text-sm font-mono"
+                placeholder={String(holding.avgPrice)} value={sellPrice} onChange={e => setSellPrice(e.target.value)} />
+              <p className="text-[10px] text-muted-foreground mt-1">Avg beli: Rp {Number(holding.avgPrice).toLocaleString("id-ID")}</p>
+            </div>
+          </div>
+        </div>
+
+        {lembar > 0 && price > 0 && (
+          <div className="mt-4 rounded-2xl bg-muted border border-border p-4 space-y-2">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Rincian Penjualan</p>
+            <div className="space-y-1.5 text-[12px]">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{lots} lot × 100 lembar</span>
+                <span className="font-mono font-medium text-foreground">{lembar.toLocaleString("id-ID")} lbr</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Hasil Penjualan</span>
+                <span className="font-mono font-semibold text-foreground">{fmtRp(saleAmount)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Modal ({lots} lot)</span>
+                <span className="font-mono text-foreground">{fmtRp(costBasis)}</span>
+              </div>
+              <div className="flex justify-between border-t border-border pt-1.5 mt-1">
+                <span className="font-medium text-foreground">Keuntungan / Rugi</span>
+                <span className={`font-mono font-semibold ${plAmount >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                  {plAmount >= 0 ? "+" : ""}{fmtRp(plAmount)} ({plPct >= 0 ? "+" : ""}{plPct.toFixed(1)}%)
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <Button
+          className="w-full h-11 mt-4 text-sm font-semibold rounded-2xl"
+          onClick={() => sell.mutate()}
+          disabled={!canSubmit}
+        >
+          {sell.isPending
+            ? "Memproses..."
+            : selectedAccountId
+              ? `Jual & Kredit ${fmtRp(saleAmount)} ke Rekening`
+              : `Jual ${lots} Lot ${holding.symbol.replace(".JK", "")}`}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ── Insight ────────────────────────────────────────────────────────────
 function InvestInsight({ holdings, quotes }: { holdings: DBHolding[]; quotes: Map<string, StockQuote> }) {
   if (holdings.length === 0) return null;
@@ -435,6 +599,7 @@ export default function InvestPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [addSheet, setAddSheet] = useState<StockQuote | null>(null);
+  const [sellSheet, setSellSheet] = useState<DBHolding | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // DB portfolio
@@ -641,8 +806,14 @@ export default function InvestPage() {
                             </p>
                           )}
                         </div>
+                        <button onClick={() => setSellSheet(h)}
+                          className="w-6 h-6 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-500/15 transition-colors flex items-center justify-center group"
+                          title="Jual">
+                          <TrendingDown className="w-3 h-3 text-muted-foreground group-hover:text-emerald-600 dark:group-hover:text-emerald-400" />
+                        </button>
                         <button onClick={() => deleteHolding.mutate(h.id)}
-                          className="w-6 h-6 rounded-md hover:bg-red-100 dark:hover:bg-red-500/15 transition-colors flex items-center justify-center group">
+                          className="w-6 h-6 rounded-md hover:bg-red-100 dark:hover:bg-red-500/15 transition-colors flex items-center justify-center group"
+                          title="Hapus">
                           <Trash2 className="w-3 h-3 text-muted-foreground group-hover:text-red-600 dark:group-hover:text-red-400" />
                         </button>
                       </div>
@@ -670,6 +841,13 @@ export default function InvestPage() {
           stock={addSheet}
           onClose={() => setAddSheet(null)}
           onSaved={() => qc.invalidateQueries({ queryKey: ["/api/portfolio"] })}
+        />
+      )}
+      {sellSheet && (
+        <SellStockSheet
+          holding={sellSheet}
+          onClose={() => setSellSheet(null)}
+          onSaved={() => {}}
         />
       )}
     </>

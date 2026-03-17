@@ -17,7 +17,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   Plus, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, X, Trash2, Calendar, PiggyBank, CreditCard,
-  Wallet, Layers, ChevronDown, Check,
+  Wallet, Layers, ChevronDown, Check, BarChart2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, EXPENSE_CATEGORY_GROUPS, INCOME_CATEGORIES } from "@/lib/constants";
@@ -52,6 +52,7 @@ const typeConfig = {
   income: { icon: ArrowDownLeft, color: "text-green-600 dark:text-green-400", bg: "bg-green-500/10", label: "Income" },
   expense: { icon: ArrowUpRight, color: "text-red-500 dark:text-red-400", bg: "bg-red-500/10", label: "Expense" },
   transfer: { icon: ArrowLeftRight, color: "text-blue-500 dark:text-blue-400", bg: "bg-blue-500/10", label: "Transfer" },
+  investment: { icon: BarChart2, color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-500/10", label: "Investasi" },
 };
 
 const TX_TAB_CONFIG: { type: TxTabType; icon: typeof ArrowUpRight; color: string; activeBg: string; iconBg: string; labelKey: string }[] = [
@@ -770,7 +771,7 @@ function SpendingChart({
   );
 }
 
-type TypeFilter = "all" | "income" | "expense" | "transfer";
+type TypeFilter = "all" | "income" | "expense" | "transfer" | "investment";
 
 export default function Transactions() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -932,7 +933,7 @@ export default function Transactions() {
     setVisibleCount((prev) => prev + INITIAL_VISIBLE);
   }, []);
 
-  const activeChartType: "expense" | "income" | "transfer" = typeFilter === "income" ? "income" : typeFilter === "transfer" ? "transfer" : "expense";
+  const activeChartType = typeFilter === "income" ? "income" : typeFilter === "transfer" ? "transfer" : typeFilter === "investment" ? "investment" : "expense";
 
   const chartData = useMemo(() => {
     const days = eachDayOfInterval({
@@ -970,6 +971,7 @@ export default function Transactions() {
     if (typeFilter === "all") return t.transactions.allTypes;
     if (typeFilter === "income") return t.transactions.income;
     if (typeFilter === "expense") return t.transactions.expense;
+    if (typeFilter === "investment") return "Investasi";
     return t.transactions.transfer;
   }, [typeFilter, t]);
 
@@ -1032,6 +1034,7 @@ export default function Transactions() {
     income: t.transactions.income,
     expense: t.transactions.expense,
     transfer: t.transactions.transfer,
+    investment: "Investasi",
   };
 
   return (
@@ -1214,10 +1217,11 @@ export default function Transactions() {
           <div className="px-6 pt-2 pb-6 flex flex-col gap-5">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t.transactions.filterByType}</p>
             <div className="flex rounded-lg border border-border p-1 gap-1 bg-muted/40">
-              {(["all", "income", "expense", "transfer"] as const).map((f) => {
+              {(["all", "income", "expense", "transfer", "investment"] as const).map((f) => {
                 const label = f === "all" ? t.transactions.typeAll
                   : f === "income" ? t.transactions.income
                   : f === "expense" ? t.transactions.expense
+                  : f === "investment" ? "Investasi"
                   : t.transactions.transfer;
                 return (
                   <button
@@ -1311,15 +1315,16 @@ export default function Transactions() {
                           <span className={`font-mono font-semibold text-sm ${
                             tx.type === "income" ? "text-green-600 dark:text-green-400" :
                             tx.type === "expense" ? "text-red-500 dark:text-red-400" :
+                            tx.type === "investment" ? "text-violet-600 dark:text-violet-400" :
                             isSavingsDeposit ? "text-emerald-600 dark:text-emerald-400" :
                             "text-foreground"
                           }`}>
-                            {tx.type === "income" ? "+" : tx.type === "expense" ? "-" : ""}
+                            {tx.type === "income" ? "+" : (tx.type === "expense" || tx.type === "investment") ? "-" : ""}
                             {isSavingsDeposit ? formatCurrency(String(Math.abs(Number(tx.amount)))) : formatCurrency(tx.amount)}
                           </span>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {tx.type === "income" ? getAccountName(tx.toAccountId) :
-                             tx.type === "expense" ? getAccountName(tx.fromAccountId) : ""}
+                             (tx.type === "expense" || tx.type === "investment") ? getAccountName(tx.fromAccountId) : ""}
                           </p>
                         </div>
                         <Button
