@@ -23,7 +23,6 @@ import { formatCurrency, EXPENSE_CATEGORY_GROUPS, INCOME_CATEGORIES } from "@/li
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/auth-utils";
-import { saveLocalTransaction } from "@/lib/offline-transactions";
 import { useLanguage } from "@/lib/i18n";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -160,24 +159,8 @@ function TransactionForm({ txType, onClose, t }: { txType: "income" | "expense" 
       }
       return apiRequest("POST", "/api/transactions", payload);
     },
-    onSuccess: (_res, variables) => {
+    onSuccess: () => {
       playSound("transaction");
-      if (!navigator.onLine) {
-        saveLocalTransaction(
-          {
-            type: variables.type,
-            amount: variables.amount,
-            date: variables.date,
-            category: variables.category || null,
-            note: variables.note || null,
-            fromAccountId: (variables.type === "expense" || variables.type === "transfer") && variables.fromAccountId
-              ? parseInt(variables.fromAccountId) : null,
-            toAccountId: (variables.type === "income" || variables.type === "transfer") && variables.toAccountId
-              ? parseInt(variables.toAccountId) : null,
-          },
-          queryClient,
-        ).catch(() => {});
-      }
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
@@ -186,7 +169,7 @@ function TransactionForm({ txType, onClose, t }: { txType: "income" | "expense" 
       queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith("/api/spending-insight") });
       queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith("/api/budget") });
       queryClient.invalidateQueries({ queryKey: ["/api/daily-focus"] });
-      toast({ title: t.transactions.submit, description: !navigator.onLine ? "⏳ Tersimpan, akan disinkronkan" : "+5 XP" });
+      toast({ title: t.transactions.submit, description: "+5 XP" });
       form.reset();
       onClose();
     },
