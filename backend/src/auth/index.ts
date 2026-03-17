@@ -115,7 +115,6 @@ export async function setupAuth(app: Express) {
   });
 
   const isProduction = process.env.NODE_ENV === "production";
-  const isHttps = isProduction || !!process.env.REPLIT_DEV_DOMAIN;
 
   app.use(
     session({
@@ -126,7 +125,7 @@ export async function setupAuth(app: Express) {
       rolling: true,
       proxy: true,
       cookie: {
-        secure: isHttps,
+        secure: isProduction,
         httpOnly: true,
         sameSite: "lax",
         maxAge: 7 * 24 * 60 * 60 * 1000,

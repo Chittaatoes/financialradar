@@ -131,7 +131,7 @@ function AppContent() {
       const clean = window.location.pathname;
       window.history.replaceState({}, "", clean);
       if (loginResult === "success") {
-        queryClient.invalidateQueries();
+        queryClient.invalidateQueries({ queryKey: ["user"] });
         toast({
           title: "Login berhasil!",
           description: "Akun Google kamu sudah terhubung.",
@@ -163,7 +163,7 @@ function AppContent() {
       guestLoginCalled.current = true;
       apiRequest("POST", "/api/guest-login", {})
         .then(() => {
-          queryClient.invalidateQueries();
+          queryClient.invalidateQueries({ queryKey: ["user"] });
         })
         .catch(() => {
           setReady(true);
