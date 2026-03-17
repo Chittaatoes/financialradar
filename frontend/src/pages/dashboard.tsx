@@ -1471,8 +1471,6 @@ function AssetInsightBadge({
     return () => clearInterval(timer);
   }, [insights.length]);
 
-  if (hidden) return null;
-
   const isEmpty = totalAset === 0;
   const current = isEmpty ? null : insights[idx % Math.max(insights.length, 1)];
 
