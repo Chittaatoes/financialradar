@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://financialradar.vercel.app/sitemap.xml

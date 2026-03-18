@@ -1,7 +1,7 @@
 {
   "name": "Financial Radar - Habit-Driven Wealth Builder",
-  "short_name": "FinRadar",
-  "description": "Track assets, manage savings, and build financial discipline with gamification.",
+  "short_name": "Radar",
+  "description": "Aplikasi manajemen keuangan pribadi. Catat pemasukan & pengeluaran, kelola tabungan, pantau aset, dan bangun disiplin finansial.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -9,7 +9,7 @@
   "theme_color": "#3d9d5c",
   "background_color": "#f5f0eb",
   "categories": ["finance", "productivity"],
-  "lang": "en",
+  "lang": "id",
   "icons": [
     { "src": "/icon-72x72.png", "sizes": "72x72", "type": "image/png" },
     { "src": "/icon-96x96.png", "sizes": "96x96", "type": "image/png" },
