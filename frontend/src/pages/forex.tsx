@@ -441,14 +441,14 @@ export default function ForexPage() {
               <button
                 onClick={() => setCurrency("USD")}
                 className={cn("px-2.5 py-1 transition-colors",
-                  currency === "USD" ? "bg-violet-600 text-white" : "hover:bg-muted text-muted-foreground")}
+                  currency === "USD" ? "text-white bg-[#19432c]" : "hover:bg-muted text-muted-foreground")}
               >
                 USD
               </button>
               <button
                 onClick={() => setCurrency("IDR")}
                 className={cn("px-2.5 py-1 transition-colors",
-                  currency === "IDR" ? "bg-violet-600 text-white" : "hover:bg-muted text-muted-foreground")}
+                  currency === "IDR" ? "text-white bg-[#19432c]" : "hover:bg-muted text-muted-foreground")}
               >
                 IDR
               </button>
