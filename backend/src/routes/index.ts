@@ -32,7 +32,7 @@ import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../db";
 import { users } from "../../shared/models/auth";
-import { userProfiles, stockHoldings, transactions, forexTrades } from "../../shared/schema";
+import { userProfiles, stockHoldings, transactions, forexTrades, tradingRules, tradingStatsDaily } from "../../shared/schema";
 import { eq, sql, count, and, like, gte, lte } from "drizzle-orm";
 import { parseForexTrades } from "../services/forex-parser";
 
@@ -2937,6 +2937,195 @@ STYLE
     } catch (err) {
       console.error("forex/trades error:", err);
       res.status(500).json({ message: "Failed to fetch trades" });
+    }
+  });
+
+  // GET /api/forex/stats — Aggregate stats (today + all-time)
+  app.get("/api/forex/stats", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+      const todayEnd   = new Date(); todayEnd.setHours(23,59,59,999);
+
+      const allTrades = await db.select().from(forexTrades).where(eq(forexTrades.userId, userId));
+      const todayTrades = allTrades.filter(t => t.createdAt && t.createdAt >= todayStart && t.createdAt <= todayEnd);
+
+      const sumProfit   = (arr: typeof allTrades) => arr.filter(t => Number(t.profit) > 0).reduce((s, t) => s + Number(t.profit), 0);
+      const sumLoss     = (arr: typeof allTrades) => arr.filter(t => Number(t.profit) < 0).reduce((s, t) => s + Number(t.profit), 0);
+      const sumNet      = (arr: typeof allTrades) => arr.reduce((s, t) => s + Number(t.profit), 0);
+
+      const lastLossTrade = allTrades
+        .filter(t => Number(t.profit) < 0)
+        .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))[0];
+
+      const lastTrade = allTrades.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))[0];
+
+      res.json({
+        today: {
+          profit: sumProfit(todayTrades),
+          loss: sumLoss(todayTrades),
+          net: sumNet(todayTrades),
+          count: todayTrades.length,
+        },
+        allTime: {
+          profit: sumProfit(allTrades),
+          loss: sumLoss(allTrades),
+          net: sumNet(allTrades),
+          count: allTrades.length,
+          winRate: allTrades.length > 0 ? (allTrades.filter(t => Number(t.profit) > 0).length / allTrades.length) * 100 : 0,
+        },
+        lastLossTradeAt: lastLossTrade?.createdAt ?? null,
+        lastTradeAt: lastTrade?.createdAt ?? null,
+      });
+    } catch (err) {
+      console.error("forex/stats error:", err);
+      res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+
+  // GET /api/forex/rules — Get user's trading discipline rules
+  app.get("/api/forex/rules", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      let rules = await db.select().from(tradingRules).where(eq(tradingRules.userId, userId)).then(r => r[0]);
+      if (!rules) {
+        const inserted = await db.insert(tradingRules).values({ userId }).returning();
+        rules = inserted[0];
+      }
+      res.json(rules);
+    } catch (err) {
+      console.error("forex/rules GET error:", err);
+      res.status(500).json({ message: "Failed to fetch rules" });
+    }
+  });
+
+  // PUT /api/forex/rules — Update user's trading discipline rules
+  app.put("/api/forex/rules", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { maxLossPercent, targetProfitPercent, maxTradesPerDay, revengeWindowMinutes } = req.body;
+      const existing = await db.select().from(tradingRules).where(eq(tradingRules.userId, userId)).then(r => r[0]);
+      if (!existing) {
+        const inserted = await db.insert(tradingRules).values({
+          userId,
+          maxLossPercent: String(maxLossPercent ?? 1),
+          targetProfitPercent: String(targetProfitPercent ?? 2),
+          maxTradesPerDay: maxTradesPerDay ?? 10,
+          revengeWindowMinutes: revengeWindowMinutes ?? 5,
+        }).returning();
+        return res.json(inserted[0]);
+      }
+      const updated = await db.update(tradingRules).set({
+        ...(maxLossPercent !== undefined && { maxLossPercent: String(maxLossPercent) }),
+        ...(targetProfitPercent !== undefined && { targetProfitPercent: String(targetProfitPercent) }),
+        ...(maxTradesPerDay !== undefined && { maxTradesPerDay }),
+        ...(revengeWindowMinutes !== undefined && { revengeWindowMinutes }),
+        updatedAt: new Date(),
+      }).where(eq(tradingRules.userId, userId)).returning();
+      res.json(updated[0]);
+    } catch (err) {
+      console.error("forex/rules PUT error:", err);
+      res.status(500).json({ message: "Failed to update rules" });
+    }
+  });
+
+  // GET /api/forex/insights — Best pair, winrate breakdown, most profitable hour
+  app.get("/api/forex/insights", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const allTrades = await db.select().from(forexTrades).where(eq(forexTrades.userId, userId));
+
+      if (allTrades.length === 0) return res.json({ bestPair: null, worstPair: null, bySymbol: [], byHour: [] });
+
+      // Group by symbol
+      const bySymbolMap: Record<string, { symbol: string; profit: number; loss: number; wins: number; total: number }> = {};
+      for (const t of allTrades) {
+        if (!bySymbolMap[t.symbol]) bySymbolMap[t.symbol] = { symbol: t.symbol, profit: 0, loss: 0, wins: 0, total: 0 };
+        const p = Number(t.profit);
+        bySymbolMap[t.symbol].total++;
+        if (p > 0) { bySymbolMap[t.symbol].profit += p; bySymbolMap[t.symbol].wins++; }
+        else { bySymbolMap[t.symbol].loss += p; }
+      }
+      const bySymbol = Object.values(bySymbolMap).map(s => ({ ...s, net: s.profit + s.loss, winRate: (s.wins / s.total) * 100 }));
+      const bestPair  = bySymbol.sort((a, b) => b.net - a.net)[0]?.symbol ?? null;
+      const worstPair = [...bySymbol].sort((a, b) => a.net - b.net)[0]?.symbol ?? null;
+
+      // Group by hour
+      const byHourMap: Record<number, { hour: number; profit: number; count: number }> = {};
+      for (const t of allTrades) {
+        if (!t.createdAt) continue;
+        const h = new Date(t.createdAt).getHours();
+        if (!byHourMap[h]) byHourMap[h] = { hour: h, profit: 0, count: 0 };
+        byHourMap[h].profit += Number(t.profit);
+        byHourMap[h].count++;
+      }
+      const byHour = Object.values(byHourMap).sort((a, b) => a.hour - b.hour);
+
+      res.json({ bestPair, worstPair, bySymbol, byHour });
+    } catch (err) {
+      console.error("forex/insights error:", err);
+      res.status(500).json({ message: "Failed to fetch insights" });
+    }
+  });
+
+  // POST /api/forex/psychology — Check psychology alerts before submitting trade
+  app.post("/api/forex/psychology", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { accountBalance } = req.body as { accountBalance?: number };
+
+      const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+      const todayEnd   = new Date(); todayEnd.setHours(23,59,59,999);
+      const allTrades  = await db.select().from(forexTrades).where(eq(forexTrades.userId, userId));
+      const todayTrades = allTrades.filter(t => t.createdAt && t.createdAt >= todayStart && t.createdAt <= todayEnd);
+
+      let rules = await db.select().from(tradingRules).where(eq(tradingRules.userId, userId)).then(r => r[0]);
+      if (!rules) {
+        const ins = await db.insert(tradingRules).values({ userId }).returning();
+        rules = ins[0];
+      }
+
+      const alerts: Array<{ type: string; message: string; severity: "warning" | "danger" | "info" }> = [];
+
+      const todayLoss   = todayTrades.filter(t => Number(t.profit) < 0).reduce((s, t) => s + Math.abs(Number(t.profit)), 0);
+      const todayProfit = todayTrades.filter(t => Number(t.profit) > 0).reduce((s, t) => s + Number(t.profit), 0);
+      const balance     = accountBalance ?? 0;
+
+      // 1. Daily loss limit
+      if (balance > 0) {
+        const lossThreshold = balance * (Number(rules.maxLossPercent) / 100);
+        if (todayLoss >= lossThreshold) {
+          alerts.push({ type: "daily_loss_limit", severity: "danger", message: `Kamu sudah mencapai batas kerugian harian (${rules.maxLossPercent}%). Istirahat sekarang.` });
+        }
+      }
+
+      // 2. Profit target reminder
+      if (balance > 0) {
+        const profitThreshold = balance * (Number(rules.targetProfitPercent) / 100);
+        if (todayProfit >= profitThreshold) {
+          alerts.push({ type: "profit_target", severity: "info", message: `Profit sudah ${rules.targetProfitPercent}% hari ini. Mau lanjut atau istirahat?` });
+        }
+      }
+
+      // 3. Overtrading
+      if (todayTrades.length >= rules.maxTradesPerDay) {
+        alerts.push({ type: "overtrading", severity: "warning", message: `Overtrading terdeteksi — ${todayTrades.length} trade hari ini melebihi batas ${rules.maxTradesPerDay}.` });
+      }
+
+      // 4. Revenge trading
+      const sortedByTime = [...allTrades].sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+      const lastTrade = sortedByTime[0];
+      if (lastTrade && Number(lastTrade.profit) < 0 && lastTrade.createdAt) {
+        const minsAgo = (Date.now() - lastTrade.createdAt.getTime()) / 60_000;
+        if (minsAgo < rules.revengeWindowMinutes) {
+          alerts.push({ type: "revenge_trading", severity: "danger", message: `Tenang dulu. Trade terakhir rugi ${Math.round(minsAgo)} menit lalu — jangan balas dendam market.` });
+        }
+      }
+
+      res.json({ alerts, todayStats: { count: todayTrades.length, loss: todayLoss, profit: todayProfit } });
+    } catch (err) {
+      console.error("forex/psychology error:", err);
+      res.status(500).json({ message: "Failed to check psychology" });
     }
   });
 

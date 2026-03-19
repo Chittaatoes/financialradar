@@ -318,6 +318,37 @@ export const insertBudgetPlanSchema = createInsertSchema(budgetPlans).omit({ id:
 export type BudgetPlan = typeof budgetPlans.$inferSelect;
 export type InsertBudgetPlan = z.infer<typeof insertBudgetPlanSchema>;
 
+// === TRADING RULES TABLE ===
+export const tradingRules = pgTable("trading_rules", {
+  id:                    integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId:                varchar("user_id").notNull().references(() => users.id).unique(),
+  maxLossPercent:        numeric("max_loss_percent", { precision: 5, scale: 2 }).notNull().default("1"),
+  targetProfitPercent:   numeric("target_profit_percent", { precision: 5, scale: 2 }).notNull().default("2"),
+  maxTradesPerDay:       integer("max_trades_per_day").notNull().default(10),
+  revengeWindowMinutes:  integer("revenge_window_minutes").notNull().default(5),
+  updatedAt:             timestamp("updated_at").defaultNow(),
+});
+
+export const insertTradingRulesSchema = createInsertSchema(tradingRules).omit({ id: true, updatedAt: true });
+export type TradingRules = typeof tradingRules.$inferSelect;
+export type InsertTradingRules = z.infer<typeof insertTradingRulesSchema>;
+
+// === TRADING STATS DAILY TABLE ===
+export const tradingStatsDaily = pgTable("trading_stats_daily", {
+  id:          integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId:      varchar("user_id").notNull().references(() => users.id),
+  date:        date("date").notNull(),
+  totalProfit: numeric("total_profit", { precision: 15, scale: 2 }).notNull().default("0"),
+  totalLoss:   numeric("total_loss",   { precision: 15, scale: 2 }).notNull().default("0"),
+  net:         numeric("net",          { precision: 15, scale: 2 }).notNull().default("0"),
+  tradeCount:  integer("trade_count").notNull().default(0),
+  updatedAt:   timestamp("updated_at").defaultNow(),
+});
+
+export const insertTradingStatsDailySchema = createInsertSchema(tradingStatsDaily).omit({ id: true, updatedAt: true });
+export type TradingStatsDaily = typeof tradingStatsDaily.$inferSelect;
+export type InsertTradingStatsDaily = z.infer<typeof insertTradingStatsDailySchema>;
+
 // === FOREX TRADES TABLE ===
 // Trading history uploaded from MT4/MT5 screenshots via OCR
 export const forexTrades = pgTable("forex_trades", {

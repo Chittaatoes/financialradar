@@ -101,6 +101,24 @@ Browser → Vite dev server (port 5000, /api proxy) → Express API (port 5001) 
 - **daily_focus** — Daily missions (3 per day)
 - **custom_categories** — User-defined transaction categories (Google users only)
 - **budget_plans** — Monthly budget strategies
+- **forex_trades** — MT4/MT5 trade history (symbol, type, lot, openPrice, closePrice, profit, source)
+- **trading_rules** — Per-user discipline settings (maxLossPercent, targetProfitPercent, maxTradesPerDay, revengeWindowMinutes)
+- **trading_stats_daily** — Aggregated daily trading performance (totalProfit, totalLoss, net, tradeCount)
+- **stock_holdings** — Investment portfolio holdings (IDX stocks)
+
+## Forex Trading Tracker Feature (`/forex`)
+Full trading journal with psychology/discipline coaching:
+- **Upload Flow:** Screenshot upload → OCR text → regex parser (MT4/MT5 formats) → editable preview → save with duplicate detection
+- **Dashboard:** Today's net/profit/loss/count, all-time stats, win rate
+- **Psychology System:**
+  - Daily loss limit alert (default 1% of balance)
+  - Profit target reminder (default 2% of balance)
+  - Overtrading detection (>10 trades/day)
+  - Revenge trading detection (<5 min after a loss)
+- **Insights:** Best/worst pair, win rate per pair, profit chart by hour
+- **Discipline Rules:** User-configurable trading limits (`PUT /api/forex/rules`)
+- **API Routes:** `/api/forex/parse`, `/api/forex/save`, `/api/forex/trades`, `/api/forex/stats`, `/api/forex/rules`, `/api/forex/insights`, `/api/forex/psychology`
+- **Parser:** `backend/src/services/forex-parser.ts` — 6 regex patterns for MT4/MT5 formats, symbol normalization (removes .sc suffix)
 
 ## Environment Variables
 

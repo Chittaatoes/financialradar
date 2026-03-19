@@ -41,6 +41,7 @@ const MarketPage = lazy(() => import("@/pages/market"));
 const ToolsPage = lazy(() => import("@/pages/tools"));
 const AiAdvisorPage = lazy(() => import("@/pages/ai-advisor"));
 const InvestPage = lazy(() => import("@/pages/invest"));
+const ForexPage  = lazy(() => import("@/pages/forex"));
 
 function useNavPlusHandler() {
   const [location, setLocation] = useLocation();
@@ -110,6 +111,7 @@ function AuthenticatedLayout() {
                 <Route path="/tools" component={ToolsPage} />
                 <Route path="/ai-advisor" component={AiAdvisorPage} />
                 <Route path="/invest" component={InvestPage} />
+                <Route path="/forex"  component={ForexPage} />
                 <Route component={NotFound} />
               </Switch>
             </Suspense>

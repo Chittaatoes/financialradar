@@ -86,6 +86,7 @@ export function AppSidebar() {
     { title: "Tools", url: "/tools", icon: Calculator },
     { title: "AI Advisor", url: "/ai-advisor", icon: Bot },
     { title: "Investasi", url: "/invest", icon: CandlestickChart },
+    { title: "Forex Tracker", url: "/forex", icon: TrendingUp },
   ];
 
   return (

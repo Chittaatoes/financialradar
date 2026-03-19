@@ -318,6 +318,57 @@ export const insertBudgetPlanSchema = createInsertSchema(budgetPlans).omit({ id:
 export type BudgetPlan = typeof budgetPlans.$inferSelect;
 export type InsertBudgetPlan = z.infer<typeof insertBudgetPlanSchema>;
 
+// === FOREX TRADES TABLE ===
+export const forexTrades = pgTable("forex_trades", {
+  id:         integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId:     varchar("user_id").notNull().references(() => users.id),
+  symbol:     text("symbol").notNull(),
+  type:       text("type").notNull(),
+  lot:        numeric("lot",        { precision: 10, scale: 2 }).notNull(),
+  openPrice:  numeric("open_price", { precision: 15, scale: 5 }).notNull(),
+  closePrice: numeric("close_price",{ precision: 15, scale: 5 }).notNull(),
+  profit:     numeric("profit",     { precision: 15, scale: 2 }).notNull(),
+  source:     text("source").notNull().default("image"),
+  createdAt:  timestamp("created_at").defaultNow(),
+});
+
+export const insertForexTradeSchema = createInsertSchema(forexTrades).omit({ id: true, createdAt: true });
+export type ForexTrade     = typeof forexTrades.$inferSelect;
+export type InsertForexTrade = z.infer<typeof insertForexTradeSchema>;
+
+// === TRADING RULES TABLE ===
+// Per-user psychology/discipline settings
+export const tradingRules = pgTable("trading_rules", {
+  id:                    integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId:                varchar("user_id").notNull().references(() => users.id).unique(),
+  maxLossPercent:        numeric("max_loss_percent", { precision: 5, scale: 2 }).notNull().default("1"),
+  targetProfitPercent:   numeric("target_profit_percent", { precision: 5, scale: 2 }).notNull().default("2"),
+  maxTradesPerDay:       integer("max_trades_per_day").notNull().default(10),
+  revengeWindowMinutes:  integer("revenge_window_minutes").notNull().default(5),
+  updatedAt:             timestamp("updated_at").defaultNow(),
+});
+
+export const insertTradingRulesSchema = createInsertSchema(tradingRules).omit({ id: true, updatedAt: true });
+export type TradingRules = typeof tradingRules.$inferSelect;
+export type InsertTradingRules = z.infer<typeof insertTradingRulesSchema>;
+
+// === TRADING STATS DAILY TABLE ===
+// Aggregated per-user per-day trading performance
+export const tradingStatsDaily = pgTable("trading_stats_daily", {
+  id:          integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId:      varchar("user_id").notNull().references(() => users.id),
+  date:        date("date").notNull(),
+  totalProfit: numeric("total_profit", { precision: 15, scale: 2 }).notNull().default("0"),
+  totalLoss:   numeric("total_loss",   { precision: 15, scale: 2 }).notNull().default("0"),
+  net:         numeric("net",          { precision: 15, scale: 2 }).notNull().default("0"),
+  tradeCount:  integer("trade_count").notNull().default(0),
+  updatedAt:   timestamp("updated_at").defaultNow(),
+});
+
+export const insertTradingStatsDailySchema = createInsertSchema(tradingStatsDaily).omit({ id: true, updatedAt: true });
+export type TradingStatsDaily = typeof tradingStatsDaily.$inferSelect;
+export type InsertTradingStatsDaily = z.infer<typeof insertTradingStatsDailySchema>;
+
 // === STOCK HOLDINGS TABLE ===
 // Portfolio: each row is one holding entry. 1 lot = 100 lembar (IDX convention).
 export const stockHoldings = pgTable("stock_holdings", {
