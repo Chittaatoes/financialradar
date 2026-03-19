@@ -1,0 +1,65 @@
+23:22:01.333 Running build in Washington, D.C., USA (East) – iad1
+23:22:01.334 Build machine configuration: 2 cores, 8 GB
+23:22:01.349 Cloning github.com/Chittaatoes/financialradar (Branch: main, Commit: a95c2ef)
+23:22:01.350 Skipping build cache, deployment was triggered without cache.
+23:22:02.080 Cloning completed: 731.000ms
+23:22:02.434 Running "vercel build"
+23:22:03.069 Vercel CLI 50.32.4
+23:22:03.864 Installing dependencies...
+23:22:07.165 npm warn deprecated sourcemap-codec@1.4.8: Please use @jridgewell/sourcemap-codec instead
+23:22:08.400 npm warn deprecated source-map@0.8.0-beta.0: The work that was done in this beta branch won't be included in future versions
+23:22:10.116 npm warn deprecated glob@11.1.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+23:22:13.866 
+23:22:13.866 added 573 packages in 9s
+23:22:13.867 
+23:22:13.868 120 packages are looking for funding
+23:22:13.868   run `npm fund` for details
+23:22:14.018 
+23:22:14.019 > build
+23:22:14.019 > vite build
+23:22:14.019 
+23:22:15.371 [36mvite v6.4.1 [32mbuilding for production...[36m[39m
+23:22:15.705 transforming...
+23:22:17.120 
+23:22:17.121 A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+23:22:21.616 [32m✓[39m 3338 modules transformed.
+23:22:24.190 
+23:22:24.191 PWA v0.21.2
+23:22:24.191 mode      generateSW
+23:22:24.191 precache  2 entries (0.00 KiB)
+23:22:24.191 files generated
+23:22:24.191   dist/sw.js
+23:22:24.191   dist/workbox-59aa6eed.js
+23:22:24.192 warnings
+23:22:24.192   One of the glob patterns doesn't match any files. Please remove or fix the following: {
+23:22:24.192   "globDirectory": "/vercel/path0/frontend/dist",
+23:22:24.192   "globPattern": "**/*.{js,css,html,ico,png,svg,woff,woff2,webmanifest}",
+23:22:24.192   "globIgnores": [
+23:22:24.193     "**/node_modules/**",
+23:22:24.193     "sw.js",
+23:22:24.193     "workbox-*.js"
+23:22:24.193   ]
+23:22:24.193 }
+23:22:24.193 
+23:22:24.197 [31m✗[39m Build failed in 8.80s
+23:22:24.197 [31merror during build:
+23:22:24.198 [31m[vite-plugin-pwa:build] There was an error during the build:
+23:22:24.198   src/pages/forex.tsx (16:9): "RiskCalculatorCard" is not exported by "src/components/risk-calculator-card.tsx", imported by "src/pages/forex.tsx".
+23:22:24.198 Additionally, handling the error in the 'buildEnd' hook caused the following error:
+23:22:24.199   src/pages/forex.tsx (16:9): "RiskCalculatorCard" is not exported by "src/components/risk-calculator-card.tsx", imported by "src/pages/forex.tsx".[31m
+23:22:24.199 file: [36m/vercel/path0/frontend/src/pages/forex.tsx:16:9[31m
+23:22:24.199 [33m
+23:22:24.199 14: import { apiRequest } from "@/lib/queryClient";
+23:22:24.199 15: import { ForexUploadSheet } from "@/components/forex-upload-sheet";
+23:22:24.200 16: import { RiskCalculatorCard } from "@/components/risk-calculator-card";
+23:22:24.200              ^
+23:22:24.200 17: import { cn } from "@/lib/utils";
+23:22:24.200 [31m
+23:22:24.200     at getRollupError (file:///vercel/path0/frontend/node_modules/vite/node_modules/rollup/dist/es/shared/parseAst.js:402:41)
+23:22:24.200     at file:///vercel/path0/frontend/node_modules/vite/node_modules/rollup/dist/es/shared/node-entry.js:23467:39
+23:22:24.201     at async catchUnfinishedHookActions (file:///vercel/path0/frontend/node_modules/vite/node_modules/rollup/dist/es/shared/node-entry.js:22925:16)
+23:22:24.201     at async rollupInternal (file:///vercel/path0/frontend/node_modules/vite/node_modules/rollup/dist/es/shared/node-entry.js:23450:5)
+23:22:24.201     at async buildEnvironment (file:///vercel/path0/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:46235:14)
+23:22:24.201     at async Object.defaultBuildApp [as buildApp] (file:///vercel/path0/frontend/node_modules/vite/dist/node/chunks/dep-D4NMHUTW.js:46713:5)
+23:22:24.201     at async CAC.<anonymous> (file:///vercel/path0/frontend/node_modules/vite/dist/node/cli.js:863:7)[39m
+23:22:24.264 Error: Command "npm run build" exited with 1
