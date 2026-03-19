@@ -2902,24 +2902,26 @@ STYLE
         return res.status(400).json({ message: "trades array is required" });
       }
 
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date();
-      todayEnd.setHours(23, 59, 59, 999);
-
       let inserted = 0;
       let duplicates = 0;
 
       for (const trade of trades) {
+        // A trade is a duplicate only when all five fields match within a
+        // rolling 5-minute window.  This lets the same pair trade again later
+        // in the day at the same price level (different lot → different profit)
+        // while still blocking accidental re-uploads of the same screenshot.
+        const windowStart = new Date(Date.now() - 5 * 60 * 1000);
+
         const existing = await db.query.forexTrades.findFirst({
           where: and(
-            eq(forexTrades.userId, userId),
-            eq(forexTrades.symbol, trade.symbol),
-            eq(forexTrades.type, trade.type.toLowerCase()),
+            eq(forexTrades.userId,    userId),
+            eq(forexTrades.symbol,    trade.symbol),
+            eq(forexTrades.type,      trade.type.toLowerCase()),
+            eq(forexTrades.lot,       String(trade.lot)),
             eq(forexTrades.openPrice, String(trade.openPrice)),
-            eq(forexTrades.closePrice, String(trade.closePrice)),
-            gte(forexTrades.createdAt, todayStart),
-            lte(forexTrades.createdAt, todayEnd),
+            eq(forexTrades.closePrice,String(trade.closePrice)),
+            eq(forexTrades.profit,    String(trade.profit)),
+            gte(forexTrades.createdAt, windowStart),
           ),
         });
 

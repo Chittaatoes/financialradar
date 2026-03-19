@@ -1,0 +1,140 @@
+Fix missing trades issue after successful parsing in Forex feature.
+
+Parser is already correct (multi-line grouped strategy works), but some trades are not showing or are missing.
+
+---
+
+# 🎯 MAIN ISSUE
+
+Trades are being incorrectly:
+
+* filtered as duplicates
+* overwritten in frontend state
+* merged due to wrong React key
+
+---
+
+# ✅ STEP 1: FIX DUPLICATE DETECTION (CRITICAL)
+
+Current duplicate logic is too aggressive.
+
+UPDATE rule:
+
+A trade is duplicate ONLY IF:
+
+* same userId
+* same symbol
+* same openPrice
+* same closePrice
+* same type
+* AND timestamp is within ±1 minute
+
+---
+
+### Add timestamp tolerance:
+
+```ts
+const isDuplicate = await db.query.trades.findFirst({
+  where: and(
+    eq(trades.userId, userId),
+    eq(trades.symbol, trade.symbol),
+    eq(trades.openPrice, trade.openPrice),
+    eq(trades.closePrice, trade.closePrice),
+    eq(trades.type, trade.type),
+    gte(trades.createdAt, new Date(trade.createdAt - 60000)),
+    lte(trades.createdAt, new Date(trade.createdAt + 60000))
+  )
+})
+```
+
+---
+
+# ✅ STEP 2: ADD UNIQUE HASH (BETTER)
+
+Instead of relying only on price:
+
+```ts
+const tradeHash = `${symbol}-${type}-${openPrice}-${closePrice}-${profit}-${Date.now()}`
+```
+
+Store it in DB:
+
+* prevents accidental overwrite
+
+---
+
+# ✅ STEP 3: FIX FRONTEND STATE MERGE
+
+DO NOT overwrite trades.
+
+Replace:
+
+```ts
+setTrades(newTrades)
+```
+
+WITH:
+
+```ts
+setTrades(prev => [...prev, ...newTrades])
+```
+
+---
+
+# ✅ STEP 4: FIX REACT KEY (IMPORTANT)
+
+Replace:
+
+```tsx
+key={trade.symbol}
+```
+
+WITH:
+
+```tsx
+key={`${trade.symbol}-${trade.openPrice}-${trade.closePrice}-${index}`}
+```
+
+---
+
+# ✅ STEP 5: DEBUG FRONTEND
+
+Add log:
+
+```ts
+console.log("TRADES FROM API:", trades)
+```
+
+Check:
+
+* API returns full data?
+* UI shows less?
+
+---
+
+# ✅ STEP 6: DO NOT GROUP TRADES
+
+Ensure no grouping like:
+
+```ts
+groupBy(symbol)
+```
+
+Each trade must be independent.
+
+---
+
+# 🎯 EXPECTED RESULT
+
+* All SELL trades appear correctly
+* No missing entries
+* No accidental merge
+* Duplicate detection only blocks exact same trade
+
+---
+
+# 🔥 BONUS
+
+If user uploads same screenshot twice:
+
+* duplicates shou

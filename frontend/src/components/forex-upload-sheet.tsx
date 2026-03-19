@@ -276,7 +276,7 @@ export function ForexUploadSheet({ open, onClose }: Props) {
 
                   {trades.map((trade, i) => (
                     <TradeEditCard
-                      key={i}
+                      key={`${trade.symbol}-${trade.type}-${trade.openPrice}-${trade.closePrice}-${i}`}
                       trade={trade}
                       index={i}
                       onChange={updateTrade}
