@@ -62,23 +62,24 @@ interface ForexTrade {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(n);
+const USD_IDR_RATE = 15_500;
+
+function fmtProfit(n: number, currency: "USD" | "IDR"): string {
+  const sign = n >= 0 ? "+" : "";
+  if (currency === "USD") return `${sign}${n.toFixed(2)}`;
+  const v = n * USD_IDR_RATE;
+  if (Math.abs(v) >= 1_000_000) return `${sign}Rp ${(v / 1_000_000).toFixed(1)}jt`;
+  if (Math.abs(v) >= 1_000)     return `${sign}Rp ${(v / 1_000).toFixed(0)}rb`;
+  return `${sign}Rp ${Math.round(v)}`;
 }
 
-function fmtCompact(n: number) {
-  if (Math.abs(n) >= 1_000_000) return `Rp ${(n / 1_000_000).toFixed(1)}jt`;
-  if (Math.abs(n) >= 1_000) return `Rp ${(n / 1_000).toFixed(0)}rb`;
-  return `Rp ${n.toFixed(0)}`;
-}
-
-function ProfitBadge({ profit }: { profit: number }) {
+function ProfitBadge({ profit, currency }: { profit: number; currency: "USD" | "IDR" }) {
   const pos = profit >= 0;
   return (
     <span className={cn("flex items-center gap-0.5 font-semibold tabular-nums text-sm",
       pos ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400")}>
       {pos ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownLeft className="w-3.5 h-3.5" />}
-      {pos ? "+" : ""}{fmtCompact(profit)}
+      {fmtProfit(profit, currency)}
     </span>
   );
 }
@@ -150,7 +151,7 @@ function RulesEditor({ rules, onSave }: { rules: TradingRules; onSave: (r: Parti
   );
 }
 
-function TradeRow({ t }: { t: ForexTrade }) {
+function TradeRow({ t, currency }: { t: ForexTrade; currency: "USD" | "IDR" }) {
   const profit = Number(t.profit);
   const isWin  = profit >= 0;
   const date   = t.createdAt ? new Date(t.createdAt).toLocaleDateString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "-";
@@ -170,7 +171,7 @@ function TradeRow({ t }: { t: ForexTrade }) {
           <p className="text-[10px] text-muted-foreground">{date}</p>
         </div>
       </div>
-      <ProfitBadge profit={profit} />
+      <ProfitBadge profit={profit} currency={currency} />
     </div>
   );
 }
@@ -187,7 +188,7 @@ function WinRateBar({ wins, total }: { wins: number; total: number }) {
   );
 }
 
-function HourChart({ byHour }: { byHour: ForexInsights["byHour"] }) {
+function HourChart({ byHour, currency }: { byHour: ForexInsights["byHour"]; currency: "USD" | "IDR" }) {
   if (byHour.length === 0) return <p className="text-xs text-muted-foreground text-center py-4">Belum ada data</p>;
   const maxAbs = Math.max(...byHour.map(h => Math.abs(h.profit)), 1);
   return (
@@ -196,7 +197,7 @@ function HourChart({ byHour }: { byHour: ForexInsights["byHour"] }) {
         const pct = Math.abs(h.profit) / maxAbs;
         const pos = h.profit >= 0;
         return (
-          <div key={h.hour} className="flex flex-col items-center flex-1 gap-0.5" title={`${h.hour}:00 — ${fmtCompact(h.profit)}`}>
+          <div key={h.hour} className="flex flex-col items-center flex-1 gap-0.5" title={`${h.hour}:00 — ${fmtProfit(h.profit, currency)}`}>
             <div className="flex-1 flex items-end w-full">
               <div
                 className={cn("w-full rounded-t-sm min-h-[2px]", pos ? "bg-emerald-500" : "bg-red-400")}
@@ -219,6 +220,7 @@ export default function ForexPage() {
   const [uploadOpen, setUploadOpen]   = useState(false);
   const [rulesOpen,  setRulesOpen]    = useState(false);
   const [showAll,    setShowAll]      = useState(false);
+  const [currency,   setCurrency]     = useState<"USD" | "IDR">("USD");
 
   const { data: stats, isLoading: statsLoading } = useQuery<ForexStats>({
     queryKey: ["/api/forex/stats"],
@@ -293,9 +295,9 @@ export default function ForexPage() {
           </div>
         ) : (
           <div className="flex gap-2 overflow-x-auto pb-1">
-            <StatCard label="Net Profit" value={fmtCompact(stats?.today.net ?? 0)} positive={(stats?.today.net ?? 0) >= 0} />
-            <StatCard label="Total Profit" value={fmtCompact(stats?.today.profit ?? 0)} positive />
-            <StatCard label="Total Loss"   value={fmtCompact(stats?.today.loss ?? 0)} positive={false} />
+            <StatCard label="Net Profit" value={fmtProfit(stats?.today.net ?? 0, currency)} positive={(stats?.today.net ?? 0) >= 0} />
+            <StatCard label="Total Profit" value={fmtProfit(stats?.today.profit ?? 0, currency)} positive />
+            <StatCard label="Total Loss"   value={fmtProfit(stats?.today.loss ?? 0, currency)} positive={false} />
             <StatCard label="Trades" value={String(stats?.today.count ?? 0)} neutral />
           </div>
         )}
@@ -314,7 +316,7 @@ export default function ForexPage() {
               <div className="text-center">
                 <p className="text-xs text-muted-foreground">Total Net</p>
                 <p className={cn("text-sm font-bold tabular-nums", (stats?.allTime.net ?? 0) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500")}>
-                  {fmtCompact(stats?.allTime.net ?? 0)}
+                  {fmtProfit(stats?.allTime.net ?? 0, currency)}
                 </p>
               </div>
               <div className="text-center">
@@ -396,7 +398,7 @@ export default function ForexPage() {
                         <div className="flex justify-between text-xs">
                           <span className="font-medium">{s.symbol}</span>
                           <span className={s.net >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}>
-                            {fmtCompact(s.net)}
+                            {fmtProfit(s.net, currency)}
                           </span>
                         </div>
                         <WinRateBar wins={s.wins} total={s.total} />
@@ -412,7 +414,7 @@ export default function ForexPage() {
                   <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5" /> Profit per Jam
                   </p>
-                  <HourChart byHour={insights.byHour} />
+                  <HourChart byHour={insights.byHour} currency={currency} />
                 </div>
               )}
 
@@ -427,9 +429,27 @@ export default function ForexPage() {
       {/* Trade History */}
       <Card>
         <CardHeader className="py-3 px-4">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Zap className="w-4 h-4 text-yellow-500" /> Riwayat Trade
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Zap className="w-4 h-4 text-yellow-500" /> Riwayat Trade
+            </CardTitle>
+            <div className="flex items-center rounded-lg border border-border overflow-hidden text-xs font-medium">
+              <button
+                onClick={() => setCurrency("USD")}
+                className={cn("px-2.5 py-1 transition-colors",
+                  currency === "USD" ? "bg-violet-600 text-white" : "hover:bg-muted text-muted-foreground")}
+              >
+                USD
+              </button>
+              <button
+                onClick={() => setCurrency("IDR")}
+                className={cn("px-2.5 py-1 transition-colors",
+                  currency === "IDR" ? "bg-violet-600 text-white" : "hover:bg-muted text-muted-foreground")}
+              >
+                IDR
+              </button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="px-4 pb-2">
           {tradesLoading ? (
@@ -444,7 +464,7 @@ export default function ForexPage() {
             </div>
           ) : (
             <>
-              {displayedTrades.map(t => <TradeRow key={t.id} t={t} />)}
+              {displayedTrades.map(t => <TradeRow key={t.id} t={t} currency={currency} />)}
               {trades.length > 10 && (
                 <Button variant="ghost" size="sm" className="w-full mt-2 text-xs" onClick={() => setShowAll(o => !o)}>
                   {showAll ? "Tampilkan lebih sedikit" : `Tampilkan semua (${trades.length} trade)`}

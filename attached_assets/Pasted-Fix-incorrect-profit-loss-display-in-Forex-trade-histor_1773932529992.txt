@@ -1,0 +1,143 @@
+Fix incorrect profit/loss display in Forex trade history.
+
+Current issue:
+
+* Profit values shown in UI do NOT match parsed data
+* Values appear fixed or incorrect (e.g., always Rp 5rb)
+
+---
+
+# 🎯 OBJECTIVE
+
+1. Display exact profit from parsed trades
+2. Support currency toggle: USD / IDR
+3. Preserve decimal precision in USD
+4. Convert correctly to IDR when needed
+
+---
+
+# ⚙️ STEP 1: USE REAL PROFIT VALUE
+
+Ensure UI uses:
+
+```ts
+trade.profit
+```
+
+NOT:
+
+* hardcoded values
+* rounded placeholders
+
+---
+
+# ⚙️ STEP 2: ADD USER CURRENCY SETTING
+
+Create state:
+
+```ts
+const [currency, setCurrency] = useState<'USD' | 'IDR'>('USD')
+```
+
+---
+
+# ⚙️ STEP 3: FORMAT USD DISPLAY
+
+```ts
+const formatUSD = (value: number) => {
+  return `${value > 0 ? '+' : ''}${value.toFixed(2)}`
+}
+```
+
+Example:
++315.00
+-125.00
+
+---
+
+# ⚙️ STEP 4: CONVERT TO IDR
+
+Use static rate (or API later):
+
+```ts
+const RATE = 15500
+```
+
+Convert:
+
+```ts
+const toIDR = (usd: number) => usd * RATE
+```
+
+---
+
+# ⚙️ STEP 5: FORMAT IDR
+
+```ts
+const formatIDR = (value: number) => {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0
+  }).format(value)
+}
+```
+
+---
+
+# ⚙️ STEP 6: DISPLAY LOGIC
+
+```tsx
+const displayProfit =
+  currency === 'USD'
+    ? formatUSD(trade.profit)
+    : formatIDR(toIDR(trade.profit))
+```
+
+---
+
+# ⚙️ STEP 7: COLOR LOGIC
+
+```ts
+const color = trade.profit >= 0 ? 'green' : 'red'
+```
+
+---
+
+# ⚙️ STEP 8: UI TOGGLE
+
+Add toggle button:
+
+* USD
+* IDR
+
+Example:
+
+```tsx
+<button onClick={() => setCurrency('USD')}>USD</button>
+<button onClick={() => setCurrency('IDR')}>IDR</button>
+```
+
+---
+
+# ⚠️ IMPORTANT
+
+* NEVER modify original profit value
+* Always store profit in original currency (USD)
+* Only convert for display
+
+---
+
+# 🎯 EXPECTED RESULT
+
+USD mode:
++315.00
+-125.00
+
+IDR mode:
++Rp 4.882.500
+-Rp 1.937.500
+
+---
+
+Make sure values exactly match parsed trades.

@@ -1,0 +1,243 @@
+Build a "Smart Lot Size Recommendation & Risk Management System" for my Forex feature.
+
+This system must guide users to avoid using oversized lots based on their balance.
+
+---
+
+# 🎯 MAIN GOAL
+
+User sets:
+
+* Account balance (USD or IDR)
+* Account type (Standard / Cent)
+* Risk percentage per trade (default: 1%)
+
+System calculates:
+
+* Recommended lot size
+* Warns if user exceeds safe lot
+* Prevents over-risk trading
+
+---
+
+# 🧠 USER INPUT SETTINGS
+
+Create settings UI:
+
+1. Balance:
+
+   * Input number
+   * Example: 100 USD / 1,500,000 IDR
+
+2. Currency:
+
+   * USD / IDR
+
+3. Account Type:
+
+   * Standard
+   * Cent
+
+4. Risk per Trade:
+
+   * default: 1%
+   * editable (0.5% - 3%)
+
+---
+
+# ⚙️ STEP 1: NORMALIZE BALANCE
+
+If IDR → convert to USD:
+
+```ts
+const RATE = 15500
+const balanceUSD =
+  currency === 'IDR' ? balance / RATE : balance
+```
+
+---
+
+# ⚙️ STEP 2: HANDLE ACCOUNT TYPE
+
+If CENT account:
+
+```ts
+const effectiveBalance =
+  accountType === 'CENT'
+    ? balanceUSD / 100
+    : balanceUSD
+```
+
+---
+
+# ⚙️ STEP 3: CALCULATE RISK AMOUNT
+
+```ts
+const riskAmount = effectiveBalance * (riskPercent / 100)
+```
+
+Example:
+
+* Balance: $100
+* Risk: 1%
+  👉 riskAmount = $1
+
+---
+
+# ⚙️ STEP 4: ESTIMATE LOT SIZE
+
+Assume:
+
+* XAUUSD ≈ $10 per lot per $1 movement
+
+Basic formula:
+
+```ts
+const stopLoss = userInputSL || 10 // default 10 price distance
+
+const lotSize = riskAmount / (stopLoss * 10)
+```
+
+---
+
+# ⚙️ STEP 5: ROUND LOT
+
+```ts
+const recommendedLot = Math.max(0.01, Number(lotSize.toFixed(2)))
+```
+
+---
+
+# ⚙️ STEP 6: WARNING SYSTEM
+
+If user lot > recommended:
+
+Show warning:
+
+⚠️ "Lot terlalu besar untuk saldo kamu"
+
+Also calculate risk:
+
+```ts
+const actualRisk =
+  userLot * stopLoss * 10
+```
+
+---
+
+# ⚙️ STEP 7: UI DISPLAY
+
+Show:
+
+* Recommended Lot:
+  👉 0.02 lot
+
+* Risk Amount:
+  👉 $1 (1%)
+
+* If user input:
+  👉 show comparison
+
+Example:
+
+```ts
+Recommended: 0.02 lot
+Your Lot: 0.10 lot ❌
+Risk: $5 (5%)
+```
+
+---
+
+# ⚙️ STEP 8: AUTO SUGGESTION
+
+Add button:
+
+👉 "Gunakan Lot Aman"
+
+```ts
+setLot(recommendedLot)
+```
+
+---
+
+# ⚙️ STEP 9: TRADE VALIDATION
+
+Before saving trade:
+
+```ts
+if (userLot > recommendedLot * 2) {
+  blockTrade()
+}
+```
+
+---
+
+# 🧠 ADVANCED LOGIC (IMPORTANT)
+
+## Different Pair Handling
+
+For now support:
+
+* XAUUSD → multiplier = 10
+* BTCUSD → multiplier = 1 (simplified)
+
+```ts
+const multiplier =
+  symbol === 'XAUUSD' ? 10 : 1
+```
+
+---
+
+# 🎯 EXPECTED RESULT
+
+User with:
+
+* $100 balance
+* risk 1%
+
+Will get:
+
+👉 Recommended lot ≈ 0.01 - 0.02
+
+NOT:
+👉 0.10+ (danger)
+
+---
+
+# 🔥 UX IMPROVEMENTS
+
+* Show color:
+
+  * green = safe
+  * red = over-risk
+
+* Add label:
+  👉 "Safe Zone"
+  👉 "High Risk"
+
+---
+
+# 💾 STORE SETTINGS
+
+Table: trading_risk_settings
+
+* userId
+* balance
+* currency
+* accountType
+* riskPercent
+
+---
+
+# ⚠️ IMPORTANT
+
+* This system is advisory, not broker-level exact
+* Keep logic simple but realistic
+* Focus on user discipline, not precision
+
+---
+
+Build clean, modular:
+
+* riskCalculator.ts
+* useRisk.ts (frontend hook)
