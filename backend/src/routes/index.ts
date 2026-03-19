@@ -35,6 +35,7 @@ import { users } from "../../shared/models/auth";
 import { userProfiles, stockHoldings, transactions, forexTrades, tradingRules, tradingStatsDaily, tradingRiskSettings } from "../../shared/schema";
 import { eq, sql, count, and, like, gte, lte } from "drizzle-orm";
 import { parseForexTrades } from "../services/forex-parser";
+import { cached, CACHE_TTL, registerWarmup } from "../services/market-cache";
 
 // === REQUEST VALIDATION SCHEMAS ===
 // Zod schemas for validating POST/PATCH request bodies before database operations.
@@ -2131,15 +2132,8 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
   // MARKET FEATURE
   // ══════════════════════════════════════════════════════
 
-  // Cache simple in-memory (5 min TTL)
-  const marketCache: Record<string, { data: unknown; ts: number }> = {};
-  const CACHE_TTL = 5 * 60 * 1000;
-
-  function cached<T>(key: string, fn: () => Promise<T>): Promise<T> {
-    const hit = marketCache[key];
-    if (hit && Date.now() - hit.ts < CACHE_TTL) return Promise.resolve(hit.data as T);
-    return fn().then(data => { marketCache[key] = { data, ts: Date.now() }; return data; });
-  }
+  // Cache helpers are imported from ../services/market-cache (shared singleton)
+  // so the health endpoint warmup shares the same cache object as these routes.
 
   const translationCache = new Map<string, string>();
 
@@ -2163,87 +2157,7 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
   app.get("/api/market/prices", isAuthenticated, async (_req, res) => {
     try {
       const bucket = Math.floor(Date.now() / (5 * 60_000));
-      const data = await cached(`market_prices_${bucket}`, async () => {
-        const TO = 8_000;
-        const CC_HEADERS = { "User-Agent": "Mozilla/5.0 (compatible; FinancialRadar/1.0)", "Accept": "application/json" };
-
-        const [ccCryptoRes, fxRes, fxFallbackRes] = await Promise.all([
-          // CryptoCompare: BTC, ETH, PAXG (gold) all in IDR — reliable from cloud servers
-          fetch("https://min-api.cryptocompare.com/data/pricemultifull?fsyms=BTC,ETH,PAXG&tsyms=IDR,USD", { signal: AbortSignal.timeout(TO), headers: CC_HEADERS }).catch(() => null),
-          // Primary USD/IDR: open.er-api (free, no key, no cloud restrictions)
-          fetch("https://open.er-api.com/v6/latest/USD", { signal: AbortSignal.timeout(TO) }).catch(() => null),
-          // Fallback USD/IDR: Frankfurter
-          fetch("https://api.frankfurter.app/latest?from=USD&to=IDR", { signal: AbortSignal.timeout(TO) }).catch(() => null),
-        ]);
-
-        // ── USD/IDR ──────────────────────────────────────────────────────────
-        const erData  = fxRes?.ok      ? await fxRes.json()        as { rates?: { IDR?: number } } : null;
-        const fxData  = fxFallbackRes?.ok ? await fxFallbackRes.json() as { rates?: { IDR?: number } } : null;
-        const usdIdr  = erData?.rates?.IDR ?? fxData?.rates?.IDR ?? 16_800;
-
-        // ── CryptoCompare: BTC, ETH, PAXG ────────────────────────────────────
-        type CCRaw = { RAW?: Record<string, { IDR?: { PRICE?: number; CHANGEPCT24HOUR?: number } }> };
-        const ccData = ccCryptoRes?.ok ? await ccCryptoRes.json() as CCRaw : null;
-        const ccRaw  = ccData?.RAW ?? {};
-
-        let btcIdr    = Math.round(ccRaw.BTC?.IDR?.PRICE    ?? 0);
-        let ethIdr    = Math.round(ccRaw.ETH?.IDR?.PRICE    ?? 0);
-        let btcChange = ccRaw.BTC?.IDR?.CHANGEPCT24HOUR      ?? 0;
-        let ethChange = ccRaw.ETH?.IDR?.CHANGEPCT24HOUR      ?? 0;
-        const paxgIdr = ccRaw.PAXG?.IDR?.PRICE               ?? 0;
-        let goldGram  = paxgIdr > 0 ? Math.round(paxgIdr / 31.1035) : 0;
-        let goldChange = ccRaw.PAXG?.IDR?.CHANGEPCT24HOUR    ?? 0;
-
-        // ── CoinGecko fallback (for any missing values) ───────────────────────
-        if (btcIdr === 0 || ethIdr === 0 || goldGram === 0) {
-          try {
-            const cgRes = await fetch(
-              "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,pax-gold&vs_currencies=usd,idr&include_24hr_change=true",
-              { signal: AbortSignal.timeout(TO), headers: CC_HEADERS }
-            );
-            if (cgRes.ok) {
-              const cg = await cgRes.json() as Record<string, Record<string, number>>;
-              if (btcIdr === 0) {
-                btcIdr    = Math.round(cg?.bitcoin?.idr     ?? 0);
-                btcChange = cg?.bitcoin?.idr_24h_change      ?? 0;
-              }
-              if (ethIdr === 0) {
-                ethIdr    = Math.round(cg?.ethereum?.idr    ?? 0);
-                ethChange = cg?.ethereum?.idr_24h_change     ?? 0;
-              }
-              if (goldGram === 0) {
-                const paxg = cg?.["pax-gold"]?.idr ?? 0;
-                goldGram   = paxg > 0 ? Math.round(paxg / 31.1035) : 0;
-                goldChange = cg?.["pax-gold"]?.idr_24h_change ?? 0;
-              }
-            }
-          } catch {
-            // CoinGecko fallback failed silently
-          }
-        }
-
-        // ── Compute USD/IDR 24h change via er-api (today vs yesterday) ────────
-        let usdChange = 0;
-        try {
-          const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-          const yRes = await fetch(`https://api.frankfurter.app/${yesterday}?from=USD&to=IDR`, { signal: AbortSignal.timeout(TO) }).catch(() => null);
-          const yData = yRes?.ok ? await yRes.json() as { rates?: { IDR?: number } } : null;
-          const usdYest = yData?.rates?.IDR ?? usdIdr;
-          usdChange = parseFloat((((usdIdr - usdYest) / usdYest) * 100).toFixed(3));
-        } catch { /* ignore */ }
-
-        return {
-          usdIdr: Math.round(usdIdr),
-          goldGram,
-          bitcoin: btcIdr,
-          ethereum: ethIdr,
-          btcChange,
-          ethChange,
-          goldChange,
-          usdChange,
-          updatedAt: new Date().toISOString(),
-        };
-      });
+      const data = await cached(`market_prices_${bucket}`, fetchMarketPricesData);
       res.json(data);
     } catch (err) {
       console.error("Market prices error:", err);
@@ -3209,23 +3123,7 @@ STYLE
   app.get("/api/invest/ihsg", isAuthenticated, async (_req, res) => {
     try {
       const bucket = Math.floor(Date.now() / (5 * 60_000));
-      const data = await cached(`ihsg_${bucket}`, async () => {
-        const url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EJKSE?interval=5m&range=1d";
-        const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-        if (!r.ok) throw new Error(`Yahoo IHSG ${r.status}`);
-        const json = await r.json() as any;
-        const result = json.chart?.result?.[0];
-        if (!result) throw new Error("No IHSG data");
-        const meta = result.meta;
-        const timestamps: number[] = result.timestamp || [];
-        const closes: (number | null)[] = result.indicators?.quote?.[0]?.close || [];
-        const points = timestamps
-          .map((t, i) => ({ t: t * 1000, v: closes[i] }))
-          .filter(p => p.v != null) as { t: number; v: number }[];
-        const prev = meta.chartPreviousClose ?? meta.previousClose ?? meta.regularMarketPrice;
-        const price = meta.regularMarketPrice ?? prev;
-        return { price, prevClose: prev, change: price - prev, changePct: prev > 0 ? ((price - prev) / prev) * 100 : 0, points };
-      });
+      const data = await cached(`ihsg_${bucket}`, fetchIHSGData);
       res.json(data);
     } catch (err) {
       console.error("IHSG fetch error:", err);
@@ -3233,4 +3131,100 @@ STYLE
     }
   });
 
+  // ─── Cache warmup ─────────────────────────────────────────────────────────
+  // Called by /api/health so UptimeRobot pings pre-fill the cache.
+  // Returns instantly to the caller — all fetches run in the background.
+  registerWarmup(async () => {
+    const bucket = Math.floor(Date.now() / (5 * 60_000));
+    await Promise.allSettled([
+      cached(`market_prices_${bucket}`, fetchMarketPricesData),
+      cached(`ihsg_${bucket}`,          fetchIHSGData),
+    ]);
+  });
+
+}
+
+// ─── Standalone fetch helpers (used by route handlers AND warmup) ─────────────
+// Logic is defined once here; both the route handler and registerWarmup call
+// the same function so there is zero duplication.
+
+async function fetchIHSGData() {
+  const url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EJKSE?interval=5m&range=1d";
+  const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+  if (!r.ok) throw new Error(`Yahoo IHSG ${r.status}`);
+  const json = await r.json() as any;
+  const result = json.chart?.result?.[0];
+  if (!result) throw new Error("No IHSG data");
+  const meta = result.meta;
+  const timestamps: number[] = result.timestamp || [];
+  const closes: (number | null)[] = result.indicators?.quote?.[0]?.close || [];
+  const points = timestamps
+    .map((t: number, i: number) => ({ t: t * 1000, v: closes[i] }))
+    .filter((p: { t: number; v: number | null }) => p.v != null) as { t: number; v: number }[];
+  const prev  = meta.chartPreviousClose ?? meta.previousClose ?? meta.regularMarketPrice;
+  const price = meta.regularMarketPrice ?? prev;
+  return { price, prevClose: prev, change: price - prev, changePct: prev > 0 ? ((price - prev) / prev) * 100 : 0, points };
+}
+
+async function fetchMarketPricesData() {
+  const TO = 8_000;
+  const CC_HEADERS = { "User-Agent": "Mozilla/5.0 (compatible; FinancialRadar/1.0)", "Accept": "application/json" };
+
+  const [ccCryptoRes, fxRes, fxFallbackRes] = await Promise.all([
+    fetch("https://min-api.cryptocompare.com/data/pricemultifull?fsyms=BTC,ETH,PAXG&tsyms=IDR,USD", { signal: AbortSignal.timeout(TO), headers: CC_HEADERS }).catch(() => null),
+    fetch("https://open.er-api.com/v6/latest/USD", { signal: AbortSignal.timeout(TO) }).catch(() => null),
+    fetch("https://api.frankfurter.app/latest?from=USD&to=IDR", { signal: AbortSignal.timeout(TO) }).catch(() => null),
+  ]);
+
+  const erData = fxRes?.ok      ? await fxRes.json()        as { rates?: { IDR?: number } } : null;
+  const fxData = fxFallbackRes?.ok ? await fxFallbackRes.json() as { rates?: { IDR?: number } } : null;
+  const usdIdr = erData?.rates?.IDR ?? fxData?.rates?.IDR ?? 16_800;
+
+  type CCRaw = { RAW?: Record<string, { IDR?: { PRICE?: number; CHANGEPCT24HOUR?: number } }> };
+  const ccData = ccCryptoRes?.ok ? await ccCryptoRes.json() as CCRaw : null;
+  const ccRaw  = ccData?.RAW ?? {};
+
+  let btcIdr    = Math.round(ccRaw.BTC?.IDR?.PRICE    ?? 0);
+  let ethIdr    = Math.round(ccRaw.ETH?.IDR?.PRICE    ?? 0);
+  let btcChange = ccRaw.BTC?.IDR?.CHANGEPCT24HOUR      ?? 0;
+  let ethChange = ccRaw.ETH?.IDR?.CHANGEPCT24HOUR      ?? 0;
+  const paxgIdr = ccRaw.PAXG?.IDR?.PRICE               ?? 0;
+  let goldGram  = paxgIdr > 0 ? Math.round(paxgIdr / 31.1035) : 0;
+  let goldChange = ccRaw.PAXG?.IDR?.CHANGEPCT24HOUR    ?? 0;
+
+  if (btcIdr === 0 || ethIdr === 0 || goldGram === 0) {
+    try {
+      const cgRes = await fetch(
+        "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,pax-gold&vs_currencies=usd,idr&include_24hr_change=true",
+        { signal: AbortSignal.timeout(TO), headers: CC_HEADERS }
+      );
+      if (cgRes.ok) {
+        const cg = await cgRes.json() as Record<string, Record<string, number>>;
+        if (btcIdr === 0)    { btcIdr    = Math.round(cg?.bitcoin?.idr ?? 0);    btcChange = cg?.bitcoin?.idr_24h_change ?? 0; }
+        if (ethIdr === 0)    { ethIdr    = Math.round(cg?.ethereum?.idr ?? 0);   ethChange = cg?.ethereum?.idr_24h_change ?? 0; }
+        if (goldGram === 0)  { const paxg = cg?.["pax-gold"]?.idr ?? 0; goldGram = paxg > 0 ? Math.round(paxg / 31.1035) : 0; goldChange = cg?.["pax-gold"]?.idr_24h_change ?? 0; }
+      }
+    } catch { /* CoinGecko fallback failed silently */ }
+  }
+
+  let usdChange = 0;
+  try {
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const yRes  = await fetch(`https://api.frankfurter.app/${yesterday}?from=USD&to=IDR`, { signal: AbortSignal.timeout(TO) }).catch(() => null);
+    const yData = yRes?.ok ? await yRes.json() as { rates?: { IDR?: number } } : null;
+    const usdYest = yData?.rates?.IDR ?? usdIdr;
+    usdChange = parseFloat((((usdIdr - usdYest) / usdYest) * 100).toFixed(3));
+  } catch { /* ignore */ }
+
+  return {
+    usdIdr: Math.round(usdIdr),
+    goldGram,
+    bitcoin: btcIdr,
+    ethereum: ethIdr,
+    btcChange,
+    ethChange,
+    goldChange,
+    usdChange,
+    updatedAt: new Date().toISOString(),
+  };
 }

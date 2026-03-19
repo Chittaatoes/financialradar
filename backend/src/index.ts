@@ -4,6 +4,7 @@ import cors from "cors";
 import compression from "compression";
 import { registerRoutes } from "./routes";
 import { log, requestLogger } from "./middleware/logger";
+import { runWarmup } from "./services/market-cache";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -47,15 +48,22 @@ app.use(express.urlencoded({ extended: false }));
 app.use(requestLogger);
 
 app.get("/health", (_req, res) => {
+  // Respond instantly so UptimeRobot sees a fast healthy response,
+  // then warm market-data cache in the background.
   res.json({ status: "ok" });
+  void runWarmup();
 });
 
 app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", service: "financialradar-api" });
+  res.json({ status: "ok", service: "financialradar-api", ts: Date.now() });
+  void runWarmup();
 });
 
 (async () => {
   await registerRoutes(app);
+
+  // Pre-warm market cache once at startup so the first user gets fast data
+  void runWarmup();
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
