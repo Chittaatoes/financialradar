@@ -1,15 +1,16 @@
-import { useCallback } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMutation } from "@tanstack/react-query";
 import { playSound } from "@/hooks/use-sound";
 import {
   ArrowDownLeft, ArrowUpRight, ArrowLeftRight,
-  PiggyBank, CreditCard, CalendarOff,
+  PiggyBank, CreditCard, CalendarOff, TrendingUp,
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
+import { ForexUploadSheet } from "./forex-upload-sheet";
 
 export const ACTION_SELECTOR_ITEMS = [
   { type: "income", icon: ArrowDownLeft, color: "bg-emerald-500", tLabel: "actionIncome", tDesc: "actionIncomeDesc" },
@@ -18,6 +19,7 @@ export const ACTION_SELECTOR_ITEMS = [
   { type: "savings", icon: PiggyBank, color: "bg-teal-500", tLabel: "actionSavings", tDesc: "actionSavingsDesc" },
   { type: "debt_payment", icon: CreditCard, color: "bg-orange-500", tLabel: "actionDebtPayment", tDesc: "actionDebtPaymentDesc" },
   { type: "no_spend", icon: CalendarOff, color: "bg-slate-500", tLabel: "actionNoSpend", tDesc: "actionNoSpendDesc" },
+  { type: "forex", icon: TrendingUp, color: "bg-violet-500", tLabel: "actionForex", tDesc: "actionForexDesc" },
 ] as const;
 
 interface Props {
@@ -30,6 +32,7 @@ export function ActionSelectorSheet({ open, onClose, onSelectAction }: Props) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const dashT = t.dashboard as any;
+  const [forexOpen, setForexOpen] = useState(false);
 
   const noSpendMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/no-spending"),
@@ -51,12 +54,19 @@ export function ActionSelectorSheet({ open, onClose, onSelectAction }: Props) {
       noSpendMutation.mutate();
       return;
     }
+    if (type === "forex") {
+      onClose();
+      setForexOpen(true);
+      return;
+    }
     onClose();
     onSelectAction(type);
   }, [onSelectAction, onClose, noSpendMutation]);
 
   return (
     <>
+      <ForexUploadSheet open={forexOpen} onClose={() => setForexOpen(false)} />
+
       <AnimatePresence>
         {open && (
           <motion.div

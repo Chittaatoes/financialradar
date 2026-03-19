@@ -1,0 +1,229 @@
+Build a Forex Trading Upload & Parsing Feature for my existing web app (React + TypeScript frontend, Node.js + Express backend, PostgreSQL with Drizzle ORM).
+
+## 🎯 Goal
+
+Users can upload a screenshot (MT4/MT5 trading history), and the system will:
+
+1. Parse trading data automatically
+2. Normalize symbols (e.g., XAUUSD.sc → XAUUSD)
+3. Extract structured trades
+4. Prevent duplicate trades from being inserted
+5. Allow user to preview/edit before saving
+
+---
+
+## 🧩 FRONTEND REQUIREMENTS (React + TS)
+
+### 1. Bottom Sheet (Forex Mode)
+
+* Reuse existing bottom sheet component
+* Add new mode: "forex"
+* UI:
+
+  * Title: "Tambahkan Trading Hari Ini"
+  * Subtitle: "Upload screenshot hasil trading kamu"
+  * Buttons:
+
+    * "Ambil Screenshot"
+    * "Pilih dari Galeri"
+
+### 2. Upload Flow
+
+* After user selects image:
+
+  * Send image to backend `/api/forex/parse`
+  * Show loading: "Menganalisis trading..."
+
+### 3. Parsing Result Preview
+
+Display list of trades:
+
+* Symbol
+* Type (BUY/SELL)
+* Lot
+* Open price
+* Close price
+* Profit
+
+Allow user to:
+
+* Edit values
+* Delete incorrect rows
+* Confirm save
+
+### 4. Submit
+
+POST to `/api/forex/save`
+
+---
+
+## ⚙️ BACKEND REQUIREMENTS (Node.js + Express)
+
+### 1. Endpoint: POST `/api/forex/parse`
+
+* Accept image (multipart/form-data)
+* Use OCR or AI Vision (prefer OpenAI Vision or Tesseract)
+* Extract raw text
+* Parse into structured trades
+
+### 2. Parsing Rules
+
+From text like:
+"XAUUSD.sc buy 2 4833.69 → 4834.32 315.00"
+
+Extract:
+
+* symbol: "XAUUSD"
+* type: "BUY"
+* lot: 2
+* openPrice: 4833.69
+* closePrice: 4834.32
+* profit: 315.00
+
+### 3. Normalization
+
+* Remove suffix like ".sc"
+* Uppercase symbol
+
+```ts
+symbol = rawSymbol.replace('.sc', '').toUpperCase()
+```
+
+---
+
+## 🧠 DUPLICATE DETECTION (IMPORTANT)
+
+Before inserting trades, check duplicates:
+
+### Rule:
+
+A trade is considered duplicate if:
+
+* same userId
+* same symbol
+* same openPrice
+* same closePrice
+* same type
+* AND created within same day
+
+### Implementation:
+
+```ts
+const existing = await db.query.trades.findFirst({
+  where: and(
+    eq(trades.userId, userId),
+    eq(trades.symbol, trade.symbol),
+    eq(trades.openPrice, trade.openPrice),
+    eq(trades.closePrice, trade.closePrice),
+    eq(trades.type, trade.type),
+    gte(trades.createdAt, startOfDay),
+    lte(trades.createdAt, endOfDay)
+  )
+})
+```
+
+If exists:
+
+* SKIP insert
+* mark as duplicate in response
+
+---
+
+## 💾 DATABASE (Drizzle ORM)
+
+### trades table
+
+* id
+* userId
+* symbol
+* type ("buy" | "sell")
+* lot (number)
+* openPrice (number)
+* closePrice (number)
+* profit (number)
+* createdAt (timestamp)
+* source ("image" | "manual")
+
+---
+
+## 💡 SAVE ENDPOINT
+
+### POST `/api/forex/save`
+
+Input:
+
+```ts
+{
+  trades: Trade[]
+}
+```
+
+Process:
+
+* loop trades
+* check duplicate
+* insert only non-duplicate
+* return:
+
+```ts
+{
+  inserted: number,
+  duplicates: number
+}
+```
+
+---
+
+## 🔥 BONUS (OPTIONAL BUT IMPORTANT)
+
+### 1. Symbol Detection
+
+Support:
+
+* XAUUSD
+* XAUUSD.sc
+* BTCUSD
+
+### 2. Profit Detection
+
+* positive = profit
+* negative = loss
+
+### 3. Fallback
+
+If parsing fails:
+
+* return empty array
+* frontend shows manual input form
+
+---
+
+## 🧪 EDGE CASES
+
+* Different broker formats
+* Missing arrows (→)
+* Different spacing
+* Red/blue text not available (OCR only text)
+
+---
+
+## 🎯 OUTPUT EXPECTATION
+
+Return parsed trades like:
+
+```ts
+[
+  {
+    symbol: "XAUUSD",
+    type: "BUY",
+    lot: 2,
+    openPrice: 4833.69,
+    closePrice: 4834.32,
+    profit: 315
+  }
+]
+```
+
+---
+
+Make the code clean, modular, and production-ready. Separate parsing logic into its own service file.

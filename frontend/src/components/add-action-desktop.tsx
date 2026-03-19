@@ -5,11 +5,12 @@ import { playSound } from "@/hooks/use-sound";
 import {
   Plus, X,
   ArrowDownLeft, ArrowUpRight, ArrowLeftRight,
-  PiggyBank, CreditCard, CalendarOff,
+  PiggyBank, CreditCard, CalendarOff, TrendingUp,
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ForexUploadSheet } from "./forex-upload-sheet";
 
 interface Props {
   onSelectAction: (action: string) => void;
@@ -22,10 +23,12 @@ const ACTION_ITEMS = [
   { type: "savings", icon: PiggyBank, color: "bg-teal-500", tLabel: "actionSavings" },
   { type: "debt_payment", icon: CreditCard, color: "bg-orange-500", tLabel: "actionDebtPayment" },
   { type: "no_spend", icon: CalendarOff, color: "bg-slate-500", tLabel: "actionNoSpend" },
+  { type: "forex", icon: TrendingUp, color: "bg-violet-500", tLabel: "actionForex" },
 ] as const;
 
 export function AddActionDesktop({ onSelectAction }: Props) {
   const [open, setOpen] = useState(false);
+  const [forexOpen, setForexOpen] = useState(false);
   const { t } = useLanguage();
   const { toast } = useToast();
   const dashT = t.dashboard as any;
@@ -50,6 +53,11 @@ export function AddActionDesktop({ onSelectAction }: Props) {
       noSpendMutation.mutate();
       return;
     }
+    if (type === "forex") {
+      setOpen(false);
+      setForexOpen(true);
+      return;
+    }
     setOpen(false);
     onSelectAction(type);
   }, [onSelectAction, noSpendMutation]);
@@ -65,6 +73,8 @@ export function AddActionDesktop({ onSelectAction }: Props) {
 
   return (
     <>
+      <ForexUploadSheet open={forexOpen} onClose={() => setForexOpen(false)} />
+
       <AnimatePresence>
         {open && (
           <motion.div

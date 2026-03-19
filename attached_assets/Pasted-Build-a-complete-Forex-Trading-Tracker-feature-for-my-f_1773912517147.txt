@@ -1,0 +1,294 @@
+Build a complete "Forex Trading Tracker" feature for my financial web app (React + TypeScript frontend, Node.js + Express backend, PostgreSQL + Drizzle ORM).
+
+This feature is NOT just CRUD — it must include:
+
+* Screenshot upload + AI parsing
+* Trade journal
+* Psychology control system
+* Daily limits (loss/profit discipline)
+
+---
+
+# 🎯 MAIN GOAL
+
+Users can:
+
+1. Upload trading screenshots (MT4/MT5)
+2. Automatically extract trade data
+3. Track daily profit/loss
+4. Be guided to avoid overtrading and revenge trading
+
+---
+
+# 📱 FRONTEND (UX FLOW)
+
+## 1. Add New Menu: "Forex"
+
+* Add to main menu (with chart icon 📈)
+* Route: `/forex`
+
+---
+
+## 2. Forex Page Layout
+
+### A. Summary Card (Top)
+
+Show:
+
+* Net Profit Today
+* Total Profit
+* Total Loss
+* Trade Count
+
+Example:
+
+* Rp 1.200.000 (Net)
+  Profit: Rp 2.000.000
+  Loss: Rp -800.000
+  Trades: 8
+
+---
+
+### B. Action Button
+
+Floating "+" button:
+
+* On click → open Bottom Sheet (mode: forex)
+
+---
+
+## 3. Bottom Sheet (Forex Mode)
+
+### UI:
+
+Title:
+"Tambahkan Trading Hari Ini"
+
+Options:
+
+* Upload Screenshot
+* Input Manual (fallback)
+
+---
+
+## 4. Upload Flow
+
+After image upload:
+
+* Call `/api/forex/parse`
+* Show loading: "Menganalisis trading..."
+
+---
+
+## 5. Parsing Result Preview
+
+Display editable list of trades:
+Each trade:
+
+* Symbol (XAUUSD, BTCUSD)
+* Type (BUY/SELL)
+* Lot
+* Open price
+* Close price
+* Profit
+
+User can:
+
+* Edit
+* Delete
+* Confirm save
+
+---
+
+# ⚙️ BACKEND
+
+## 1. POST `/api/forex/parse`
+
+* Accept image
+* Use OCR or AI Vision
+* Extract text
+* Parse trades
+
+---
+
+## 2. Parsing Logic
+
+From:
+"XAUUSD.sc buy 2 4833.69 → 4834.32 315.00"
+
+Extract:
+
+* symbol: XAUUSD (remove .sc)
+* type: BUY
+* lot: 2
+* openPrice
+* closePrice
+* profit
+
+---
+
+## 3. Symbol Normalization
+
+```ts
+symbol = rawSymbol.replace('.sc', '').toUpperCase()
+```
+
+---
+
+## 4. DUPLICATE DETECTION (CRITICAL)
+
+A trade is duplicate if:
+
+* same userId
+* same symbol
+* same openPrice
+* same closePrice
+* same type
+* same day
+
+If duplicate:
+
+* DO NOT insert
+* return flag: duplicate = true
+
+---
+
+## 5. POST `/api/forex/save`
+
+* Insert only non-duplicate trades
+* Return:
+  {
+  inserted: number,
+  duplicates: number
+  }
+
+---
+
+# 🧠 PSYCHOLOGY SYSTEM (IMPORTANT FEATURE)
+
+## 1. Daily Loss Limit
+
+User setting:
+
+* maxLossPercent = 1%
+
+Logic:
+If totalLossToday >= balance * 0.01:
+
+* block new trade input
+* show warning:
+  "Kamu sudah mencapai batas kerugian harian"
+
+---
+
+## 2. Profit Target Reminder
+
+If profit >= target (ex: 2%):
+Show popup:
+"Profit sudah cukup. Mau lanjut atau istirahat?"
+
+Buttons:
+
+* Lanjut (danger)
+* Istirahat (recommended)
+
+---
+
+## 3. Overtrading Detection
+
+If trades > 10/day:
+Show warning:
+"Overtrading terdeteksi"
+
+---
+
+## 4. Revenge Trading Detection
+
+If:
+
+* last trade = loss
+* next trade within 5 minutes
+
+Show:
+"Tenang dulu. Jangan balas dendam market."
+
+---
+
+# 💾 DATABASE
+
+## trades table
+
+* id
+* userId
+* symbol
+* type
+* lot
+* openPrice
+* closePrice
+* profit
+* createdAt
+* source ("image")
+
+---
+
+## trading_stats_daily
+
+* userId
+* date
+* totalProfit
+* totalLoss
+* net
+* tradeCount
+
+---
+
+## trading_rules
+
+* userId
+* maxLossPercent (default 1%)
+* targetProfitPercent (default 2%)
+* maxTradesPerDay
+
+---
+
+# 🔥 EXTRA FEATURES
+
+## 1. Insight
+
+* Best pair
+* Winrate
+* Most profitable time
+
+---
+
+## 2. Gamification
+
+* +XP if user stops at loss limit
+* +XP if user avoids overtrading
+
+---
+
+## 3. Error Handling
+
+If parsing fails:
+
+* return empty
+* show manual input form
+
+---
+
+# 🎯 EXPECTATION
+
+This feature should feel like:
+"Trading Journal + Discipline Coach"
+
+Not just data input — but behavior guidance.
+
+---
+
+Write clean, modular, production-ready code.
+Separate:
+
+* parsing service
+* duplicate checker
+* psychology engine

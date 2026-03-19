@@ -318,6 +318,25 @@ export const insertBudgetPlanSchema = createInsertSchema(budgetPlans).omit({ id:
 export type BudgetPlan = typeof budgetPlans.$inferSelect;
 export type InsertBudgetPlan = z.infer<typeof insertBudgetPlanSchema>;
 
+// === FOREX TRADES TABLE ===
+// Trading history uploaded from MT4/MT5 screenshots via OCR
+export const forexTrades = pgTable("forex_trades", {
+  id:         integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId:     varchar("user_id").notNull().references(() => users.id),
+  symbol:     text("symbol").notNull(),
+  type:       text("type").notNull(),
+  lot:        numeric("lot",        { precision: 10, scale: 2 }).notNull(),
+  openPrice:  numeric("open_price", { precision: 15, scale: 5 }).notNull(),
+  closePrice: numeric("close_price",{ precision: 15, scale: 5 }).notNull(),
+  profit:     numeric("profit",     { precision: 15, scale: 2 }).notNull(),
+  source:     text("source").notNull().default("image"),
+  createdAt:  timestamp("created_at").defaultNow(),
+});
+
+export const insertForexTradeSchema = createInsertSchema(forexTrades).omit({ id: true, createdAt: true });
+export type ForexTrade     = typeof forexTrades.$inferSelect;
+export type InsertForexTrade = z.infer<typeof insertForexTradeSchema>;
+
 // === STOCK HOLDINGS TABLE ===
 // Portfolio: each row is one holding entry. 1 lot = 100 lembar (IDX convention).
 export const stockHoldings = pgTable("stock_holdings", {

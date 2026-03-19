@@ -32,8 +32,9 @@ import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../db";
 import { users } from "../../shared/models/auth";
-import { userProfiles, stockHoldings, transactions } from "../../shared/schema";
-import { eq, sql, count, and, like } from "drizzle-orm";
+import { userProfiles, stockHoldings, transactions, forexTrades } from "../../shared/schema";
+import { eq, sql, count, and, like, gte, lte } from "drizzle-orm";
+import { parseForexTrades } from "../services/forex-parser";
 
 // === REQUEST VALIDATION SCHEMAS ===
 // Zod schemas for validating POST/PATCH request bodies before database operations.
@@ -2845,6 +2846,97 @@ STYLE
     } catch (err) {
       console.error("Stock search error:", err);
       res.json([]);
+    }
+  });
+
+  // ===== FOREX TRADING =====
+
+  // POST /api/forex/parse — Parse OCR text from MT4/MT5 screenshot into structured trades
+  app.post("/api/forex/parse", isAuthenticated, async (req, res) => {
+    try {
+      const { text } = req.body as { text?: string };
+      if (!text || typeof text !== "string") {
+        return res.status(400).json({ message: "text is required" });
+      }
+      const trades = parseForexTrades(text);
+      res.json({ trades });
+    } catch (err) {
+      console.error("forex/parse error:", err);
+      res.status(500).json({ message: "Parse failed", trades: [] });
+    }
+  });
+
+  // POST /api/forex/save — Save parsed trades with duplicate detection
+  app.post("/api/forex/save", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { trades } = req.body as { trades?: Array<{
+        symbol: string; type: string; lot: number;
+        openPrice: number; closePrice: number; profit: number;
+      }> };
+
+      if (!Array.isArray(trades) || trades.length === 0) {
+        return res.status(400).json({ message: "trades array is required" });
+      }
+
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+
+      let inserted = 0;
+      let duplicates = 0;
+
+      for (const trade of trades) {
+        const existing = await db.query.forexTrades.findFirst({
+          where: and(
+            eq(forexTrades.userId, userId),
+            eq(forexTrades.symbol, trade.symbol),
+            eq(forexTrades.type, trade.type.toLowerCase()),
+            eq(forexTrades.openPrice, String(trade.openPrice)),
+            eq(forexTrades.closePrice, String(trade.closePrice)),
+            gte(forexTrades.createdAt, todayStart),
+            lte(forexTrades.createdAt, todayEnd),
+          ),
+        });
+
+        if (existing) {
+          duplicates++;
+          continue;
+        }
+
+        await db.insert(forexTrades).values({
+          userId,
+          symbol: trade.symbol,
+          type: trade.type.toLowerCase(),
+          lot: String(trade.lot),
+          openPrice: String(trade.openPrice),
+          closePrice: String(trade.closePrice),
+          profit: String(trade.profit),
+          source: "image",
+        });
+        inserted++;
+      }
+
+      res.json({ inserted, duplicates });
+    } catch (err) {
+      console.error("forex/save error:", err);
+      res.status(500).json({ message: "Save failed" });
+    }
+  });
+
+  // GET /api/forex/trades — Get user's forex trade history
+  app.get("/api/forex/trades", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const rows = await db.select().from(forexTrades)
+        .where(eq(forexTrades.userId, userId))
+        .orderBy(sql`${forexTrades.createdAt} DESC`)
+        .limit(100);
+      res.json(rows);
+    } catch (err) {
+      console.error("forex/trades error:", err);
+      res.status(500).json({ message: "Failed to fetch trades" });
     }
   });
 
