@@ -1,0 +1,158 @@
+Fix Forex parsing to support multi-line MT4/MT5 trade format.
+
+Current issue:
+Each trade is split into multiple lines, causing missing or incorrect parsing.
+
+---
+
+# 🎯 TARGET FORMAT (IMPORTANT)
+
+Example OCR text:
+
+XAUUSD.sc sell 4
+4851.54 → 4851.55
+-4.00
+
+XAUUSD.sc buy 5
+4833.69 → 4834.32
+315.00
+
+---
+
+# ⚠️ PROBLEM
+
+Each trade consists of 3 lines:
+
+1. symbol + type + lot
+2. openPrice → closePrice
+3. profit
+
+Current regex fails because it expects single-line format.
+
+---
+
+# ✅ SOLUTION: GROUP BY 3 LINES
+
+## STEP 1: Normalize text into lines
+
+```ts
+const lines = extractedText
+  .replace(/\.sc/g, '')
+  .split('\n')
+  .map(l => l.trim())
+  .filter(l => l.length > 0)
+```
+
+---
+
+## STEP 2: Iterate and group trades
+
+```ts
+const trades = []
+
+for (let i = 0; i < lines.length; i++) {
+  const line = lines[i]
+
+  // detect header line
+  const headerMatch = line.match(/(XAUUSD|BTCUSD)\s*(BUY|SELL)\s*(\d+)/i)
+
+  if (headerMatch) {
+    const symbol = headerMatch[1].toUpperCase()
+    const type = headerMatch[2].toUpperCase()
+    const lot = Number(headerMatch[3])
+
+    const priceLine = lines[i + 1] || ''
+    const profitLine = lines[i + 2] || ''
+
+    const priceMatch = priceLine.match(/(\d+\.\d+)\s*[→-]\s*(\d+\.\d+)/)
+    const profitMatch = profitLine.match(/-?\d+\.?\d*/)
+
+    if (priceMatch && profitMatch) {
+      trades.push({
+        symbol,
+        type,
+        lot,
+        openPrice: Number(priceMatch[1]),
+        closePrice: Number(priceMatch[2]),
+        profit: Number(profitMatch[0]),
+      })
+
+      // skip next 2 lines
+      i += 2
+    }
+  }
+}
+```
+
+---
+
+## STEP 3: FILTER INVALID
+
+```ts
+const validTrades = trades.filter(t =>
+  t.symbol && t.type && t.openPrice && t.closePrice
+)
+```
+
+---
+
+## STEP 4: DEBUG LOG
+
+```ts
+console.log("LINES:", lines)
+console.log("PARSED TRADES:", validTrades)
+```
+
+---
+
+# 🧠 IMPORTANT IMPROVEMENTS
+
+## 1. HANDLE .sc SYMBOL
+
+Already normalized:
+XAUUSD.sc → XAUUSD
+
+---
+
+## 2. HANDLE ARROW VARIATIONS
+
+Support:
+
+* →
+* *
+* →
+
+Already handled:
+
+```ts
+/[→-]/
+```
+
+---
+
+## 3. HANDLE PARTIAL OCR ERRORS
+
+If price line missing:
+
+* skip trade safely
+
+---
+
+# 🎯 EXPECTED OUTPUT
+
+From screenshot:
+👉 ALL trades detected correctly
+👉 No missing SELL entries
+👉 Profit accurate
+
+---
+
+# ⚠️ DO NOT USE SINGLE-LINE REGEX ANYMORE
+
+Use structured grouping instead.
+
+---
+
+# BONUS (OPTIONAL)
+
+Sort trades by timestamp if needed.

@@ -226,6 +226,74 @@ function parseByLine(rawText: string): TradeEntry[] {
   return trades;
 }
 
+// ─── Strategy 3: 3-line grouped OCR format ────────────────────────────────────
+// Handles output where each trade is split across 3 consecutive lines:
+//   Line 1 (header): "XAUUSD.sc sell 4"   → symbol, type, lot
+//   Line 2 (prices): "4851.54 → 4851.55"  → openPrice, closePrice
+//   Line 3 (profit): "-4.00"               → profit
+//
+// The parser scans the line array for a header line; when found it reads the
+// next two lines for prices and profit, then jumps ahead by 2.
+
+function parseGrouped(rawText: string): TradeEntry[] {
+  const trades: TradeEntry[] = [];
+
+  const lines = rawText
+    .replace(/\.sc\b/gi, "")          // XAUUSD.sc → XAUUSD
+    .replace(/\r?\n/g, "\n")
+    .split("\n")
+    .map(l => l.trim())
+    .filter(l => l.length > 0);
+
+  // Matches "XAUUSD sell 4" or "XAUUSD.sc buy 2.5"
+  const headerRe = /^([A-Z][A-Z0-9]{2,9}(?:\.[A-Z]{1,5})?)\s+(buy|sell)\s+([\d.,]+)/i;
+
+  // Matches "4851.54 → 4851.55" — various arrow characters
+  const priceRe = /([\d.,]+)\s*[→➜>→\-–]+\s*([\d.,]+)/i;
+
+  // Matches a bare number, possibly negative or in parens
+  const profitRe = /^(-?[\d.,]+|\([\d.,]+\))$/;
+
+  for (let i = 0; i < lines.length; i++) {
+    const hm = lines[i].match(headerRe);
+    if (!hm) continue;
+
+    const symbol = normalizeSymbol(hm[1]);
+    if (!isLikelySymbol(symbol)) continue;
+
+    const type = hm[2].toLowerCase() as "buy" | "sell";
+    const lot  = parseNum(hm[3]);
+    if (lot == null || lot <= 0) continue;
+
+    // Scan ahead (skip any blank noise lines) for the price line
+    let priceIdx = -1;
+    let pm: RegExpMatchArray | null = null;
+    for (let j = i + 1; j <= i + 4 && j < lines.length; j++) {
+      pm = lines[j].match(priceRe);
+      if (pm) { priceIdx = j; break; }
+    }
+    if (priceIdx === -1 || !pm) continue;
+
+    const openPrice  = parseNum(pm[1]);
+    const closePrice = parseNum(pm[2]);
+    if (openPrice == null || closePrice == null || openPrice <= 0 || closePrice <= 0) continue;
+
+    // Scan one more line ahead for the profit value
+    let profit: number | null = null;
+    for (let j = priceIdx + 1; j <= priceIdx + 3 && j < lines.length; j++) {
+      if (profitRe.test(lines[j])) {
+        profit = parseNum(lines[j]);
+        if (profit !== null) { i = j; break; }  // advance outer loop past this trade
+      }
+    }
+    if (profit === null) continue;  // profit line missing — skip safely
+
+    trades.push({ symbol, type, lot, openPrice, closePrice, profit });
+  }
+
+  return trades;
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export interface ParseResult {
@@ -236,11 +304,15 @@ export interface ParseResult {
 export function parseForexTrades(rawText: string): ParseResult {
   const cleanText = cleanOCRText(rawText);
 
-  // Strategy 1: line-by-line (precise — good for MT4/MT5 history tables)
+  // Strategy 1: single-line structured rows (MT4/MT5 history tables, all data on one line)
   let trades = parseByLine(rawText);
 
-  // Strategy 2: global flat-text regex (tolerant — good for messy single-line OCR)
-  // Only use if line-by-line found nothing
+  // Strategy 2: 3-line grouped OCR format (header / prices / profit on separate lines)
+  if (trades.length === 0) {
+    trades = parseGrouped(rawText);
+  }
+
+  // Strategy 3: global flat-text regex (last resort — messy single-line OCR blob)
   if (trades.length === 0) {
     trades = parseGlobal(cleanText);
   }
