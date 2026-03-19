@@ -1,3 +1,5 @@
+import { validateAndCorrectProfit } from "./profit-calculator";
+
 export interface TradeEntry {
   symbol: string;
   type: "buy" | "sell";
@@ -5,6 +7,7 @@ export interface TradeEntry {
   openPrice: number;
   closePrice: number;
   profit: number;
+  profitCorrected?: boolean;  // true when OCR profit was overridden
 }
 
 // ─── Known forex/commodity/index symbols ─────────────────────────────────────
@@ -319,6 +322,17 @@ export function parseForexTrades(rawText: string): ParseResult {
 
   // Final deduplication
   trades = dedupe(trades);
+
+  // Profit validation: correct OCR profit against price-movement direction
+  trades = trades.map(t => {
+    const corrected = validateAndCorrectProfit(
+      t.profit, t.type, t.openPrice, t.closePrice, t.lot, t.symbol,
+    );
+    if (corrected !== t.profit) {
+      return { ...t, profit: corrected, profitCorrected: true };
+    }
+    return t;
+  });
 
   return { trades, cleanText };
 }

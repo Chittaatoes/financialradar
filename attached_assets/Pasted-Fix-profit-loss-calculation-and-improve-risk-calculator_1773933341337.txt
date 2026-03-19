@@ -1,0 +1,195 @@
+Fix profit/loss calculation and improve risk calculator logic for Forex feature.
+
+---
+
+# 🎯 PROBLEM 1: WRONG PROFIT LOGIC
+
+Currently profit is taken directly from OCR or displayed incorrectly.
+
+We must calculate profit direction based on:
+
+* trade type (BUY / SELL)
+* open price
+* close price
+
+---
+
+# ✅ STEP 1: CALCULATE PROFIT DIRECTION
+
+Rule:
+
+BUY (LONG):
+
+* profit if closePrice > openPrice
+* loss if closePrice < openPrice
+
+SELL (SHORT):
+
+* profit if closePrice < openPrice
+* loss if closePrice > openPrice
+
+---
+
+## IMPLEMENTATION
+
+```ts
+function calculateProfit({
+  type,
+  openPrice,
+  closePrice,
+  lot
+}) {
+  const diff = closePrice - openPrice
+
+  let raw = 0
+
+  if (type === 'BUY') {
+    raw = diff
+  } else {
+    raw = -diff
+  }
+
+  // XAUUSD approx: $10 per 1 lot per 1.0 move
+  const multiplier = 10
+
+  const profit = raw * lot * multiplier
+
+  return Number(profit.toFixed(2))
+}
+```
+
+---
+
+# ⚙️ STEP 2: VALIDATE OCR PROFIT
+
+If OCR profit exists:
+
+* compare with calculated profit
+* if mismatch > 5% → override with calculated
+
+```ts
+if (Math.abs(ocrProfit - calculatedProfit) > Math.abs(calculatedProfit * 0.05)) {
+  finalProfit = calculatedProfit
+}
+```
+
+---
+
+# ⚙️ STEP 3: FORCE CORRECT SIGN
+
+Ensure:
+
+* profit > 0 → gain
+* profit < 0 → loss
+
+---
+
+# 🎯 EXPECTED RESULT
+
+BUY:
+4832.98 → 4832.43
+→ LOSS ✅
+
+SELL:
+4840 → 4825
+→ PROFIT ✅
+
+---
+
+# 🧠 PROBLEM 2: RISK CALCULATOR WRONG (CENT ACCOUNT)
+
+Currently:
+Lot 1 in cent account is treated same as standard → WRONG
+
+---
+
+# ✅ STEP 4: FIX CENT ACCOUNT LOGIC
+
+Rule:
+
+* 1 lot (cent) = 0.01 lot (standard)
+
+---
+
+## IMPLEMENTATION
+
+```ts
+function normalizeLot(lot, accountType) {
+  if (accountType === 'CENT') {
+    return lot * 0.01
+  }
+  return lot
+}
+```
+
+---
+
+# ⚙️ STEP 5: USE NORMALIZED LOT IN RISK
+
+```ts
+const realLot = normalizeLot(userLot, accountType)
+```
+
+Use `realLot` in all calculations:
+
+* risk
+* profit
+* validation
+
+---
+
+# ⚙️ STEP 6: FIX RISK FORMULA
+
+```ts
+const riskAmount = balanceUSD * (riskPercent / 100)
+
+const estimatedLoss =
+  realLot * stopLoss * 10
+```
+
+---
+
+# ⚙️ STEP 7: UPDATE UI DISPLAY
+
+Show:
+
+* Entered Lot: 1 (cent)
+* Real Lot: 0.01 (standard)
+
+Example:
+
+"1 lot (cent) = 0.01 lot standard"
+
+---
+
+# ⚙️ STEP 8: WARNING FIX
+
+```ts
+if (estimatedLoss > riskAmount) {
+  showWarning("Lot terlalu besar")
+}
+```
+
+---
+
+# 🎯 FINAL RESULT
+
+* Profit/loss ALWAYS correct
+* BUY/SELL logic respected
+* Cent account handled properly
+* Risk calculator realistic
+
+---
+
+# ⚠️ IMPORTANT
+
+* Never trust OCR profit blindly
+* Always validate with price movement
+* Always normalize lot before calculations
+
+---
+
+Refactor clean:
+
+* profitCalculator.ts
+* riskCalculator.ts

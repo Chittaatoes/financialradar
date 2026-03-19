@@ -159,7 +159,7 @@ export function RiskCalculatorCard() {
             />
             {settings.accountType === "cent" && (
               <p className="text-[10px] text-muted-foreground mt-1">
-                Cent account: effective balance = ${result.effectiveBalance.toFixed(2)}
+                Cent account: 1 cent lot = 0.01 standard lot
               </p>
             )}
           </div>
@@ -217,7 +217,14 @@ export function RiskCalculatorCard() {
 
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">Recommended Lot</span>
-              <span className="text-base font-bold tabular-nums">{recommendedLotStr}</span>
+              <div className="text-right">
+                <span className="text-base font-bold tabular-nums">{recommendedLotStr}</span>
+                {settings.accountType === "cent" && (
+                  <p className="text-[10px] text-muted-foreground">
+                    = {result.recommendedStandardLot.toFixed(2)} std lot
+                  </p>
+                )}
+              </div>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">Risk Amount</span>
