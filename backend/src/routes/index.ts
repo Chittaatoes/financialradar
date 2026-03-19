@@ -2120,66 +2120,80 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
     }
   }
 
-  // GET /api/market/prices — USD/IDR, Gold, BTC, ETH (CoinGecko primary, Binance fallback)
+  // GET /api/market/prices — USD/IDR, Gold, BTC, ETH
+  // Primary: CryptoCompare (reliable from cloud IPs, no key needed for basic use)
+  // Fallback: CoinGecko with headers, open.er-api for USD/IDR
   app.get("/api/market/prices", isAuthenticated, async (_req, res) => {
     try {
       const bucket = Math.floor(Date.now() / (5 * 60_000));
       const data = await cached(`market_prices_${bucket}`, async () => {
-        const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-        const TO = 6_000;
+        const TO = 8_000;
+        const CC_HEADERS = { "User-Agent": "Mozilla/5.0 (compatible; FinancialRadar/1.0)", "Accept": "application/json" };
 
-        const [cryptoRes, fxRes, fxYestRes, binBtcRes, binEthRes, metalsRes] = await Promise.all([
-          fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,pax-gold&vs_currencies=usd,idr&include_24hr_change=true", { signal: AbortSignal.timeout(TO) }).catch(() => null),
-          fetch("https://api.frankfurter.app/latest?from=USD&to=IDR",           { signal: AbortSignal.timeout(TO) }).catch(() => null),
-          fetch(`https://api.frankfurter.app/${yesterday}?from=USD&to=IDR`,     { signal: AbortSignal.timeout(TO) }).catch(() => null),
-          fetch("https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT",    { signal: AbortSignal.timeout(TO) }).catch(() => null),
-          fetch("https://api.binance.com/api/v3/ticker/24hr?symbol=ETHUSDT",    { signal: AbortSignal.timeout(TO) }).catch(() => null),
-          fetch("https://api.metals.live/v1/spot/gold",                         { signal: AbortSignal.timeout(TO) }).catch(() => null),
+        const [ccCryptoRes, fxRes, fxFallbackRes] = await Promise.all([
+          // CryptoCompare: BTC, ETH, PAXG (gold) all in IDR — reliable from cloud servers
+          fetch("https://min-api.cryptocompare.com/data/pricemultifull?fsyms=BTC,ETH,PAXG&tsyms=IDR,USD", { signal: AbortSignal.timeout(TO), headers: CC_HEADERS }).catch(() => null),
+          // Primary USD/IDR: open.er-api (free, no key, no cloud restrictions)
+          fetch("https://open.er-api.com/v6/latest/USD", { signal: AbortSignal.timeout(TO) }).catch(() => null),
+          // Fallback USD/IDR: Frankfurter
+          fetch("https://api.frankfurter.app/latest?from=USD&to=IDR", { signal: AbortSignal.timeout(TO) }).catch(() => null),
         ]);
 
-        // USD/IDR
-        const fx      = fxRes?.ok      ? await fxRes.json()      as { rates?: { IDR?: number } } : null;
-        const fxYest  = fxYestRes?.ok  ? await fxYestRes.json()  as { rates?: { IDR?: number } } : null;
-        const usdIdr  = fx?.rates?.IDR ?? 16_800;
-        const usdYest = fxYest?.rates?.IDR ?? usdIdr;
-        const usdChange = usdYest ? ((usdIdr - usdYest) / usdYest) * 100 : 0;
+        // ── USD/IDR ──────────────────────────────────────────────────────────
+        const erData  = fxRes?.ok      ? await fxRes.json()        as { rates?: { IDR?: number } } : null;
+        const fxData  = fxFallbackRes?.ok ? await fxFallbackRes.json() as { rates?: { IDR?: number } } : null;
+        const usdIdr  = erData?.rates?.IDR ?? fxData?.rates?.IDR ?? 16_800;
 
-        // ── CoinGecko (primary) ──────────────────────────────────────────────
-        const crypto = cryptoRes?.ok ? await cryptoRes.json() as Record<string, Record<string, number>> : null;
+        // ── CryptoCompare: BTC, ETH, PAXG ────────────────────────────────────
+        type CCRaw = { RAW?: Record<string, { IDR?: { PRICE?: number; CHANGEPCT24HOUR?: number } }> };
+        const ccData = ccCryptoRes?.ok ? await ccCryptoRes.json() as CCRaw : null;
+        const ccRaw  = ccData?.RAW ?? {};
 
-        let btcIdr     = Math.round(crypto?.bitcoin?.idr     ?? 0);
-        let ethIdr     = Math.round(crypto?.ethereum?.idr    ?? 0);
-        let btcChange  = crypto?.bitcoin?.idr_24h_change     ?? 0;
-        let ethChange  = crypto?.ethereum?.idr_24h_change    ?? 0;
-        const paxgIdr  = crypto?.["pax-gold"]?.idr           ?? 0;
-        let goldGram   = paxgIdr > 0 ? Math.round(paxgIdr / 31.1035) : 0;
-        let goldChange = crypto?.["pax-gold"]?.idr_24h_change ?? 0;
+        let btcIdr    = Math.round(ccRaw.BTC?.IDR?.PRICE    ?? 0);
+        let ethIdr    = Math.round(ccRaw.ETH?.IDR?.PRICE    ?? 0);
+        let btcChange = ccRaw.BTC?.IDR?.CHANGEPCT24HOUR      ?? 0;
+        let ethChange = ccRaw.ETH?.IDR?.CHANGEPCT24HOUR      ?? 0;
+        const paxgIdr = ccRaw.PAXG?.IDR?.PRICE               ?? 0;
+        let goldGram  = paxgIdr > 0 ? Math.round(paxgIdr / 31.1035) : 0;
+        let goldChange = ccRaw.PAXG?.IDR?.CHANGEPCT24HOUR    ?? 0;
 
-        // ── Binance fallback for BTC/ETH ─────────────────────────────────────
-        if (btcIdr === 0) {
-          const b = binBtcRes?.ok ? await binBtcRes.json() as { lastPrice?: string; priceChangePercent?: string } : null;
-          if (b?.lastPrice) {
-            btcIdr    = Math.round(parseFloat(b.lastPrice) * usdIdr);
-            btcChange = parseFloat(b.priceChangePercent ?? "0");
+        // ── CoinGecko fallback (for any missing values) ───────────────────────
+        if (btcIdr === 0 || ethIdr === 0 || goldGram === 0) {
+          try {
+            const cgRes = await fetch(
+              "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,pax-gold&vs_currencies=usd,idr&include_24hr_change=true",
+              { signal: AbortSignal.timeout(TO), headers: CC_HEADERS }
+            );
+            if (cgRes.ok) {
+              const cg = await cgRes.json() as Record<string, Record<string, number>>;
+              if (btcIdr === 0) {
+                btcIdr    = Math.round(cg?.bitcoin?.idr     ?? 0);
+                btcChange = cg?.bitcoin?.idr_24h_change      ?? 0;
+              }
+              if (ethIdr === 0) {
+                ethIdr    = Math.round(cg?.ethereum?.idr    ?? 0);
+                ethChange = cg?.ethereum?.idr_24h_change     ?? 0;
+              }
+              if (goldGram === 0) {
+                const paxg = cg?.["pax-gold"]?.idr ?? 0;
+                goldGram   = paxg > 0 ? Math.round(paxg / 31.1035) : 0;
+                goldChange = cg?.["pax-gold"]?.idr_24h_change ?? 0;
+              }
+            }
+          } catch {
+            // CoinGecko fallback failed silently
           }
         }
-        if (ethIdr === 0) {
-          const b = binEthRes?.ok ? await binEthRes.json() as { lastPrice?: string; priceChangePercent?: string } : null;
-          if (b?.lastPrice) {
-            ethIdr    = Math.round(parseFloat(b.lastPrice) * usdIdr);
-            ethChange = parseFloat(b.priceChangePercent ?? "0");
-          }
-        }
 
-        // ── metals.live fallback for Gold ─────────────────────────────────────
-        if (goldGram === 0) {
-          const m = metalsRes?.ok ? await metalsRes.json() as Array<{ gold?: number }> | { price?: number } : null;
-          const goldUsd: number = Array.isArray(m) ? (m[0]?.gold ?? 0) : ((m as any)?.price ?? 0);
-          if (goldUsd > 0) {
-            goldGram   = Math.round((goldUsd * usdIdr) / 31.1035);
-            goldChange = 0;
-          }
-        }
+        // ── Compute USD/IDR 24h change via er-api (today vs yesterday) ────────
+        let usdChange = 0;
+        try {
+          const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+          const yRes = await fetch(`https://api.frankfurter.app/${yesterday}?from=USD&to=IDR`, { signal: AbortSignal.timeout(TO) }).catch(() => null);
+          const yData = yRes?.ok ? await yRes.json() as { rates?: { IDR?: number } } : null;
+          const usdYest = yData?.rates?.IDR ?? usdIdr;
+          usdChange = parseFloat((((usdIdr - usdYest) / usdYest) * 100).toFixed(3));
+        } catch { /* ignore */ }
 
         return {
           usdIdr: Math.round(usdIdr),
@@ -2189,7 +2203,7 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
           btcChange,
           ethChange,
           goldChange,
-          usdChange: parseFloat(usdChange.toFixed(3)),
+          usdChange,
           updatedAt: new Date().toISOString(),
         };
       });
