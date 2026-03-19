@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/lib/i18n";
 import { apiRequest } from "@/lib/queryClient";
 import { ForexUploadSheet } from "@/components/forex-upload-sheet";
+import { RiskCalculatorCard } from "@/components/risk-calculator-card";
 import { cn } from "@/lib/utils";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -353,6 +354,9 @@ export default function ForexPage() {
           </CardContent>
         )}
       </Card>
+
+      {/* Risk Calculator */}
+      <RiskCalculatorCard />
 
       {/* Insights */}
       <Card>

@@ -32,7 +32,7 @@ import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../db";
 import { users } from "../../shared/models/auth";
-import { userProfiles, stockHoldings, transactions, forexTrades, tradingRules, tradingStatsDaily } from "../../shared/schema";
+import { userProfiles, stockHoldings, transactions, forexTrades, tradingRules, tradingStatsDaily, tradingRiskSettings } from "../../shared/schema";
 import { eq, sql, count, and, like, gte, lte } from "drizzle-orm";
 import { parseForexTrades } from "../services/forex-parser";
 
@@ -3151,6 +3151,57 @@ STYLE
     } catch (err) {
       console.error("forex/psychology error:", err);
       res.status(500).json({ message: "Failed to check psychology" });
+    }
+  });
+
+  // GET /api/forex/risk-settings — Returns (or creates) user's risk calculator settings
+  app.get("/api/forex/risk-settings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      let settings = await db.select().from(tradingRiskSettings).where(eq(tradingRiskSettings.userId, userId)).then(r => r[0]);
+      if (!settings) {
+        const ins = await db.insert(tradingRiskSettings).values({ userId }).returning();
+        settings = ins[0];
+      }
+      res.json(settings);
+    } catch (err) {
+      console.error("forex/risk-settings GET error:", err);
+      res.status(500).json({ message: "Failed to load risk settings" });
+    }
+  });
+
+  // PUT /api/forex/risk-settings — Persist user's risk calculator settings
+  app.put("/api/forex/risk-settings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { balance, currency, accountType, riskPercent } = req.body as {
+        balance?: number; currency?: string; accountType?: string; riskPercent?: number;
+      };
+      const existing = await db.select().from(tradingRiskSettings).where(eq(tradingRiskSettings.userId, userId)).then(r => r[0]);
+      if (existing) {
+        const updated = await db.update(tradingRiskSettings)
+          .set({
+            ...(balance      !== undefined && { balance:     String(balance) }),
+            ...(currency     !== undefined && { currency }),
+            ...(accountType  !== undefined && { accountType }),
+            ...(riskPercent  !== undefined && { riskPercent: String(riskPercent) }),
+            updatedAt: new Date(),
+          })
+          .where(eq(tradingRiskSettings.userId, userId))
+          .returning();
+        return res.json(updated[0]);
+      }
+      const ins = await db.insert(tradingRiskSettings).values({
+        userId,
+        ...(balance     !== undefined && { balance:     String(balance) }),
+        ...(currency    !== undefined && { currency }),
+        ...(accountType !== undefined && { accountType }),
+        ...(riskPercent !== undefined && { riskPercent: String(riskPercent) }),
+      }).returning();
+      res.json(ins[0]);
+    } catch (err) {
+      console.error("forex/risk-settings PUT error:", err);
+      res.status(500).json({ message: "Failed to save risk settings" });
     }
   });
 

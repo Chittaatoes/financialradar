@@ -368,6 +368,22 @@ export const insertForexTradeSchema = createInsertSchema(forexTrades).omit({ id:
 export type ForexTrade     = typeof forexTrades.$inferSelect;
 export type InsertForexTrade = z.infer<typeof insertForexTradeSchema>;
 
+// === TRADING RISK SETTINGS TABLE ===
+// Per-user lot size / risk management settings for the calculator
+export const tradingRiskSettings = pgTable("trading_risk_settings", {
+  id:          integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId:      varchar("user_id").notNull().references(() => users.id).unique(),
+  balance:     numeric("balance",      { precision: 15, scale: 2 }).notNull().default("100"),
+  currency:    text("currency").notNull().default("USD"),
+  accountType: text("account_type").notNull().default("standard"),
+  riskPercent: numeric("risk_percent", { precision: 5,  scale: 2 }).notNull().default("1"),
+  updatedAt:   timestamp("updated_at").defaultNow(),
+});
+
+export const insertTradingRiskSettingsSchema = createInsertSchema(tradingRiskSettings).omit({ id: true, updatedAt: true });
+export type TradingRiskSettings     = typeof tradingRiskSettings.$inferSelect;
+export type InsertTradingRiskSettings = z.infer<typeof insertTradingRiskSettingsSchema>;
+
 // === STOCK HOLDINGS TABLE ===
 // Portfolio: each row is one holding entry. 1 lot = 100 lembar (IDX convention).
 export const stockHoldings = pgTable("stock_holdings", {
