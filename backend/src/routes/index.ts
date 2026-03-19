@@ -2003,6 +2003,42 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
     }
   });
 
+  // GET /api/macro-radar/past-events — High impact events released this week (with actual data)
+  app.get("/api/macro-radar/past-events", async (_req, res) => {
+    try {
+      const url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
+      const raw = await _macroFetch("ff_events", url) as any[];
+      const cutoff = Date.now() - 60_000;
+      const pastEvents = (Array.isArray(raw) ? raw : [])
+        .filter((e: any) => {
+          const eventTime = new Date(e.date).getTime();
+          return (
+            e.impact === "High" &&
+            eventTime < cutoff &&
+            e.actual !== undefined &&
+            e.actual !== "" &&
+            e.actual !== null
+          );
+        })
+        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 5)
+        .map((e: any) => ({
+          event:    e.title ?? e.event ?? "",
+          country:  e.country ?? "",
+          currency: e.country ?? "",
+          date:     e.date,
+          impact:   e.impact,
+          actual:   e.actual,
+          forecast: e.forecast !== undefined && e.forecast !== "" ? e.forecast : null,
+          previous: e.previous !== undefined && e.previous !== "" ? e.previous : null,
+        }));
+      res.json(pastEvents);
+    } catch (err: any) {
+      console.error("macro-radar/past-events:", err.message);
+      res.status(200).json([]);
+    }
+  });
+
   app.get("/api/macro-radar/indicators", async (req, res) => {
     // Hardcoded recent values as fallback (updated quarterly – data changes slowly)
     const FALLBACK_RESPONSE = {

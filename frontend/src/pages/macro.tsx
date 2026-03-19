@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Activity, AlertTriangle, TrendingUp, TrendingDown, Minus,
   Clock, Globe, Zap, Brain, BarChart3, Shield, Layers, DollarSign,
-  Map, Sparkles, Newspaper, ArrowUpCircle, ArrowDownCircle,
+  Map, Sparkles, Newspaper, ArrowUpCircle, ArrowDownCircle, X, History,
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 
@@ -773,6 +773,224 @@ const INDICATOR_PLACEHOLDER: MacroIndicators = {
   unemployment: { id: "", value: 4.2,   prevValue: 4.1,   date: null },
 };
 
+// ─── Previous Events Card ──────────────────────────────────────────────────────
+function PreviousEventsCard({ m, isID }: { m: any; isID: boolean }) {
+  const { data: pastEvents = [], isLoading } = useQuery<MacroEvent[]>({
+    queryKey: ["/api/macro-radar/past-events"],
+    refetchInterval: 60_000,
+    retry: 1,
+  });
+
+  const fmtRelativeTime = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60_000);
+    const hrs  = Math.floor(diff / 3_600_000);
+    if (mins < 60) return isID ? `${mins} menit lalu` : `${mins}m ago`;
+    return isID ? `${hrs} jam lalu` : `${hrs}h ago`;
+  };
+
+  const getOutcome = (e: MacroEvent): { label: string; color: string } => {
+    if (!e.actual || !e.forecast) return { label: isID ? "Aktual" : "Actual", color: "text-muted-foreground" };
+    const a = parseFloat(e.actual.replace(/[^0-9.\-]/g, ""));
+    const f = parseFloat(e.forecast.replace(/[^0-9.\-]/g, ""));
+    if (isNaN(a) || isNaN(f)) return { label: isID ? "Dirilis" : "Released", color: "text-sky-500" };
+    if (a > f) return { label: isID ? "Lebih Baik" : "Beat", color: "text-emerald-600 dark:text-emerald-400" };
+    if (a < f) return { label: isID ? "Lebih Buruk" : "Miss", color: "text-red-500 dark:text-red-400" };
+    return { label: isID ? "Sesuai" : "In Line", color: "text-amber-500 dark:text-amber-400" };
+  };
+
+  return (
+    <Card className="rounded-2xl shadow-sm">
+      <CardContent className="p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-slate-500/15 flex items-center justify-center">
+            <History className="w-4 h-4 text-slate-500" />
+          </div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{m.previousEvents}</p>
+        </div>
+
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2].map((i) => <Skeleton key={i} className="h-14 rounded-xl" />)}
+          </div>
+        ) : pastEvents.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-3">{m.noPreviousEvents}</p>
+        ) : (
+          <div className="space-y-2">
+            {pastEvents.map((e, i) => {
+              const outcome = getOutcome(e);
+              return (
+                <div key={i} className="rounded-xl bg-muted/30 border border-border p-3 space-y-1.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-semibold leading-snug flex-1 truncate">{e.event}</p>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {e.currency && (
+                        <span className="text-[10px] font-semibold bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 rounded px-1.5 py-0.5">
+                          {e.currency}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-muted-foreground">{fmtRelativeTime(e.date)}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-2 flex-1">
+                      {[
+                        { label: isID ? "Aktual" : "Actual",   val: e.actual },
+                        { label: isID ? "Perkiraan" : "Forecast", val: e.forecast },
+                      ].map(({ label, val }) => (
+                        <div key={label} className="rounded-lg bg-background border border-border px-2 py-1">
+                          <p className="text-[9px] text-muted-foreground uppercase tracking-wider">{label}</p>
+                          <p className="text-xs font-bold">{val ?? "—"}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <span className={`text-[10px] font-bold uppercase tracking-wider ${outcome.color}`}>
+                      {outcome.label}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Result Released Popup ─────────────────────────────────────────────────────
+function ResultReleasedPopup({
+  event, surprise, eventType, m, isID, onDismiss,
+}: {
+  event: MacroEvent;
+  surprise: ReturnType<typeof calcSurprise>;
+  eventType: EventType;
+  m: any;
+  isID: boolean;
+  onDismiss: () => void;
+}) {
+  const [secsLeft, setSecsLeft] = useState(300);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setSecsLeft((s) => {
+        if (s <= 1) { onDismiss(); return 0; }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [onDismiss]);
+
+  if (!surprise) return null;
+
+  const outcomeColor = surprise.dir === "BEAT"
+    ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-200 dark:border-emerald-800"
+    : surprise.dir === "MISS"
+    ? "text-red-500 dark:text-red-400 bg-red-500/10 border-red-200 dark:border-red-800"
+    : "text-amber-500 dark:text-amber-400 bg-amber-500/10 border-amber-200 dark:border-amber-800";
+
+  const outcomeLabel = surprise.dir === "BEAT"
+    ? m.betterThanExpected
+    : surprise.dir === "MISS"
+    ? m.worseThanExpected
+    : m.inLineWithExpected;
+
+  const OutcomeIcon = surprise.dir === "BEAT" ? TrendingUp : surprise.dir === "MISS" ? TrendingDown : Minus;
+
+  const [pairsA, pairsB] = buildCurrencyPairs(event.currency ?? "USD");
+  const detectedCurrency = event.currency ?? "USD";
+  const bullish = isBullishForCurrency(eventType, surprise.dir);
+  const activePairs = (bullish ? pairsA : pairsB).filter((p) => p.arrow !== "→");
+
+  const mins = Math.floor(secsLeft / 60);
+  const secs = secsLeft % 60;
+
+  return (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm pointer-events-auto">
+      <div className="rounded-2xl shadow-2xl border border-violet-200 dark:border-violet-700 bg-white dark:bg-gray-900 overflow-hidden">
+        {/* Progress bar */}
+        <div className="h-1 bg-violet-100 dark:bg-violet-900">
+          <div
+            className="h-full bg-violet-500 transition-all duration-1000"
+            style={{ width: `${(secsLeft / 300) * 100}%` }}
+          />
+        </div>
+
+        <div className="p-4 space-y-3">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-violet-500/15 flex items-center justify-center">
+                <Newspaper className="w-3.5 h-3.5 text-violet-500" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-violet-600 dark:text-violet-400">{m.resultJustReleased}</p>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-500 dark:text-red-400 bg-red-500/10 rounded px-1.5 py-0.5 mt-0.5">
+                  <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                  LIVE
+                </span>
+              </div>
+            </div>
+            <button onClick={onDismiss} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-lg hover:bg-muted">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Event name + outcome */}
+          <div className="rounded-xl bg-muted/40 p-3 space-y-2">
+            <p className="text-xs font-semibold truncate">{event.event}</p>
+            <div className="flex items-center gap-2">
+              <div className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold ${outcomeColor}`}>
+                <OutcomeIcon className="w-3 h-3" />
+                {outcomeLabel}
+              </div>
+              <div className="flex gap-1.5 ml-auto">
+                {[
+                  { label: isID ? "Aktual" : "Actual",   val: event.actual },
+                  { label: isID ? "Perkiraan" : "Forecast", val: event.forecast },
+                ].map(({ label, val }) => (
+                  <div key={label} className="rounded bg-background border border-border px-2 py-0.5 text-center">
+                    <p className="text-[9px] text-muted-foreground">{label}</p>
+                    <p className="text-xs font-bold">{val ?? "—"}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Currency impact */}
+          {activePairs.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {activePairs.slice(0, 3).map(({ label, arrow }) => (
+                <div
+                  key={label}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-lg ${ARROW_BG[arrow]}`}
+                >
+                  <span className="text-[10px] font-medium text-muted-foreground">{label}</span>
+                  <span className={`text-sm font-bold ${ARROW_COLOR[arrow]}`}>{arrow}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] text-muted-foreground">
+              {m.autoClosesIn} {mins}:{secs.toString().padStart(2, "0")}
+            </p>
+            <button
+              onClick={onDismiss}
+              className="text-[11px] font-semibold text-muted-foreground hover:text-foreground px-3 py-1 rounded-lg hover:bg-muted transition-colors"
+            >
+              {m.popupDismiss}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ─────────────────────────────────────────────────────────────────
 export default function MacroRadarPage() {
   const { t, language } = useLanguage();
@@ -780,6 +998,8 @@ export default function MacroRadarPage() {
   const isID = language === "id";
 
   const [now, setNow] = useState(Date.now());
+  const [showPopup, setShowPopup] = useState(false);
+  const prevIsPostRelease = useRef(false);
 
   const { data: events = [], isLoading: eventsLoading } = useQuery<MacroEvent[]>({
     queryKey: ["/api/macro-radar/events"],
@@ -811,6 +1031,19 @@ export default function MacroRadarPage() {
   const nextEvent    = useMemo(() => events[0] ?? null, [events]);
   const minsUntil   = useMemo(() => nextEvent ? minutesUntil(nextEvent.date) : Infinity, [nextEvent, now]);
   const msUntil     = useMemo(() => nextEvent ? new Date(nextEvent.date).getTime() - now : 0, [nextEvent, now]);
+
+  // Detect transition from pre-release → post-release and trigger popup
+  const isPostReleaseComputed = useMemo(
+    () => !!(nextEvent?.actual != null && nextEvent.actual.trim() !== "" && nextEvent.actual.trim() !== "-" && nextEvent.actual.trim() !== "—"),
+    [nextEvent],
+  );
+
+  useEffect(() => {
+    if (isPostReleaseComputed && !prevIsPostRelease.current) {
+      setShowPopup(true);
+    }
+    prevIsPostRelease.current = isPostReleaseComputed;
+  }, [isPostReleaseComputed]);
 
   const detectedCurrency = useMemo(() => nextEvent?.currency ?? "USD", [nextEvent]);
   const eventType        = useMemo(() => nextEvent ? detectEventType(nextEvent.event) : "OTHER", [nextEvent]);
@@ -1045,6 +1278,9 @@ export default function MacroRadarPage() {
       {isPostRelease && nextEvent && surprise && (
         <ActualMarketImpactCard surprise={surprise} event={nextEvent} eventType={eventType} m={m} />
       )}
+
+      {/* ── 4c. Previous Events This Week ──────────────────────────────── */}
+      <PreviousEventsCard m={m} isID={isID} />
 
       {/* ── 5. AI Macro Insight (adapts post-release) ──────────────────── */}
       <Card className="rounded-2xl shadow-sm border-0 bg-emerald-50 dark:bg-emerald-950/30">
@@ -1305,6 +1541,18 @@ export default function MacroRadarPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* ── Result Released Popup ──────────────────────────────────────── */}
+      {showPopup && nextEvent && surprise && (
+        <ResultReleasedPopup
+          event={nextEvent}
+          surprise={surprise}
+          eventType={eventType}
+          m={m}
+          isID={isID}
+          onDismiss={() => setShowPopup(false)}
+        />
       )}
 
     </div>
