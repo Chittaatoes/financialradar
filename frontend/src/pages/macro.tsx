@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Activity, AlertTriangle, TrendingUp, TrendingDown, Minus,
   Clock, Globe, Zap, Brain, BarChart3, Shield, Layers, DollarSign,
-  Map, Sparkles,
+  Map, Sparkles, Newspaper, ArrowUpCircle, ArrowDownCircle,
 } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 
@@ -569,6 +569,152 @@ function ActualMarketImpactCard({ surprise, event, eventType, m }: {
   );
 }
 
+function NewsResultSummaryCard({ surprise, event, eventType, m, isID }: {
+  surprise: SurpriseResult;
+  event: MacroEvent;
+  eventType: EventType;
+  m: any;
+  isID: boolean;
+}) {
+  const ccy = event.currency ?? "USD";
+  const bullish = isBullishForCurrency(eventType, surprise.dir);
+  const [pairsA, pairsB] = buildCurrencyPairs(ccy);
+  const activePairs = bullish ? pairsA : pairsB;
+  const [scenA, scenB] = buildScenarios(eventType, isID, ccy);
+  const matchedScenario = surprise.dir === "NEUTRAL" ? null : bullish ? scenA : scenB;
+
+  const outcomeLabel = surprise.dir === "POSITIVE"
+    ? m.betterThanExpected
+    : surprise.dir === "NEGATIVE"
+    ? m.worseThanExpected
+    : m.inLineWithExpected;
+
+  const outcomeColor = surprise.dir === "POSITIVE"
+    ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-200 dark:border-emerald-800"
+    : surprise.dir === "NEGATIVE"
+    ? "text-red-500 dark:text-red-400 bg-red-500/10 border-red-200 dark:border-red-800"
+    : "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-200 dark:border-amber-800";
+
+  const OutcomeIcon = surprise.dir === "POSITIVE" ? TrendingUp : surprise.dir === "NEGATIVE" ? TrendingDown : Minus;
+
+  const tradingSignals = activePairs
+    .filter((p) => p.label !== ccy)
+    .map(({ label, arrow }) => ({
+      pair: label,
+      signal: arrow === "↑" ? "BUY" : arrow === "↓" ? "SHORT" : "WAIT",
+      arrow,
+    }));
+
+  const genericAssets = [
+    { label: "💵 USD", arrow: matchedScenario?.usd ?? "→" },
+    { label: "🥇 Gold", arrow: matchedScenario?.gold ?? "→" },
+    { label: "₿ BTC",  arrow: matchedScenario?.btc  ?? "→" },
+    ...(matchedScenario?.stocks ? [{ label: "📈 Stocks", arrow: matchedScenario.stocks }] : []),
+  ] as { label: string; arrow: ArrowDir }[];
+
+  return (
+    <Card className="rounded-2xl shadow-sm border border-violet-200 dark:border-violet-800/50 bg-gradient-to-br from-violet-50/80 to-indigo-50/60 dark:from-violet-950/30 dark:to-indigo-950/20">
+      <CardContent className="p-5 space-y-4">
+
+        {/* Header */}
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-violet-500/15 flex items-center justify-center">
+            <Newspaper className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+          </div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{m.newsResult}</p>
+          <span className="ml-auto flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400 bg-red-500/10 rounded-full px-2.5 py-0.5 border border-red-200 dark:border-red-800">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            LIVE
+          </span>
+        </div>
+
+        {/* Event name + outcome badge */}
+        <div className="rounded-xl bg-white/60 dark:bg-white/5 border border-violet-100 dark:border-violet-800/40 p-3 space-y-2">
+          <p className="text-xs text-muted-foreground font-medium truncate">{event.event}</p>
+          <div className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-bold ${outcomeColor}`}>
+            <OutcomeIcon className="w-4 h-4" />
+            {outcomeLabel}
+          </div>
+        </div>
+
+        {/* Scenario that played out */}
+        {matchedScenario && (
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{m.scenarioPlayed}</p>
+            <div className="rounded-xl border border-violet-200 dark:border-violet-700 bg-violet-50/60 dark:bg-violet-950/30 p-3 space-y-2">
+              <p className="text-[10px] font-bold text-violet-700 dark:text-violet-300 uppercase tracking-wider">{matchedScenario.label}</p>
+              <p className="text-sm font-medium leading-snug">{matchedScenario.description}</p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {genericAssets.map(({ label, arrow }) => (
+                  <div key={label} className={`flex items-center gap-1 px-2 py-1 rounded-lg ${ARROW_BG[arrow]}`}>
+                    <span className="text-xs text-muted-foreground">{label}</span>
+                    <span className={`text-base font-bold ${ARROW_COLOR[arrow]}`}>{arrow}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Currency impact */}
+        {activePairs.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{m.currencyImpactResult}</p>
+            <div className="space-y-1.5">
+              {activePairs.map(({ label, arrow }) => (
+                <div key={label} className={`flex items-center justify-between px-3 py-2 rounded-lg ${ARROW_BG[arrow]}`}>
+                  <span className="text-sm font-semibold">{label}</span>
+                  <span className={`text-base font-bold ${ARROW_COLOR[arrow]}`}>{arrow}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Trading signals */}
+        {tradingSignals.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{m.tradingSignals}</p>
+            <div className="grid grid-cols-2 gap-2">
+              {tradingSignals.map(({ pair, signal }) => (
+                <div
+                  key={pair}
+                  className={`rounded-xl border p-3 flex flex-col gap-1 ${
+                    signal === "BUY"
+                      ? "bg-emerald-500/10 border-emerald-200 dark:border-emerald-800"
+                      : signal === "SHORT"
+                      ? "bg-red-500/10 border-red-200 dark:border-red-800"
+                      : "bg-amber-500/10 border-amber-200 dark:border-amber-800"
+                  }`}
+                >
+                  <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">{pair}</p>
+                  <div className="flex items-center gap-1.5">
+                    {signal === "BUY" ? (
+                      <ArrowUpCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    ) : signal === "SHORT" ? (
+                      <ArrowDownCircle className="w-4 h-4 text-red-500 dark:text-red-400" />
+                    ) : (
+                      <Minus className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+                    )}
+                    <p className={`text-sm font-bold ${
+                      signal === "BUY"   ? "text-emerald-600 dark:text-emerald-400"
+                      : signal === "SHORT" ? "text-red-500 dark:text-red-400"
+                      : "text-amber-600 dark:text-amber-400"
+                    }`}>
+                      {signal === "BUY" ? m.signalBuy : signal === "SHORT" ? m.signalShort : m.signalWait}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-relaxed pt-0.5">{m.tradingSignalsDisclaimer}</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 
 function RiskMeter({ level, t }: { level: RiskLevel; t: any }) {
@@ -637,7 +783,15 @@ export default function MacroRadarPage() {
 
   const { data: events = [], isLoading: eventsLoading } = useQuery<MacroEvent[]>({
     queryKey: ["/api/macro-radar/events"],
-    refetchInterval: 60 * 1000,
+    refetchInterval: (query) => {
+      const evts = (query.state.data ?? []) as MacroEvent[];
+      const first = evts[0];
+      if (!first) return 60_000;
+      const mins = minutesUntil(first.date);
+      if (mins <= 0 && first.actual == null) return 15_000;
+      if (mins > 0 && mins <= 30) return 20_000;
+      return 60_000;
+    },
     retry: 2,
   });
 
@@ -869,6 +1023,17 @@ export default function MacroRadarPage() {
             <QuickImpactBox condition={quickImpact.condition} items={quickImpact.items} />
           </CardContent>
         </Card>
+      )}
+
+      {/* ── 4. News Result Summary (POST-RELEASE only) ─────────────────── */}
+      {isPostRelease && nextEvent && surprise && (
+        <NewsResultSummaryCard
+          surprise={surprise}
+          event={nextEvent}
+          eventType={eventType}
+          m={m}
+          isID={isID}
+        />
       )}
 
       {/* ── 4a. News Surprise Indicator (POST-RELEASE only) ────────────── */}
