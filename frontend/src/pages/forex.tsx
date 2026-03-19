@@ -269,7 +269,7 @@ export default function ForexPage() {
           <Button variant="outline" size="sm" onClick={() => { qc.invalidateQueries({ queryKey: ["/api/forex/stats"] }); qc.invalidateQueries({ queryKey: ["/api/forex/psychology"] }); }}>
             <RefreshCw className="w-3.5 h-3.5" />
           </Button>
-          <Button size="sm" onClick={() => setUploadOpen(true)} className="bg-violet-600 hover:bg-violet-700">
+          <Button size="sm" onClick={() => setUploadOpen(true)} className="bg-[#19432c] hover:bg-violet-700">
             <Plus className="w-3.5 h-3.5 mr-1" /> Upload Trade
           </Button>
         </div>
