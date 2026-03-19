@@ -2169,100 +2169,7 @@ app.post("/api/transactions", isAuthenticated, async (req, res) => {
   app.get("/api/market/news", isAuthenticated, async (req, res) => {
     try {
       const lang = (req.query.lang as string) || "id";
-      const GNEWS_KEY = process.env.GNEWS_API_KEY;
-
-      const detectImpact = (title: string, body = ""): "high" | "medium" | "low" => {
-        const t = (title + " " + body).toLowerCase();
-        const HIGH = [
-          "crash", "collapse", "surge", "soar", "plunge", "pump", "dump", "all-time high", "ath",
-          "record", "ban", "etf approved", "sec", "federal reserve", "rate hike", "rate cut",
-          "naik tajam", "turun drastis", "krisis", "suku bunga", "inflasi tinggi", "resesi",
-          "breakout", "breakdown", "liquidation", "halving", "hack", "exploit", "sanctions",
-          "war", "geopolit", "perang", "gold rally", "emas naik", "bitcoin rally",
-        ];
-        const MED = [
-          "bitcoin", "btc", "ethereum", "eth", "gold", "emas", "dollar", "usd", "idr", "rupiah",
-          "forex", "crypto", "blockchain", "defi", "nft", "market", "trading", "investasi",
-          "saham", "obligasi", "inflation", "gdp", "economy", "bank", "fed", "interest",
-        ];
-        if (HIGH.some(k => t.includes(k))) return "high";
-        if (MED.some(k => t.includes(k))) return "medium";
-        return "low";
-      };
-
-      type NewsArticle = { title: string; source: string; url: string; publishedAt: string; impact: "high" | "medium" | "low"; fromCC?: boolean };
-
-      const rawData = await cached("market_news_raw", async () => {
-        const articles: Array<NewsArticle> = [];
-
-        // ── Source 1: CryptoCompare (free, no key, crypto + gold + forex news) ──
-        try {
-          const ccUrl = "https://data-api.cryptocompare.com/news/v1/article/list?lang=EN&limit=10&categories=BTC,ETH,XAU,MARKET,FOREX";
-          const ccRes = await fetch(ccUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
-          if (ccRes.ok) {
-            const ccJson = await ccRes.json() as { Data?: Array<{ TITLE: string; URL: string; SOURCE_DATA?: { NAME?: string }; PUBLISHED_ON: number; BODY?: string }> };
-            const ccItems = (ccJson.Data || []).slice(0, 6);
-            for (const a of ccItems) {
-              articles.push({
-                title: a.TITLE,
-                source: a.SOURCE_DATA?.NAME || "CryptoNews",
-                url: a.URL,
-                publishedAt: new Date(a.PUBLISHED_ON * 1000).toISOString(),
-                impact: detectImpact(a.TITLE, a.BODY),
-                fromCC: true,
-              });
-            }
-          }
-        } catch (e) {
-          console.error("[News] CryptoCompare failed:", e);
-        }
-
-        // ── Source 2: GNews (focused on gold, dollar, forex, rupiah) ──
-        if (GNEWS_KEY) {
-          try {
-            const queries = [
-              `emas+gold+harga`,
-              `bitcoin+cryptocurrency+market`,
-              `dollar+rupiah+forex`,
-            ];
-            const query = queries[Math.floor(Date.now() / (10 * 60000)) % queries.length];
-            const gnUrl = `https://gnews.io/api/v4/search?q=${query}&lang=id&max=4&sortby=publishedAt&token=${GNEWS_KEY}`;
-            const gnRes = await fetch(gnUrl);
-            if (gnRes.ok) {
-              const gnJson = await gnRes.json() as { articles?: Array<{ title: string; source: { name: string }; url: string; publishedAt: string; content?: string }> };
-              for (const a of (gnJson.articles || []).slice(0, 4)) {
-                articles.push({
-                  title: a.title,
-                  source: a.source?.name || "GNews",
-                  url: a.url,
-                  publishedAt: a.publishedAt,
-                  impact: detectImpact(a.title, a.content),
-                });
-              }
-            }
-          } catch (e) {
-            console.error("[News] GNews failed:", e);
-          }
-        }
-
-        // ── Sort: high impact first, then by date ──
-        const ORDER = { high: 0, medium: 1, low: 2 };
-        articles.sort((a, b) => {
-          if (ORDER[a.impact] !== ORDER[b.impact]) return ORDER[a.impact] - ORDER[b.impact];
-          return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
-        });
-
-        // ── Deduplicate by title similarity ──
-        const seen = new Set<string>();
-        const unique = articles.filter(a => {
-          const key = a.title.slice(0, 40).toLowerCase();
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
-
-        return { articles: unique.slice(0, 6) };
-      });
+      const rawData = await cached("market_news_raw", () => fetchMarketNewsRaw());
 
       if (lang === "id") {
         const translated = await cached(`market_news_id_${Math.floor(Date.now() / (30 * 60000))}`, async () => {
@@ -3132,13 +3039,25 @@ STYLE
   });
 
   // ─── Cache warmup ─────────────────────────────────────────────────────────
-  // Called by /api/health so UptimeRobot pings pre-fill the cache.
-  // Returns instantly to the caller — all fetches run in the background.
+  // Called by /api/health so UptimeRobot pings pre-fill every 5-min cache.
+  // The response is sent BEFORE this runs — UptimeRobot always sees instant reply.
+  const FRED_KEY = process.env.FRED_API_KEY ?? "77095150d0e19bd97aab68640aef28d5";
+  const FRED_BASE = `https://api.stlouisfed.org/fred/series/observations?api_key=${FRED_KEY}&file_type=json&sort_order=desc&limit=3&series_id=`;
+
   registerWarmup(async () => {
     const bucket = Math.floor(Date.now() / (5 * 60_000));
     await Promise.allSettled([
+      // ── Market snapshot (5-min cache) ─────────────────────────────────────
       cached(`market_prices_${bucket}`, fetchMarketPricesData),
       cached(`ihsg_${bucket}`,          fetchIHSGData),
+      cached("market_news_raw",         fetchMarketNewsRaw),
+      // ── Macro Radar — FRED economic indicators (5-min cache) ──────────────
+      _macroFetch("fred_FEDFUNDS", `${FRED_BASE}FEDFUNDS`),
+      _macroFetch("fred_CPIAUCSL", `${FRED_BASE}CPIAUCSL`),
+      _macroFetch("fred_M2SL",     `${FRED_BASE}M2SL`),
+      _macroFetch("fred_UNRATE",   `${FRED_BASE}UNRATE`),
+      // ── Macro Radar — Forex Factory calendar (5-min cache) ────────────────
+      _macroFetch("ff_events", "https://nfs.faireconomy.media/ff_calendar_thisweek.json"),
     ]);
   });
 
@@ -3227,4 +3146,93 @@ async function fetchMarketPricesData() {
     usdChange,
     updatedAt: new Date().toISOString(),
   };
+}
+
+// ─── Market news raw fetch (shared by route handler and warmup) ───────────────
+
+type NewsArticle = { title: string; source: string; url: string; publishedAt: string; impact: "high" | "medium" | "low"; fromCC?: boolean };
+
+function detectNewsImpact(title: string, body = ""): "high" | "medium" | "low" {
+  const t = (title + " " + body).toLowerCase();
+  const HIGH = [
+    "crash", "collapse", "surge", "soar", "plunge", "pump", "dump", "all-time high", "ath",
+    "record", "ban", "etf approved", "sec", "federal reserve", "rate hike", "rate cut",
+    "naik tajam", "turun drastis", "krisis", "suku bunga", "inflasi tinggi", "resesi",
+    "breakout", "breakdown", "liquidation", "halving", "hack", "exploit", "sanctions",
+    "war", "geopolit", "perang", "gold rally", "emas naik", "bitcoin rally",
+  ];
+  const MED = [
+    "bitcoin", "btc", "ethereum", "eth", "gold", "emas", "dollar", "usd", "idr", "rupiah",
+    "forex", "crypto", "blockchain", "defi", "nft", "market", "trading", "investasi",
+    "saham", "obligasi", "inflation", "gdp", "economy", "bank", "fed", "interest",
+  ];
+  if (HIGH.some(k => t.includes(k))) return "high";
+  if (MED.some(k => t.includes(k))) return "medium";
+  return "low";
+}
+
+async function fetchMarketNewsRaw(): Promise<{ articles: NewsArticle[] }> {
+  const GNEWS_KEY = process.env.GNEWS_API_KEY;
+  const articles: Array<NewsArticle> = [];
+
+  // Source 1: CryptoCompare (free, no key, crypto + gold + forex news)
+  try {
+    const ccUrl = "https://data-api.cryptocompare.com/news/v1/article/list?lang=EN&limit=10&categories=BTC,ETH,XAU,MARKET,FOREX";
+    const ccRes = await fetch(ccUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
+    if (ccRes.ok) {
+      const ccJson = await ccRes.json() as { Data?: Array<{ TITLE: string; URL: string; SOURCE_DATA?: { NAME?: string }; PUBLISHED_ON: number; BODY?: string }> };
+      for (const a of (ccJson.Data || []).slice(0, 6)) {
+        articles.push({
+          title: a.TITLE,
+          source: a.SOURCE_DATA?.NAME || "CryptoNews",
+          url: a.URL,
+          publishedAt: new Date(a.PUBLISHED_ON * 1000).toISOString(),
+          impact: detectNewsImpact(a.TITLE, a.BODY),
+          fromCC: true,
+        });
+      }
+    }
+  } catch (e) {
+    console.error("[News] CryptoCompare failed:", e);
+  }
+
+  // Source 2: GNews (focused on gold, dollar, forex, rupiah)
+  if (GNEWS_KEY) {
+    try {
+      const queries = ["emas+gold+harga", "bitcoin+cryptocurrency+market", "dollar+rupiah+forex"];
+      const query   = queries[Math.floor(Date.now() / (10 * 60000)) % queries.length];
+      const gnUrl   = `https://gnews.io/api/v4/search?q=${query}&lang=id&max=4&sortby=publishedAt&token=${GNEWS_KEY}`;
+      const gnRes   = await fetch(gnUrl);
+      if (gnRes.ok) {
+        const gnJson = await gnRes.json() as { articles?: Array<{ title: string; source: { name: string }; url: string; publishedAt: string; content?: string }> };
+        for (const a of (gnJson.articles || []).slice(0, 4)) {
+          articles.push({
+            title: a.title,
+            source: a.source?.name || "GNews",
+            url: a.url,
+            publishedAt: a.publishedAt,
+            impact: detectNewsImpact(a.title, a.content),
+          });
+        }
+      }
+    } catch (e) {
+      console.error("[News] GNews failed:", e);
+    }
+  }
+
+  const ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
+  articles.sort((a, b) => {
+    if (ORDER[a.impact] !== ORDER[b.impact]) return ORDER[a.impact] - ORDER[b.impact];
+    return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+  });
+
+  const seen = new Set<string>();
+  const unique = articles.filter(a => {
+    const key = a.title.slice(0, 40).toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return { articles: unique.slice(0, 6) };
 }
