@@ -2856,13 +2856,36 @@ STYLE
     try {
       const { text } = req.body as { text?: string };
       if (!text || typeof text !== "string") {
-        return res.status(400).json({ message: "text is required" });
+        return res.status(400).json({ success: false, message: "text is required", trades: [] });
       }
-      const trades = parseForexTrades(text);
-      res.json({ trades });
+
+      // Debug: log raw OCR text
+      console.log("=== FOREX OCR RAW TEXT ===");
+      console.log(text);
+      console.log("==========================");
+
+      const { trades, cleanText } = parseForexTrades(text);
+
+      // Debug: log clean text and results
+      console.log("=== FOREX CLEAN TEXT ===");
+      console.log(cleanText);
+      console.log("=== FOREX PARSED ===", trades.length, "trade(s)");
+      console.log(JSON.stringify(trades, null, 2));
+      console.log("====================");
+
+      if (trades.length === 0) {
+        return res.json({
+          success: false,
+          trades: [],
+          message: "Parsing gagal — tidak ada trade yang terdeteksi",
+          debug: { rawText: text, cleanText },
+        });
+      }
+
+      res.json({ success: true, trades });
     } catch (err) {
       console.error("forex/parse error:", err);
-      res.status(500).json({ message: "Parse failed", trades: [] });
+      res.status(500).json({ success: false, message: "Parse failed", trades: [] });
     }
   });
 

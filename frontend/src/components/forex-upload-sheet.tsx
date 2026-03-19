@@ -21,6 +21,13 @@ interface ParsedTrade {
   profit: number;
 }
 
+interface ParseResponse {
+  success: boolean;
+  trades: ParsedTrade[];
+  message?: string;
+  debug?: { rawText: string; cleanText: string };
+}
+
 type Stage = "upload" | "scanning" | "preview" | "saving" | "done";
 
 interface Props {
@@ -36,12 +43,16 @@ export function ForexUploadSheet({ open, onClose }: Props) {
   const [stage, setStage] = useState<Stage>("upload");
   const [trades, setTrades] = useState<ParsedTrade[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<{ rawText: string; cleanText: string } | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
   const [saveResult, setSaveResult] = useState<{ inserted: number; duplicates: number } | null>(null);
 
   const reset = useCallback(() => {
     setStage("upload");
     setTrades([]);
     setParseError(null);
+    setDebugInfo(null);
+    setShowDebug(false);
     setSaveResult(null);
   }, []);
 
@@ -52,10 +63,11 @@ export function ForexUploadSheet({ open, onClose }: Props) {
 
   const parseMutation = useMutation({
     mutationFn: (text: string) =>
-      apiRequest("POST", "/api/forex/parse", { text }) as Promise<{ trades: ParsedTrade[] }>,
+      apiRequest("POST", "/api/forex/parse", { text }).then(r => r.json()) as Promise<ParseResponse>,
     onSuccess: (data) => {
-      if (data.trades.length === 0) {
-        setParseError("Tidak ada data trading yang terdeteksi. Coba input manual di bawah.");
+      if (data.debug) setDebugInfo(data.debug);
+      if (!data.success || data.trades.length === 0) {
+        setParseError(data.message ?? "Tidak ada data trading yang terdeteksi. Coba input manual di bawah.");
         setStage("preview");
       } else {
         setTrades(data.trades);
@@ -71,7 +83,7 @@ export function ForexUploadSheet({ open, onClose }: Props) {
 
   const saveMutation = useMutation({
     mutationFn: (trades: ParsedTrade[]) =>
-      apiRequest("POST", "/api/forex/save", { trades }) as Promise<{ inserted: number; duplicates: number }>,
+      apiRequest("POST", "/api/forex/save", { trades }).then(r => r.json()) as Promise<{ inserted: number; duplicates: number }>,
     onSuccess: (data) => {
       setSaveResult(data);
       setStage("done");
@@ -232,9 +244,33 @@ export function ForexUploadSheet({ open, onClose }: Props) {
               {(stage === "preview" || stage === "saving") && (
                 <div className="p-5 space-y-4 pb-36">
                   {parseError && (
-                    <div className="flex items-start gap-2.5 rounded-xl bg-amber-500/10 border border-amber-200 dark:border-amber-800 p-3">
-                      <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                      <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">{parseError}</p>
+                    <div className="rounded-xl bg-amber-500/10 border border-amber-200 dark:border-amber-800 p-3 space-y-2">
+                      <div className="flex items-start gap-2.5">
+                        <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">{parseError}</p>
+                      </div>
+                      {debugInfo && (
+                        <div className="mt-1">
+                          <button
+                            className="text-[10px] text-muted-foreground underline"
+                            onClick={() => setShowDebug(v => !v)}
+                          >
+                            {showDebug ? "Sembunyikan" : "Lihat"} teks OCR hasil baca
+                          </button>
+                          {showDebug && (
+                            <div className="mt-2 space-y-1.5">
+                              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Teks asli:</p>
+                              <pre className="text-[10px] bg-muted rounded-lg p-2 overflow-x-auto whitespace-pre-wrap break-all max-h-24 overflow-y-auto">
+                                {debugInfo.rawText || "(kosong)"}
+                              </pre>
+                              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Setelah normalisasi:</p>
+                              <pre className="text-[10px] bg-muted rounded-lg p-2 overflow-x-auto whitespace-pre-wrap break-all max-h-24 overflow-y-auto">
+                                {debugInfo.cleanText || "(kosong)"}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 

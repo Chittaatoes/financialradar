@@ -1,0 +1,157 @@
+Fix my Forex OCR parsing system in a Node.js + Express backend.
+
+Currently, image upload works but parsing always returns:
+"0 trade detected" → meaning parsing fails.
+
+I need you to:
+
+---
+
+# 🎯 MAIN OBJECTIVE
+
+1. Log OCR result clearly
+2. Normalize messy OCR text
+3. Improve parsing logic (flexible regex)
+4. Handle multiple broker formats (MT4/MT5)
+5. Prevent empty parsing silently failing
+6. Return debug info if parsing fails
+
+---
+
+# ⚙️ STEP 1: ADD DEBUG LOGGING
+
+After OCR extraction, log raw text:
+
+```ts
+console.log("=== OCR RAW TEXT ===")
+console.log(extractedText)
+console.log("====================")
+```
+
+---
+
+# ⚙️ STEP 2: CLEAN / NORMALIZE TEXT
+
+Before parsing, normalize text:
+
+```ts
+const cleanText = extractedText
+  .replace(/\n/g, ' ')
+  .replace(/\.sc/g, '')
+  .replace(/→|-/g, ' ')
+  .replace(/\s+/g, ' ')
+  .toUpperCase()
+
+console.log("=== CLEAN TEXT ===")
+console.log(cleanText)
+```
+
+---
+
+# ⚙️ STEP 3: FLEXIBLE PARSING (IMPORTANT)
+
+Use more tolerant regex:
+
+```ts
+const regex = /(XAUUSD|BTCUSD)\s*(BUY|SELL)\s*(\d+)[^\d]+(\d+\.\d+)[^\d]+(\d+\.\d+)[^\d]+(-?\d+\.?\d*)/gi
+
+const trades = []
+let match
+
+while ((match = regex.exec(cleanText)) !== null) {
+  trades.push({
+    symbol: match[1],
+    type: match[2],
+    lot: Number(match[3]),
+    openPrice: Number(match[4]),
+    closePrice: Number(match[5]),
+    profit: Number(match[6]),
+  })
+}
+
+console.log("=== PARSED TRADES ===", trades)
+```
+
+---
+
+# ⚙️ STEP 4: HANDLE FAIL CASE
+
+If parsing returns empty:
+
+```ts
+if (trades.length === 0) {
+  return res.json({
+    success: false,
+    message: "Parsing gagal",
+    debug: {
+      rawText: extractedText,
+      cleanText
+    }
+  })
+}
+```
+
+---
+
+# ⚙️ STEP 5: HANDLE COMMON VARIATIONS
+
+Support:
+
+* XAUUSD.sc → normalize to XAUUSD
+* Missing arrow (→)
+* Random spacing
+* buy2 / sell2 (no space)
+
+Add fix:
+
+```ts
+const fixedText = cleanText
+  .replace(/BUY(\d+)/g, 'BUY $1')
+  .replace(/SELL(\d+)/g, 'SELL $1')
+```
+
+---
+
+# ⚙️ STEP 6: RETURN STRUCTURED RESPONSE
+
+```ts
+return res.json({
+  success: true,
+  trades
+})
+```
+
+---
+
+# ⚠️ IMPORTANT
+
+* Do NOT fail silently
+* Always return debug info if parsing fails
+* Make parsing tolerant to messy OCR
+
+---
+
+# 🎯 EXPECTED RESULT
+
+Input:
+"XAUUSD.sc buy 2 4833.69 → 4834.32 315.00"
+
+Output:
+
+```json
+[
+  {
+    "symbol": "XAUUSD",
+    "type": "BUY",
+    "lot": 2,
+    "openPrice": 4833.69,
+    "closePrice": 4834.32,
+    "profit": 315
+  }
+]
+```
+
+---
+
+Make the code clean and modular. Put parsing logic in a separate service file like:
+`services/forexParser.ts`
