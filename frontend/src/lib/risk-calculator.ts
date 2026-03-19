@@ -3,11 +3,10 @@
 // and risk tolerance.  Results are estimates, not broker-exact figures.
 //
 // CENT ACCOUNT RULE:
-//   1 cent lot on the platform  =  0.01 standard lot in actual exposure.
-//   The balance is entered as-is (it IS the real dollar amount, not cents).
-//   Only the lot sizing is scaled: recommended display lots are 100× larger
-//   than the equivalent standard lots so they match what the user sees on
-//   their cent-account MT4/MT5 platform.
+//   Balance is entered in USC (Cent units):  $50 USD  =  5000 USC
+//   balanceUSD  =  uscBalance / 100
+//   1 USC lot   =  0.01 standard lot in actual exposure.
+//   Recommended lot is shown in USC lots (what the MT4/MT5 platform displays).
 
 export type AccountCurrency = "USD" | "IDR";
 export type AccountType     = "standard" | "cent";
@@ -63,8 +62,18 @@ export function getMultiplier(symbol: string): number {
 export function calculateRisk(input: RiskInput): RiskResult {
   const { balance, currency, accountType, riskPercent, symbol, stopLoss, userLot } = input;
 
-  // 1. Normalize balance to USD (balance is always the real dollar amount)
-  const balanceUSD = currency === "IDR" ? balance / USD_IDR_RATE : balance;
+  // 1. Normalize balance to USD
+  //    Cent account: user enters USC (e.g. 5000 USC = $50 USD) → divide by 100
+  //    Standard USD: use directly
+  //    Standard IDR: convert via exchange rate
+  let balanceUSD: number;
+  if (accountType === "cent") {
+    balanceUSD = balance / 100;           // USC → USD
+  } else if (currency === "IDR") {
+    balanceUSD = balance / USD_IDR_RATE;  // IDR → USD
+  } else {
+    balanceUSD = balance;                 // already USD
+  }
 
   // 2. Dollar amount willing to risk (always from the full balance)
   const riskAmount = balanceUSD * (riskPercent / 100);

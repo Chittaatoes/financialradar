@@ -124,22 +124,29 @@ export function RiskCalculatorCard() {
             <div className="flex gap-2 items-end">
               <div className="flex-1">
                 <NumInput
-                  label={`Balance (${settings.currency})`}
+                  label={settings.accountType === "cent" ? "Balance (USC)" : `Balance (${settings.currency})`}
                   value={settings.balance}
                   onChange={v => setField("balance", Math.max(0, Number(v)))}
                   min={0}
                   step="1"
-                  placeholder="e.g. 100"
+                  placeholder={settings.accountType === "cent" ? "e.g. 5000" : "e.g. 100"}
                 />
               </div>
-              <ToggleGroup
-                options={[{ label: "USD", value: "USD" }, { label: "IDR", value: "IDR" }]}
-                value={settings.currency}
-                onChange={v => setField("currency", v)}
-                className="mb-0 self-end"
-              />
+              {settings.accountType !== "cent" && (
+                <ToggleGroup
+                  options={[{ label: "USD", value: "USD" }, { label: "IDR", value: "IDR" }]}
+                  value={settings.currency}
+                  onChange={v => setField("currency", v)}
+                  className="mb-0 self-end"
+                />
+              )}
             </div>
-            {settings.currency === "IDR" && (
+            {settings.accountType === "cent" && (
+              <p className="text-[10px] text-muted-foreground">
+                ≈ ${result.balanceUSD.toFixed(2)} USD (5000 USC = $50 USD)
+              </p>
+            )}
+            {settings.accountType !== "cent" && settings.currency === "IDR" && (
               <p className="text-[10px] text-muted-foreground">
                 ≈ ${result.balanceUSD.toFixed(2)} USD (kurs Rp {USD_IDR_RATE.toLocaleString()})
               </p>
@@ -159,7 +166,7 @@ export function RiskCalculatorCard() {
             />
             {settings.accountType === "cent" && (
               <p className="text-[10px] text-muted-foreground mt-1">
-                Cent account: 1 cent lot = 0.01 standard lot
+                USC: 1 lot USC = 0.01 lot standar · $50 USD = 5000 USC
               </p>
             )}
           </div>
