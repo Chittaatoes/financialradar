@@ -5,6 +5,7 @@ import compression from "compression";
 import { registerRoutes } from "./routes";
 import { log, requestLogger } from "./middleware/logger";
 import { runWarmup } from "./services/market-cache";
+import { ensureSchema } from "./db";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -60,6 +61,9 @@ app.get("/api/health", (_req, res) => {
 });
 
 (async () => {
+  // Auto-create any missing tables on every startup (safe: IF NOT EXISTS)
+  await ensureSchema();
+
   await registerRoutes(app);
 
   // Pre-warm market cache once at startup so the first user gets fast data
