@@ -206,7 +206,9 @@ function generateSLTP(
     tpDist = slDist * dc.tpMult;
   }
 
-  if (slDist <= 0 || tpDist <= 0) throw new Error("Invalid SL/TP — ATR is zero or negative");
+  // Guard: if ATR produced nonsense, use a sensible pip-based minimum
+  if (slDist <= 0 || isNaN(slDist)) slDist = sc.maxPips * pip * 0.5;
+  if (tpDist <= 0 || isNaN(tpDist)) tpDist = slDist * sc.minRR;
 
   const fmt = (n: number) => parseFloat(n.toFixed(decimals));
   const sl  = direction === "SHORT" ? fmt(entry + slDist) : fmt(entry - slDist);
@@ -221,63 +223,96 @@ function generateSLTP(
 
 interface ForexFetchResult { closes: number[]; bars: OHLCVBar[]; }
 
+// Separate short-lived cache for raw OHLCV data (shared across all styles of same pair)
+// So scalp/day/swing for XAU/USD all reuse the same single CryptoCompare fetch.
+const OHLCV_TTL = 5 * 60 * 1000;
+const ohlcvCache: Record<string, { data: ForexFetchResult; ts: number }> = {};
+
+function cachedOHLCV(key: string, fn: () => Promise<ForexFetchResult>): Promise<ForexFetchResult> {
+  const hit = ohlcvCache[key];
+  if (hit && Date.now() - hit.ts < OHLCV_TTL) return Promise.resolve(hit.data);
+  return fn().then(data => { ohlcvCache[key] = { data, ts: Date.now() }; return data; });
+}
+
 async function fetchForexRates(base: string, target: string): Promise<ForexFetchResult> {
-  const end   = new Date();
-  const start = new Date();
-  start.setDate(start.getDate() - 120);
-  const fmt = (d: Date) => d.toISOString().split("T")[0];
+  return cachedOHLCV(`fx_${base}_${target}`, async () => {
+    const end   = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 120);
+    const fmt = (d: Date) => d.toISOString().split("T")[0];
 
-  const url  = `${FRANKFURTER_BASE}/${fmt(start)}..${fmt(end)}?from=${base}&to=${target}`;
-  const resp = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-  if (!resp.ok) throw new Error(`Frankfurter API ${resp.status}`);
+    const url  = `${FRANKFURTER_BASE}/${fmt(start)}..${fmt(end)}?from=${base}&to=${target}`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+    if (!resp.ok) throw new Error(`Frankfurter API ${resp.status}`);
 
-  const json  = await resp.json() as { rates: Record<string, Record<string, number>> };
-  const closes = Object.values(json.rates)
-    .map(r => r[target])
-    .filter((v): v is number => typeof v === "number" && !isNaN(v));
+    const json = await resp.json() as { rates?: Record<string, Record<string, number>> };
+    if (!json.rates) throw new Error("Frankfurter API returned no rates");
 
-  if (closes.length < 15) throw new Error("Insufficient forex rate history");
+    const closes = Object.values(json.rates)
+      .map(r => r[target])
+      .filter((v): v is number => typeof v === "number" && !isNaN(v));
 
-  // Frankfurter has no OHLCV — synthesize bars from close data only
-  // (high/low approximated as ±0.03% of close; used for ATR via approxATR)
-  const bars: OHLCVBar[] = closes.map((c, i) => ({
-    open:  i > 0 ? closes[i - 1] : c,
-    high:  c * 1.0003,
-    low:   c * 0.9997,
-    close: c,
-  }));
+    if (closes.length < 15) throw new Error("Insufficient forex rate history");
 
-  return { closes, bars };
+    const bars: OHLCVBar[] = closes.map((c, i) => ({
+      open:  i > 0 ? closes[i - 1] : c,
+      high:  c * 1.0003,
+      low:   c * 0.9997,
+      close: c,
+    }));
+
+    return { closes, bars };
+  });
 }
 
 async function fetchCryptoRates(symbol: string): Promise<ForexFetchResult> {
-  const url  = `${CC_BASE}?fsym=${symbol}&tsym=USD&limit=120`;
-  const resp = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-  if (!resp.ok) throw new Error(`CryptoCompare API ${resp.status}`);
+  return cachedOHLCV(`crypto_${symbol}`, async () => {
+    const url  = `${CC_BASE}?fsym=${symbol}&tsym=USD&limit=120`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+    if (!resp.ok) throw new Error(`CryptoCompare API ${resp.status}`);
 
-  const json = await resp.json() as {
-    Data: { Data: Array<{ open: number; high: number; low: number; close: number }> }
-  };
-  const raw = json.Data.Data.filter(d => d.close > 0);
+    const json = await resp.json() as any;
 
-  if (raw.length < 15) throw new Error("Insufficient crypto rate history");
+    // CryptoCompare sometimes returns 200 with {Response: "Error"} when rate-limited
+    if (json?.Response === "Error" || !json?.Data?.Data) {
+      throw new Error(`CryptoCompare error: ${json?.Message ?? "no data"}`);
+    }
 
-  const bars:   OHLCVBar[] = raw.map(d => ({ open: d.open, high: d.high, low: d.low, close: d.close }));
-  const closes: number[]   = raw.map(d => d.close);
+    const raw = (json.Data.Data as Array<{ open: number; high: number; low: number; close: number }>)
+      .filter(d => d.close > 0);
 
-  return { closes, bars };
+    if (raw.length < 15) throw new Error("Insufficient crypto rate history");
+
+    const bars:   OHLCVBar[] = raw.map(d => ({ open: d.open, high: d.high, low: d.low, close: d.close }));
+    const closes: number[]   = raw.map(d => d.close);
+
+    return { closes, bars };
+  });
 }
 
 // ─── Core analysis ────────────────────────────────────────────────────────────
 
 const AI_COPILOT_TTL = 5 * 60 * 1000; // 5 min — matches health-ping interval so cache never goes cold
 
-/** Pre-warm all 9 pairs × 3 styles in parallel. Called by health warmup. */
+/** Pre-warm all 9 pairs × 3 styles. Called by health warmup.
+ *  Fetches OHLCV for each pair first (filling ohlcvCache), then runs
+ *  all 3 style analyses per pair reusing that cached OHLCV. This reduces
+ *  external API calls from 27 → 9 and avoids CryptoCompare rate-limit.
+ */
 export async function warmAllPairs(): Promise<void> {
-  const pairs  = Object.keys(SUPPORTED_PAIRS);
   const styles: TradingStyle[] = ["scalp", "day", "swing"];
-  const tasks  = pairs.flatMap(p => styles.map(s => analyzeForexPair(p, s).catch(() => null)));
-  await Promise.allSettled(tasks);
+  // Process pairs sequentially to be gentle on external APIs
+  for (const [pair, cfg] of Object.entries(SUPPORTED_PAIRS)) {
+    try {
+      // Pre-fill OHLCV cache (1 call per pair)
+      if (cfg.isCrypto) await fetchCryptoRates(cfg.base).catch(() => null);
+      else              await fetchForexRates(cfg.base, cfg.target).catch(() => null);
+      // Now analyze all 3 styles — all reuse the cached OHLCV above
+      await Promise.allSettled(styles.map(s => analyzeForexPair(pair, s).catch(() => null)));
+    } catch {
+      // Individual pair failure must not stop the rest
+    }
+  }
 }
 
 export async function analyzeForexPair(pair: string, tradingStyle: TradingStyle = "day"): Promise<AIForexSignal> {
