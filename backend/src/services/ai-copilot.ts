@@ -11,11 +11,53 @@ const YAHOO_BASE       = "https://query1.finance.yahoo.com/v8/finance/chart";
 
 export type TradingStyle = "scalp" | "day" | "swing";
 
+// ─── Pair category for SL/TP bounds ──────────────────────────────────────────
+// Each pair gets a category that defines realistic min/max SL distances per style.
+// This ensures Scalp < Day < Swing in a meaningful, market-realistic way.
+type PairCategory = "gold" | "oil" | "crypto" | "forex";
+
+// minPips / maxPips for each style: SL is always clamped to [minPips * pip, maxPips * pip]
+// The ATR-fraction still shapes the SL, but these bounds prevent all styles looking the same.
+const PAIR_BOUNDS: Record<PairCategory, Record<TradingStyle, { minPips: number; maxPips: number; tpMult: number }>> = {
+  gold: {
+    //              ATR~$20 daily. pip=$0.10
+    scalp: { minPips: 10,  maxPips: 60,  tpMult: 1.5 },  // SL $1–$6
+    day:   { minPips: 80,  maxPips: 280, tpMult: 2.2 },  // SL $8–$28
+    swing: { minPips: 220, maxPips: 700, tpMult: 3.0 },  // SL $22–$70
+  },
+  oil: {
+    //              ATR~$2 daily. pip=$0.01
+    scalp: { minPips: 15,  maxPips: 80,  tpMult: 1.5 },  // SL $0.15–$0.80
+    day:   { minPips: 80,  maxPips: 320, tpMult: 2.2 },  // SL $0.80–$3.20
+    swing: { minPips: 200, maxPips: 900, tpMult: 3.0 },  // SL $2.00–$9.00
+  },
+  crypto: {
+    //              ATR~$2000 daily. pip=$1
+    scalp: { minPips: 50,   maxPips: 500,  tpMult: 1.5 }, // SL $50–$500
+    day:   { minPips: 500,  maxPips: 2200, tpMult: 2.2 }, // SL $500–$2200
+    swing: { minPips: 1800, maxPips: 6000, tpMult: 3.0 }, // SL $1800–$6000
+  },
+  forex: {
+    //              ATR~70 pips daily. pip=0.0001
+    scalp: { minPips: 4,   maxPips: 28,  tpMult: 1.5 }, // 4–28 pips
+    day:   { minPips: 28,  maxPips: 90,  tpMult: 2.2 }, // 28–90 pips
+    swing: { minPips: 70,  maxPips: 220, tpMult: 3.0 }, // 70–220 pips
+  },
+};
+
+function getPairCategory(pair: string): PairCategory {
+  if (pair === "XAU/USD")  return "gold";
+  if (pair === "USOil")    return "oil";
+  if (pair === "BTC/USD")  return "crypto";
+  return "forex";
+}
+
 export const SUPPORTED_PAIRS: Record<string, {
   base: string; target: string; decimals: number; yahooTicker?: string; pip: number;
 }> = {
   "XAU/USD": { base: "XAU", target: "USD", decimals: 2, yahooTicker: "GC=F",    pip: 0.10   },
   "BTC/USD": { base: "BTC", target: "USD", decimals: 2, yahooTicker: "BTC-USD", pip: 1.00   },
+  "USOil":   { base: "OIL", target: "USD", decimals: 2, yahooTicker: "CL=F",    pip: 0.01   },
   "EUR/USD": { base: "EUR", target: "USD", decimals: 5, pip: 0.0001 },
   "GBP/USD": { base: "GBP", target: "USD", decimals: 5, pip: 0.0001 },
   "USD/JPY": { base: "USD", target: "JPY", decimals: 3, pip: 0.01   },
@@ -177,47 +219,41 @@ function generateSLTP(
   pip: number,
   decimals: number,
 ): SLTPResult {
-  const sc = STYLE_CONFIG[style];
+  const sc       = STYLE_CONFIG[style];
+  const category = getPairCategory(pair);
+  const bounds   = PAIR_BOUNDS[category][style];
 
-  // Gold gets a 20% ATR inflation (higher intraday noise)
-  const atr = pair === "XAU/USD" ? rawATR * 1.2 : rawATR;
+  // Volatility inflation per asset class (commodities are noisier than forex)
+  const atrInflation = category === "gold" ? 1.20 : category === "oil" ? 1.10 : 1.0;
+  const atr = rawATR * atrInflation;
 
-  // Base SL = fraction of ATR simulating chosen TF
+  // ATR-fraction gives the "shape" of the SL based on market rhythm
   let slDist = atr * sc.atrFraction;
 
-  // Hard pip cap (prevents unrealistic ranges)
-  const maxSLDist = sc.maxPips * pip;
-  slDist = Math.min(slDist, maxSLDist);
+  // ── Clamp to realistic style-specific bounds (KEY FIX: ensures Day > Scalp, Swing > Day)
+  const minSLDist = bounds.minPips * pip;
+  const maxSLDist = bounds.maxPips * pip;
+  slDist = Math.max(slDist, minSLDist);   // floor: never too tight for this style
+  slDist = Math.min(slDist, maxSLDist);   // ceiling: never unrealistically wide
 
-  // Safety: ensure SL is at least 1 pip
-  slDist = Math.max(slDist, pip);
+  // Guard: ATR produced nonsense → fall back to midpoint of style range
+  if (slDist <= 0 || isNaN(slDist)) slDist = (minSLDist + maxSLDist) / 2;
 
-  // Determine TP (enforce min RR)
-  let tpDist = slDist * sc.tpMult;
-  const actualRR = tpDist / slDist;
-  if (actualRR < sc.minRR) {
-    tpDist = slDist * sc.minRR;
-  }
+  // TP = SL × style-appropriate multiplier (Scalp 1.5×, Day 2.2×, Swing 3.0×)
+  let tpDist = slDist * bounds.tpMult;
 
-  // Auto-upgrade scalp → day if SL still exceeds scalp cap after clamping
-  let effectiveStyle = style;
-  if (style === "scalp" && slDist > STYLE_CONFIG.scalp.maxPips * pip) {
-    effectiveStyle = "day";
-    const dc = STYLE_CONFIG.day;
-    tpDist = slDist * dc.tpMult;
-  }
+  // Enforce minimum RR from STYLE_CONFIG as safety net
+  if (tpDist / slDist < sc.minRR) tpDist = slDist * sc.minRR;
 
-  // Guard: if ATR produced nonsense, use a sensible pip-based minimum
-  if (slDist <= 0 || isNaN(slDist)) slDist = sc.maxPips * pip * 0.5;
   if (tpDist <= 0 || isNaN(tpDist)) tpDist = slDist * sc.minRR;
 
-  const fmt = (n: number) => parseFloat(n.toFixed(decimals));
-  const sl  = direction === "SHORT" ? fmt(entry + slDist) : fmt(entry - slDist);
-  const tp  = direction === "SHORT" ? fmt(entry - tpDist) : fmt(entry + tpDist);
-  const rr  = parseFloat((tpDist / slDist).toFixed(2));
+  const fmt    = (n: number) => parseFloat(n.toFixed(decimals));
+  const sl     = direction === "SHORT" ? fmt(entry + slDist) : fmt(entry - slDist);
+  const tp     = direction === "SHORT" ? fmt(entry - tpDist) : fmt(entry + tpDist);
+  const rr     = parseFloat((tpDist / slDist).toFixed(2));
   const slPips = Math.round(slDist / pip);
 
-  return { stopLoss: sl, takeProfit: tp, riskReward: rr, effectiveStyle, slPips };
+  return { stopLoss: sl, takeProfit: tp, riskReward: rr, effectiveStyle: style, slPips };
 }
 
 // ─── Data fetchers ────────────────────────────────────────────────────────────
@@ -356,8 +392,11 @@ export async function analyzeForexPair(pair: string, tradingStyle: TradingStyle 
   const totalCandles = sc.sentLen - 1;
 
   const isYahoo       = !!cfg.yahooTicker;
-  const rocThresh     = isYahoo ? sc.rocThreshCrypto     : sc.rocThreshFx;
-  const rocLongThresh = isYahoo ? sc.rocLongThreshCrypto : sc.rocLongThreshFx;
+  const category      = getPairCategory(pair);
+  // Crypto uses higher ROC thresholds (more volatile); commodities & forex use FX thresholds
+  const isCrypto      = category === "crypto";
+  const rocThresh     = isCrypto ? sc.rocThreshCrypto     : sc.rocThreshFx;
+  const rocLongThresh = isCrypto ? sc.rocLongThreshCrypto : sc.rocLongThreshFx;
 
   // ── Agent 1: Technical (SMA crossover)
   let technical: Vote;
@@ -416,8 +455,11 @@ export async function analyzeForexPair(pair: string, tradingStyle: TradingStyle 
     : { stopLoss: 0, takeProfit: 0, riskReward: 0, effectiveStyle: tradingStyle, slPips: 0 };
 
   // ── Risk level
-  const volHighThresh = isYahoo ? 4 : (tradingStyle === "scalp" ? 0.8 : tradingStyle === "day" ? 1.5 : 2.5);
-  const volMedThresh  = isYahoo ? 2 : (tradingStyle === "scalp" ? 0.4 : tradingStyle === "day" ? 0.7 : 1.2);
+  // Volatility thresholds differ by asset class
+  const volHighThresh = isCrypto ? 4 : category === "gold" || category === "oil" ? 2.5
+    : (tradingStyle === "scalp" ? 0.8 : tradingStyle === "day" ? 1.5 : 2.5);
+  const volMedThresh  = isCrypto ? 2 : category === "gold" || category === "oil" ? 1.2
+    : (tradingStyle === "scalp" ? 0.4 : tradingStyle === "day" ? 0.7 : 1.2);
   let riskLevel: "low" | "medium" | "high";
   if      (normVol > volHighThresh) riskLevel = "high";
   else if (normVol > volMedThresh)  riskLevel = "medium";
@@ -432,8 +474,9 @@ export async function analyzeForexPair(pair: string, tradingStyle: TradingStyle 
   const tfCtx     = `${sc.tfLabel} equivalent`;
   const atrLbl    = rawATR.toFixed(cfg.decimals);
 
-  const assetLabel = isYahoo
-    ? (pair === "XAU/USD" ? "Gold (XAU/USD)" : "Bitcoin (BTC/USD)")
+  const assetLabel = pair === "XAU/USD" ? "Gold (XAU/USD)"
+    : pair === "BTC/USD" ? "Bitcoin (BTC/USD)"
+    : pair === "USOil"   ? "WTI Crude Oil (USOil)"
     : pair;
 
   const styleNote: Record<TradingStyle, string> = {
@@ -446,9 +489,12 @@ export async function analyzeForexPair(pair: string, tradingStyle: TradingStyle 
     ? `${assetLabel} [${tfCtx}] shows bullish bias. SMA${sc.smaFast} is ${smaPct}% ${parseFloat(smaPct) >= 0 ? "above" : "below"} SMA${sc.smaSlow}. ROC(${sc.rocShort}): ${rocSLbl}, ROC(${sc.rocLong}): ${rocLLbl}. ${upCandles}/${totalCandles} recent candles positive. ATR: ${atrLbl} → SL set at ${sltp.slPips} pips.`
     : `${bullCount} agent(s) remain bullish despite majority bearish signals. A SMA${sc.smaFast} reclaim at ${fmt(smaFast)} could trigger recovery.`;
 
+  const commodityMacroNote = category === "oil"
+    ? "OPEC+ supply decisions and geopolitical risk could accelerate selling."
+    : "Macro uncertainty could accelerate selling.";
   const bearDebate = bearCount >= bullCount
     ? `${bearCount} agents flag bearish conditions on ${assetLabel} [${tfCtx}]. ROC(${sc.rocLong}): ${rocLLbl}. Volatility: ${volLbl}%. SMA alignment: ${technical === "bearish" ? `bearish (SMA${sc.smaFast} < SMA${sc.smaSlow})` : "mixed"}.`
-    : `Bearish risks remain: vol at ${volLbl}%. ${bearCount} agent(s) warn. ${isYahoo ? "Macro uncertainty could accelerate selling." : "Adverse macro events could rapidly reverse trend."}`;
+    : `Bearish risks remain: vol at ${volLbl}%. ${bearCount} agent(s) warn. ${isYahoo ? commodityMacroNote : "Adverse macro events could rapidly reverse trend."}`;
 
   const judgeDebate = direction === "NO_TRADE"
     ? `Evidence: ${bullCount} bullish vs ${bearCount} bearish on ${tfCtx}. Confidence ${confidence.toFixed(0)}% < 55% minimum. Market structure unclear — best action is to wait for a cleaner ${tradingStyle} setup.`

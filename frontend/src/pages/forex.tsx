@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   TrendingUp, TrendingDown, AlertTriangle, ShieldAlert,
@@ -17,10 +17,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useLanguage } from "@/lib/i18n";
 import { apiRequest } from "@/lib/queryClient";
-import { ForexUploadSheet } from "@/components/forex-upload-sheet";
-import { RiskCalculatorCard } from "@/components/risk-calculator-card";
-import { AIForexCopilot } from "@/components/ai-forex-copilot";
 import { cn } from "@/lib/utils";
+
+const ForexUploadSheet   = lazy(() => import("@/components/forex-upload-sheet").then(m => ({ default: m.ForexUploadSheet })));
+const RiskCalculatorCard = lazy(() => import("@/components/risk-calculator-card").then(m => ({ default: m.RiskCalculatorCard })));
+const AIForexCopilot     = lazy(() => import("@/components/ai-forex-copilot").then(m => ({ default: m.AIForexCopilot })));
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -120,7 +121,7 @@ function StatCard({ label, value, sub, positive, neutral }: {
   );
 }
 
-function RulesEditor({ rules, onSave }: { rules: TradingRules; onSave: (r: Partial<TradingRules>) => void }) {
+function RulesEditor({ rules, onSave, fx }: { rules: TradingRules; onSave: (r: Partial<TradingRules>) => void; fx: any }) {
   const [draft, setDraft] = useState({ ...rules });
   const [saving, setSaving] = useState(false);
 
@@ -130,15 +131,17 @@ function RulesEditor({ rules, onSave }: { rules: TradingRules; onSave: (r: Parti
     setSaving(false);
   }
 
+  const fields = [
+    { key: "maxLossPercent",        label: fx.rulesMaxLoss,      type: "number", step: "0.1" },
+    { key: "targetProfitPercent",   label: fx.rulesTargetProfit, type: "number", step: "0.1" },
+    { key: "maxTradesPerDay",       label: fx.rulesMaxTrades,    type: "number", step: "1"   },
+    { key: "revengeWindowMinutes",  label: fx.rulesRevengeGap,   type: "number", step: "1"   },
+  ];
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
-        {[
-          { key: "maxLossPercent", label: "Max Loss / Hari (%)", type: "number", step: "0.1" },
-          { key: "targetProfitPercent", label: "Target Profit / Hari (%)", type: "number", step: "0.1" },
-          { key: "maxTradesPerDay", label: "Max Trade / Hari", type: "number", step: "1" },
-          { key: "revengeWindowMinutes", label: "Jeda Revenge (menit)", type: "number", step: "1" },
-        ].map(({ key, label, type, step }) => (
+        {fields.map(({ key, label, type, step }) => (
           <div key={key}>
             <label className="text-xs text-muted-foreground block mb-1">{label}</label>
             <input
@@ -152,45 +155,44 @@ function RulesEditor({ rules, onSave }: { rules: TradingRules; onSave: (r: Parti
         ))}
       </div>
       <Button size="sm" onClick={handleSave} disabled={saving} className="w-full">
-        {saving ? "Menyimpan..." : "Simpan Aturan"}
+        {saving ? fx.rulesSaving : fx.rulesSave}
       </Button>
     </div>
   );
 }
 
 function TradeRow({
-  t, currency, onDelete, deleting,
+  trade, currency, onDelete, deleting, fx,
 }: {
-  t: ForexTrade;
+  trade: ForexTrade;
   currency: "USD" | "IDR";
   onDelete: (id: number) => void;
   deleting: boolean;
+  fx: any;
 }) {
-  const profit = Number(t.profit);
+  const profit = Number(trade.profit);
   const isWin  = profit >= 0;
-  const date   = t.createdAt
-    ? new Date(t.createdAt).toLocaleDateString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+  const date   = trade.createdAt
+    ? new Date(trade.createdAt).toLocaleDateString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
     : "-";
 
   return (
     <div className="group flex items-center justify-between py-2 border-b border-border/50 last:border-0 gap-2">
-      {/* Left — color bar + info */}
       <div className="flex items-center gap-2 min-w-0">
         <div className={cn("w-1.5 h-8 rounded-full shrink-0", isWin ? "bg-emerald-500" : "bg-red-400")} />
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-sm">{t.symbol}</span>
+            <span className="font-semibold text-sm">{trade.symbol}</span>
             <Badge variant="outline" className={cn("text-[9px] px-1 py-0 uppercase",
-              (t.type ?? "") === "buy" ? "border-emerald-500 text-emerald-600" : "border-red-400 text-red-500")}>
-              {t.type ?? ""}
+              (trade.type ?? "") === "buy" ? "border-emerald-500 text-emerald-600" : "border-red-400 text-red-500")}>
+              {trade.type ?? ""}
             </Badge>
-            <span className="text-[10px] text-muted-foreground">{t.lot} lot</span>
+            <span className="text-[10px] text-muted-foreground">{trade.lot} lot</span>
           </div>
           <p className="text-[10px] text-muted-foreground">{date}</p>
         </div>
       </div>
 
-      {/* Right — profit + delete */}
       <div className="flex items-center gap-2 shrink-0">
         <ProfitBadge profit={profit} currency={currency} />
 
@@ -203,26 +205,29 @@ function TradeRow({
                 "opacity-0 group-hover:opacity-100 focus:opacity-100",
                 deleting && "opacity-50 cursor-not-allowed",
               )}
-              title="Hapus trade"
+              title={fx.deleteTip}
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Hapus trade ini?</AlertDialogTitle>
+              <AlertDialogTitle>{fx.deleteTrade}</AlertDialogTitle>
               <AlertDialogDescription>
-                <span className="font-semibold">{t.symbol ?? ""} {(t.type ?? "").toUpperCase()}</span>
-                {" "}({t.lot} lot, {fmtProfit(profit, "USD")}) akan dihapus permanen dan tidak dapat dibatalkan.
+                {fx.deleteTradeDesc(
+                  trade.symbol ?? "",
+                  (trade.type ?? "").toUpperCase(),
+                  fmtProfit(profit, "USD"),
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Batal</AlertDialogCancel>
+              <AlertDialogCancel>{fx.cancel}</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => onDelete(t.id)}
+                onClick={() => onDelete(trade.id)}
                 className="bg-red-600 hover:bg-red-700 text-white"
               >
-                Ya, Hapus
+                {fx.yesDelete}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -244,8 +249,8 @@ function WinRateBar({ wins, total }: { wins: number; total: number }) {
   );
 }
 
-function HourChart({ byHour, currency }: { byHour: ForexInsights["byHour"]; currency: "USD" | "IDR" }) {
-  if (byHour.length === 0) return <p className="text-xs text-muted-foreground text-center py-4">Belum ada data</p>;
+function HourChart({ byHour, currency, noDataLabel }: { byHour: ForexInsights["byHour"]; currency: "USD" | "IDR"; noDataLabel: string }) {
+  if (byHour.length === 0) return <p className="text-xs text-muted-foreground text-center py-4">{noDataLabel}</p>;
   const maxAbs = Math.max(...byHour.map(h => Math.abs(h.profit)), 1);
   return (
     <div className="flex items-end gap-1 h-20">
@@ -272,6 +277,7 @@ function HourChart({ byHour, currency }: { byHour: ForexInsights["byHour"]; curr
 
 export default function ForexPage() {
   const { t } = useLanguage();
+  const fx = t.forex;
   const qc = useQueryClient();
   const [uploadOpen, setUploadOpen]   = useState(false);
   const [rulesOpen,  setRulesOpen]    = useState(false);
@@ -280,24 +286,29 @@ export default function ForexPage() {
 
   const { data: stats, isLoading: statsLoading } = useQuery<ForexStats>({
     queryKey: ["/api/forex/stats"],
+    staleTime: 30_000,
   });
 
   const { data: rules, isLoading: rulesLoading } = useQuery<TradingRules>({
     queryKey: ["/api/forex/rules"],
+    staleTime: 120_000,
   });
 
-  const { data: psych, isLoading: psychLoading } = useQuery<PsychResult>({
+  const { data: psych } = useQuery<PsychResult>({
     queryKey: ["/api/forex/psychology"],
     queryFn: () => apiRequest("POST", "/api/forex/psychology", {}).then(r => r.json()),
     refetchInterval: 60_000,
+    staleTime: 30_000,
   });
 
   const { data: trades = [], isLoading: tradesLoading } = useQuery<ForexTrade[]>({
     queryKey: ["/api/forex/trades"],
+    staleTime: 30_000,
   });
 
   const { data: insights, isLoading: insightsLoading } = useQuery<ForexInsights>({
     queryKey: ["/api/forex/insights"],
+    staleTime: 30_000,
     select: (d) => ({
       bestPair:  d?.bestPair  ?? null,
       worstPair: d?.worstPair ?? null,
@@ -324,8 +335,6 @@ export default function ForexPage() {
   const safeTrades = trades ?? [];
   const displayedTrades = showAll ? safeTrades : safeTrades.slice(0, 10);
 
-  const hasDanger = (psych?.alerts ?? []).some(a => a.severity === "danger");
-
   return (
     <div className="max-w-2xl mx-auto px-4 py-4 pb-24 space-y-4">
       {/* Header */}
@@ -333,22 +342,22 @@ export default function ForexPage() {
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-violet-500" />
-            Forex
+            {fx.pageTitle}
           </h1>
-          <p className="text-xs text-muted-foreground">Trading Journal + Discipline Coach</p>
+          <p className="text-xs text-muted-foreground">{fx.pageSubtitle}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => { qc.invalidateQueries({ queryKey: ["/api/forex/stats"] }); qc.invalidateQueries({ queryKey: ["/api/forex/psychology"] }); }}>
             <RefreshCw className="w-3.5 h-3.5" />
           </Button>
           <Button size="sm" onClick={() => setUploadOpen(true)} className="bg-[#19432c] hover:bg-violet-700">
-            <Plus className="w-3.5 h-3.5 mr-1" /> Upload Trade
+            <Plus className="w-3.5 h-3.5 mr-1" /> {fx.uploadTrade}
           </Button>
         </div>
       </div>
 
       {/* Psychology Alerts */}
-      {!psychLoading && psych && (psych.alerts ?? []).length > 0 && (
+      {psych && (psych.alerts ?? []).length > 0 && (
         <div className="space-y-2">
           {(psych.alerts ?? []).map((a, i) => (
             <div key={i} className={cn("flex gap-2 p-3 rounded-lg border text-sm", SeverityBg(a.severity))}>
@@ -361,17 +370,17 @@ export default function ForexPage() {
 
       {/* Today Summary */}
       <div>
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Hari Ini</h2>
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{fx.today}</h2>
         {statsLoading ? (
           <div className="flex gap-2">
             {[1,2,3,4].map(i => <Skeleton key={i} className="h-16 flex-1 rounded-xl" />)}
           </div>
         ) : (
           <div className="flex gap-2 overflow-x-auto pb-1">
-            <StatCard label="Net Profit" value={fmtProfit(stats?.today.net ?? 0, currency)} positive={(stats?.today.net ?? 0) >= 0} />
-            <StatCard label="Total Profit" value={fmtProfit(stats?.today.profit ?? 0, currency)} positive />
-            <StatCard label="Total Loss"   value={fmtProfit(stats?.today.loss ?? 0, currency)} positive={false} />
-            <StatCard label="Trades" value={String(stats?.today.count ?? 0)} neutral />
+            <StatCard label={fx.netProfit}   value={fmtProfit(stats?.today.net ?? 0, currency)}    positive={(stats?.today.net ?? 0) >= 0} />
+            <StatCard label={fx.totalProfit} value={fmtProfit(stats?.today.profit ?? 0, currency)} positive />
+            <StatCard label={fx.totalLoss}   value={fmtProfit(stats?.today.loss ?? 0, currency)}   positive={false} />
+            <StatCard label={fx.trades}      value={String(stats?.today.count ?? 0)}               neutral />
           </div>
         )}
       </div>
@@ -380,26 +389,26 @@ export default function ForexPage() {
       <Card>
         <CardHeader className="py-3 px-4">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Trophy className="w-4 h-4 text-amber-500" /> Statistik Keseluruhan
+            <Trophy className="w-4 h-4 text-amber-500" /> {fx.allTimeStats}
           </CardTitle>
         </CardHeader>
         <CardContent className="px-4 pb-4">
           {statsLoading ? <Skeleton className="h-16" /> : (
             <div className="grid grid-cols-3 gap-3">
               <div className="text-center">
-                <p className="text-xs text-muted-foreground">Total Net</p>
+                <p className="text-xs text-muted-foreground">{fx.totalNet}</p>
                 <p className={cn("text-sm font-bold tabular-nums", (stats?.allTime.net ?? 0) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500")}>
                   {fmtProfit(stats?.allTime.net ?? 0, currency)}
                 </p>
               </div>
               <div className="text-center">
-                <p className="text-xs text-muted-foreground">Win Rate</p>
+                <p className="text-xs text-muted-foreground">{fx.winRate}</p>
                 <p className="text-sm font-bold tabular-nums text-blue-600 dark:text-blue-400">
                   {(stats?.allTime.winRate ?? 0).toFixed(1)}%
                 </p>
               </div>
               <div className="text-center">
-                <p className="text-xs text-muted-foreground">Total Trade</p>
+                <p className="text-xs text-muted-foreground">{fx.totalTrades}</p>
                 <p className="text-sm font-bold tabular-nums">{stats?.allTime.count ?? 0}</p>
               </div>
             </div>
@@ -414,30 +423,34 @@ export default function ForexPage() {
           onClick={() => setRulesOpen(o => !o)}
         >
           <span className="text-sm font-semibold flex items-center gap-2">
-            <Settings className="w-4 h-4 text-muted-foreground" /> Aturan Disiplin
+            <Settings className="w-4 h-4 text-muted-foreground" /> {fx.disciplineRules}
           </span>
           {rulesOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
         </button>
         {rulesOpen && (
           <CardContent className="px-4 pb-4">
             {rulesLoading ? <Skeleton className="h-32" /> : rules ? (
-              <RulesEditor rules={rules} onSave={v => saveRules.mutate(v)} />
+              <RulesEditor rules={rules} onSave={v => saveRules.mutate(v)} fx={fx} />
             ) : null}
           </CardContent>
         )}
       </Card>
 
       {/* Risk Calculator */}
-      <RiskCalculatorCard />
+      <Suspense fallback={<div className="h-40 rounded-xl bg-muted/40 animate-pulse" />}>
+        <RiskCalculatorCard />
+      </Suspense>
 
       {/* AI Trading Copilot */}
-      <AIForexCopilot />
+      <Suspense fallback={<div className="h-64 rounded-xl bg-muted/40 animate-pulse" />}>
+        <AIForexCopilot />
+      </Suspense>
 
       {/* Insights */}
       <Card>
         <CardHeader className="py-3 px-4">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-violet-500" /> Insights
+            <BarChart3 className="w-4 h-4 text-violet-500" /> {fx.insights}
           </CardTitle>
         </CardHeader>
         <CardContent className="px-4 pb-4 space-y-4">
@@ -450,7 +463,7 @@ export default function ForexPage() {
                     <div className="flex-1 flex items-center gap-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2 border border-emerald-100 dark:border-emerald-900">
                       <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
                       <div>
-                        <p className="text-[10px] text-muted-foreground">Best Pair</p>
+                        <p className="text-[10px] text-muted-foreground">{fx.bestPair}</p>
                         <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{insights.bestPair}</p>
                       </div>
                     </div>
@@ -459,7 +472,7 @@ export default function ForexPage() {
                     <div className="flex-1 flex items-center gap-2 rounded-lg bg-red-50 dark:bg-red-950/30 px-3 py-2 border border-red-100 dark:border-red-900">
                       <XCircle className="w-4 h-4 text-red-500 shrink-0" />
                       <div>
-                        <p className="text-[10px] text-muted-foreground">Worst Pair</p>
+                        <p className="text-[10px] text-muted-foreground">{fx.worstPair}</p>
                         <p className="text-sm font-bold text-red-600 dark:text-red-300">{insights.worstPair}</p>
                       </div>
                     </div>
@@ -470,7 +483,7 @@ export default function ForexPage() {
               {/* By Symbol */}
               {(insights.bySymbol ?? []).length > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Win Rate per Pair</p>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">{fx.winRatePerPair}</p>
                   <div className="space-y-2">
                     {(insights.bySymbol ?? []).slice(0, 6).map(s => (
                       <div key={s.symbol} className="space-y-0.5">
@@ -491,14 +504,14 @@ export default function ForexPage() {
               {(insights.byHour ?? []).length > 0 && (
                 <div>
                   <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" /> Profit per Jam
+                    <Clock className="w-3.5 h-3.5" /> {fx.profitByHour}
                   </p>
-                  <HourChart byHour={insights.byHour} currency={currency} />
+                  <HourChart byHour={insights.byHour} currency={currency} noDataLabel={fx.noDataYet} />
                 </div>
               )}
 
               {(insights.bySymbol ?? []).length === 0 && (insights.byHour ?? []).length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">Upload trade pertama untuk melihat insights</p>
+                <p className="text-sm text-muted-foreground text-center py-4">{fx.uploadFirstTrade}</p>
               )}
             </>
           ) : null}
@@ -510,7 +523,7 @@ export default function ForexPage() {
         <CardHeader className="py-3 px-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Zap className="w-4 h-4 text-yellow-500" /> Riwayat Trade
+              <Zap className="w-4 h-4 text-yellow-500" /> {fx.tradeHistory}
             </CardTitle>
             <div className="flex items-center rounded-lg border border-border overflow-hidden text-xs font-medium">
               <button
@@ -536,25 +549,26 @@ export default function ForexPage() {
           ) : safeTrades.length === 0 ? (
             <div className="text-center py-8 space-y-2">
               <TrendingUp className="w-10 h-10 mx-auto text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">Belum ada trade. Upload screenshot MT4/MT5 untuk mulai.</p>
+              <p className="text-sm text-muted-foreground">{fx.noTrades}</p>
               <Button size="sm" variant="outline" onClick={() => setUploadOpen(true)}>
-                <Plus className="w-3.5 h-3.5 mr-1" /> Upload Screenshot
+                <Plus className="w-3.5 h-3.5 mr-1" /> {fx.uploadScreenshot}
               </Button>
             </div>
           ) : (
             <>
-              {displayedTrades.map(t => (
+              {displayedTrades.map(trade => (
                 <TradeRow
-                  key={t.id}
-                  t={t}
+                  key={trade.id}
+                  trade={trade}
                   currency={currency}
                   onDelete={(id) => deleteTrade.mutate(id)}
-                  deleting={deleteTrade.isPending && deleteTrade.variables === t.id}
+                  deleting={deleteTrade.isPending && deleteTrade.variables === trade.id}
+                  fx={fx}
                 />
               ))}
               {safeTrades.length > 10 && (
                 <Button variant="ghost" size="sm" className="w-full mt-2 text-xs" onClick={() => setShowAll(o => !o)}>
-                  {showAll ? "Tampilkan lebih sedikit" : `Tampilkan semua (${safeTrades.length} trade)`}
+                  {showAll ? fx.showLess : (fx.showAll as any)(safeTrades.length)}
                 </Button>
               )}
             </>
@@ -562,17 +576,21 @@ export default function ForexPage() {
         </CardContent>
       </Card>
 
-      {/* Floating Upload Sheet */}
-      <ForexUploadSheet
-        open={uploadOpen}
-        onClose={() => {
-          setUploadOpen(false);
-          qc.invalidateQueries({ queryKey: ["/api/forex/trades"] });
-          qc.invalidateQueries({ queryKey: ["/api/forex/stats"] });
-          qc.invalidateQueries({ queryKey: ["/api/forex/insights"] });
-          qc.invalidateQueries({ queryKey: ["/api/forex/psychology"] });
-        }}
-      />
+      {/* Floating Upload Sheet — only mount when open to defer heavy bundle */}
+      {uploadOpen && (
+        <Suspense fallback={null}>
+          <ForexUploadSheet
+            open={uploadOpen}
+            onClose={() => {
+              setUploadOpen(false);
+              qc.invalidateQueries({ queryKey: ["/api/forex/trades"] });
+              qc.invalidateQueries({ queryKey: ["/api/forex/stats"] });
+              qc.invalidateQueries({ queryKey: ["/api/forex/insights"] });
+              qc.invalidateQueries({ queryKey: ["/api/forex/psychology"] });
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
