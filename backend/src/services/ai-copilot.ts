@@ -1,27 +1,28 @@
 // ─── AI Forex Copilot — Real Technical Analysis Engine ───────────────────────
-// Forex  → Frankfurter API (free, no key)
-// XAU/USD, BTC/USD → CryptoCompare histoday OHLCV API (free, no key)
+// Forex       → Frankfurter API (free, no key)
+// XAU/USD     → Yahoo Finance GC=F  (Gold Futures, free, no rate-limit)
+// BTC/USD     → Yahoo Finance BTC-USD (free, no rate-limit)
 // SL/TP: ATR-based, style-adaptive, pip-capped. RR enforced ≥ 1.5.
 
 import { marketCache } from "./market-cache";
 
 const FRANKFURTER_BASE = "https://api.frankfurter.app";
-const CC_BASE          = "https://min-api.cryptocompare.com/data/v2/histoday";
+const YAHOO_BASE       = "https://query1.finance.yahoo.com/v8/finance/chart";
 
 export type TradingStyle = "scalp" | "day" | "swing";
 
 export const SUPPORTED_PAIRS: Record<string, {
-  base: string; target: string; decimals: number; isCrypto: boolean; pip: number;
+  base: string; target: string; decimals: number; yahooTicker?: string; pip: number;
 }> = {
-  "XAU/USD": { base: "PAXG", target: "USD", decimals: 2, isCrypto: true,  pip: 0.10   },
-  "BTC/USD": { base: "BTC",  target: "USD", decimals: 2, isCrypto: true,  pip: 1.00   },
-  "EUR/USD": { base: "EUR",  target: "USD", decimals: 5, isCrypto: false, pip: 0.0001 },
-  "GBP/USD": { base: "GBP",  target: "USD", decimals: 5, isCrypto: false, pip: 0.0001 },
-  "USD/JPY": { base: "USD",  target: "JPY", decimals: 3, isCrypto: false, pip: 0.01   },
-  "AUD/USD": { base: "AUD",  target: "USD", decimals: 5, isCrypto: false, pip: 0.0001 },
-  "USD/CHF": { base: "USD",  target: "CHF", decimals: 5, isCrypto: false, pip: 0.0001 },
-  "NZD/USD": { base: "NZD",  target: "USD", decimals: 5, isCrypto: false, pip: 0.0001 },
-  "USD/CAD": { base: "USD",  target: "CAD", decimals: 5, isCrypto: false, pip: 0.0001 },
+  "XAU/USD": { base: "XAU", target: "USD", decimals: 2, yahooTicker: "GC=F",    pip: 0.10   },
+  "BTC/USD": { base: "BTC", target: "USD", decimals: 2, yahooTicker: "BTC-USD", pip: 1.00   },
+  "EUR/USD": { base: "EUR", target: "USD", decimals: 5, pip: 0.0001 },
+  "GBP/USD": { base: "GBP", target: "USD", decimals: 5, pip: 0.0001 },
+  "USD/JPY": { base: "USD", target: "JPY", decimals: 3, pip: 0.01   },
+  "AUD/USD": { base: "AUD", target: "USD", decimals: 5, pip: 0.0001 },
+  "USD/CHF": { base: "USD", target: "CHF", decimals: 5, pip: 0.0001 },
+  "NZD/USD": { base: "NZD", target: "USD", decimals: 5, pip: 0.0001 },
+  "USD/CAD": { base: "USD", target: "CAD", decimals: 5, pip: 0.0001 },
 };
 
 // ─── Style config ─────────────────────────────────────────────────────────────
@@ -224,7 +225,7 @@ function generateSLTP(
 interface ForexFetchResult { closes: number[]; bars: OHLCVBar[]; }
 
 // Separate short-lived cache for raw OHLCV data (shared across all styles of same pair)
-// So scalp/day/swing for XAU/USD all reuse the same single CryptoCompare fetch.
+// So scalp/day/swing for XAU/USD all reuse the same single Yahoo Finance fetch.
 const OHLCV_TTL = 5 * 60 * 1000;
 const ohlcvCache: Record<string, { data: ForexFetchResult; ts: number }> = {};
 
@@ -265,27 +266,37 @@ async function fetchForexRates(base: string, target: string): Promise<ForexFetch
   });
 }
 
-async function fetchCryptoRates(symbol: string): Promise<ForexFetchResult> {
-  return cachedOHLCV(`crypto_${symbol}`, async () => {
-    const url  = `${CC_BASE}?fsym=${symbol}&tsym=USD&limit=120`;
-    const resp = await fetch(url, { signal: AbortSignal.timeout(12_000) });
-    if (!resp.ok) throw new Error(`CryptoCompare API ${resp.status}`);
+async function fetchYahooRates(ticker: string): Promise<ForexFetchResult> {
+  return cachedOHLCV(`yahoo_${ticker}`, async () => {
+    const url  = `${YAHOO_BASE}/${encodeURIComponent(ticker)}?interval=1d&range=6mo`;
+    const resp = await fetch(url, {
+      signal: AbortSignal.timeout(12_000),
+      headers: { "User-Agent": "Mozilla/5.0" },
+    });
+    if (!resp.ok) throw new Error(`Yahoo Finance API ${resp.status} for ${ticker}`);
 
     const json = await resp.json() as any;
+    const result = json?.chart?.result?.[0];
+    if (!result) throw new Error(`Yahoo Finance: no data for ${ticker}`);
 
-    // CryptoCompare sometimes returns 200 with {Response: "Error"} when rate-limited
-    if (json?.Response === "Error" || !json?.Data?.Data) {
-      throw new Error(`CryptoCompare error: ${json?.Message ?? "no data"}`);
+    const quote  = result.indicators?.quote?.[0];
+    const rawO   = (quote?.open   as (number | null)[]) ?? [];
+    const rawH   = (quote?.high   as (number | null)[]) ?? [];
+    const rawL   = (quote?.low    as (number | null)[]) ?? [];
+    const rawC   = (quote?.close  as (number | null)[]) ?? [];
+
+    // Filter out null entries (market holidays)
+    const bars: OHLCVBar[] = [];
+    const closes: number[] = [];
+    for (let i = 0; i < rawC.length; i++) {
+      const c = rawC[i], o = rawO[i], h = rawH[i], l = rawL[i];
+      if (c != null && o != null && h != null && l != null && c > 0) {
+        bars.push({ open: o, high: h, low: l, close: c });
+        closes.push(c);
+      }
     }
 
-    const raw = (json.Data.Data as Array<{ open: number; high: number; low: number; close: number }>)
-      .filter(d => d.close > 0);
-
-    if (raw.length < 15) throw new Error("Insufficient crypto rate history");
-
-    const bars:   OHLCVBar[] = raw.map(d => ({ open: d.open, high: d.high, low: d.low, close: d.close }));
-    const closes: number[]   = raw.map(d => d.close);
-
+    if (closes.length < 15) throw new Error(`Insufficient Yahoo Finance history for ${ticker}`);
     return { closes, bars };
   });
 }
@@ -305,8 +316,8 @@ export async function warmAllPairs(): Promise<void> {
   for (const [pair, cfg] of Object.entries(SUPPORTED_PAIRS)) {
     try {
       // Pre-fill OHLCV cache (1 call per pair)
-      if (cfg.isCrypto) await fetchCryptoRates(cfg.base).catch(() => null);
-      else              await fetchForexRates(cfg.base, cfg.target).catch(() => null);
+      if (cfg.yahooTicker) await fetchYahooRates(cfg.yahooTicker).catch(() => null);
+      else                  await fetchForexRates(cfg.base, cfg.target).catch(() => null);
       // Now analyze all 3 styles — all reuse the cached OHLCV above
       await Promise.allSettled(styles.map(s => analyzeForexPair(pair, s).catch(() => null)));
     } catch {
@@ -324,8 +335,8 @@ export async function analyzeForexPair(pair: string, tradingStyle: TradingStyle 
   const cfg = SUPPORTED_PAIRS[pair];
   if (!cfg) throw new Error(`Unsupported pair: ${pair}`);
 
-  const { closes, bars } = cfg.isCrypto
-    ? await fetchCryptoRates(cfg.base)
+  const { closes, bars } = cfg.yahooTicker
+    ? await fetchYahooRates(cfg.yahooTicker)
     : await fetchForexRates(cfg.base, cfg.target);
 
   const sc      = STYLE_CONFIG[tradingStyle];
@@ -344,8 +355,9 @@ export async function analyzeForexPair(pair: string, tradingStyle: TradingStyle 
   const upCandles    = recentSlice.filter((r, i) => i > 0 && r > recentSlice[i - 1]).length;
   const totalCandles = sc.sentLen - 1;
 
-  const rocThresh     = cfg.isCrypto ? sc.rocThreshCrypto     : sc.rocThreshFx;
-  const rocLongThresh = cfg.isCrypto ? sc.rocLongThreshCrypto : sc.rocLongThreshFx;
+  const isYahoo       = !!cfg.yahooTicker;
+  const rocThresh     = isYahoo ? sc.rocThreshCrypto     : sc.rocThreshFx;
+  const rocLongThresh = isYahoo ? sc.rocLongThreshCrypto : sc.rocLongThreshFx;
 
   // ── Agent 1: Technical (SMA crossover)
   let technical: Vote;
@@ -394,8 +406,8 @@ export async function analyzeForexPair(pair: string, tradingStyle: TradingStyle 
   confidence = Math.min(93, Math.max(20, confidence));
   if (confidence < 55) direction = "NO_TRADE";
 
-  // ── ATR-based SL/TP (real OHLCV for crypto, approximated for forex)
-  const rawATR = cfg.isCrypto
+  // ── ATR-based SL/TP (real OHLCV from Yahoo for XAU/BTC, approximated for forex)
+  const rawATR = isYahoo
     ? calculateATR(bars, Math.min(14, bars.length - 1))
     : approxATR(closes, 14);
 
@@ -404,8 +416,8 @@ export async function analyzeForexPair(pair: string, tradingStyle: TradingStyle 
     : { stopLoss: 0, takeProfit: 0, riskReward: 0, effectiveStyle: tradingStyle, slPips: 0 };
 
   // ── Risk level
-  const volHighThresh = cfg.isCrypto ? 4 : (tradingStyle === "scalp" ? 0.8 : tradingStyle === "day" ? 1.5 : 2.5);
-  const volMedThresh  = cfg.isCrypto ? 2 : (tradingStyle === "scalp" ? 0.4 : tradingStyle === "day" ? 0.7 : 1.2);
+  const volHighThresh = isYahoo ? 4 : (tradingStyle === "scalp" ? 0.8 : tradingStyle === "day" ? 1.5 : 2.5);
+  const volMedThresh  = isYahoo ? 2 : (tradingStyle === "scalp" ? 0.4 : tradingStyle === "day" ? 0.7 : 1.2);
   let riskLevel: "low" | "medium" | "high";
   if      (normVol > volHighThresh) riskLevel = "high";
   else if (normVol > volMedThresh)  riskLevel = "medium";
@@ -420,7 +432,7 @@ export async function analyzeForexPair(pair: string, tradingStyle: TradingStyle 
   const tfCtx     = `${sc.tfLabel} equivalent`;
   const atrLbl    = rawATR.toFixed(cfg.decimals);
 
-  const assetLabel = cfg.isCrypto
+  const assetLabel = isYahoo
     ? (pair === "XAU/USD" ? "Gold (XAU/USD)" : "Bitcoin (BTC/USD)")
     : pair;
 
@@ -436,7 +448,7 @@ export async function analyzeForexPair(pair: string, tradingStyle: TradingStyle 
 
   const bearDebate = bearCount >= bullCount
     ? `${bearCount} agents flag bearish conditions on ${assetLabel} [${tfCtx}]. ROC(${sc.rocLong}): ${rocLLbl}. Volatility: ${volLbl}%. SMA alignment: ${technical === "bearish" ? `bearish (SMA${sc.smaFast} < SMA${sc.smaSlow})` : "mixed"}.`
-    : `Bearish risks remain: vol at ${volLbl}%. ${bearCount} agent(s) warn. ${cfg.isCrypto ? "Macro uncertainty could accelerate selling." : "Adverse macro events could rapidly reverse trend."}`;
+    : `Bearish risks remain: vol at ${volLbl}%. ${bearCount} agent(s) warn. ${isYahoo ? "Macro uncertainty could accelerate selling." : "Adverse macro events could rapidly reverse trend."}`;
 
   const judgeDebate = direction === "NO_TRADE"
     ? `Evidence: ${bullCount} bullish vs ${bearCount} bearish on ${tfCtx}. Confidence ${confidence.toFixed(0)}% < 55% minimum. Market structure unclear — best action is to wait for a cleaner ${tradingStyle} setup.`
