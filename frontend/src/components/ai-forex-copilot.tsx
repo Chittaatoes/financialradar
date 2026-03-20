@@ -1,306 +1,272 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
-  Brain, TrendingUp, TrendingDown, Minus,
-  Zap, ShieldAlert, Copy, RefreshCw,
-  ChevronDown, ChevronUp, AlertTriangle, CheckCircle2,
-  BarChart3, Activity, Newspaper, DollarSign, Clock,
+  Brain, Zap, RefreshCw, Copy, Clock, ShieldAlert,
+  ChevronDown, ChevronUp, CheckCircle2,
+  TrendingUp, TrendingDown, Minus,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/lib/i18n";
+import { apiRequest } from "@/lib/queryClient";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type TradingStyle = "scalp" | "day" | "swing";
 
 interface AIForexSignal {
-  pair: string;
-  tradingStyle: TradingStyle;
-  tfLabel: string;
+  pair:             string;
+  tradingStyle:     TradingStyle;
+  direction:        "LONG" | "SHORT" | "NO_TRADE";
+  confidence:       number;
+  entry:            string;
+  stopLoss:         string;
+  takeProfit:       string;
+  riskReward:       number;
+  riskLevel:        "low" | "medium" | "high";
+  tfLabel:          string;
   durationEstimate: string;
-  direction: "LONG" | "SHORT" | "NO_TRADE";
-  entry: number;
-  stopLoss: number;
-  takeProfit: number;
-  confidence: number;
-  riskReward: number;
-  riskLevel: "low" | "medium" | "high";
-  agentsConsensus: {
-    technical:    "bullish" | "bearish" | "neutral";
-    momentum:     "bullish" | "bearish" | "neutral";
-    sentiment:    "bullish" | "bearish" | "neutral";
-    fundamentals: "bullish" | "bearish" | "neutral";
-  };
-  debate: { bull: string; bear: string; judge: string };
-  reasoning: string;
-  timestamp: string;
+  reasoning:        string;
+  agentsConsensus:  Record<string, string>;
+  debate:           { bull: string; bear: string; judge: string };
+  timestamp:        number;
 }
 
-// ─── All pairs (flat) ─────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-const ALL_PAIRS = [
+const PAIRS: string[] = [
   "XAU/USD", "BTC/USD",
   "EUR/USD", "GBP/USD", "USD/JPY",
-  "AUD/USD", "USD/CHF", "NZD/USD", "USD/CAD",
+  "AUD/USD", "NZD/USD", "USD/CHF", "USD/CAD",
 ];
 
-// Special pairs that get a highlight
-const HIGHLIGHT_PAIRS = new Set(["XAU/USD", "BTC/USD"]);
-
-// ─── Style definitions ────────────────────────────────────────────────────────
-
-const STYLES: { key: TradingStyle; tfLabel: string; color: string }[] = [
-  { key: "scalp", tfLabel: "M1 – M15", color: "text-amber-600 dark:text-amber-400" },
-  { key: "day",   tfLabel: "H1 – H4",  color: "text-sky-600  dark:text-sky-400"    },
-  { key: "swing", tfLabel: "D1 – W1",  color: "text-violet-600 dark:text-violet-400" },
+const STYLES: { value: TradingStyle; label: { en: string; id: string }; sub: { en: string; id: string } }[] = [
+  { value: "scalp", label: { en: "Scalp", id: "Scalp"     }, sub: { en: "M1–M15",  id: "M1–M15"  } },
+  { value: "day",   label: { en: "Day",   id: "Day Trade"  }, sub: { en: "H1–H4",   id: "H1–H4"   } },
+  { value: "swing", label: { en: "Swing", id: "Swing"      }, sub: { en: "D1–W1",   id: "D1–W1"   } },
 ];
 
 // ─── i18n ─────────────────────────────────────────────────────────────────────
 
-const i18n = {
-  en: {
-    title:         "AI Trading Copilot",
-    selectPair:    "Select Asset",
-    selectStyle:   "Trading Style",
-    styleLabel: {
-      scalp: "Scalp",
-      day:   "Day Trade",
-      swing: "Swing",
-    },
-    analyzeBtn:    (p: string, s: string) => `Analyze ${p} (${s})`,
-    analyzingBtn:  (p: string) => `Analyzing ${p}…`,
-    noTrade:       "NO TRADE",
-    noTradeMsg:    "🚫 Market condition unclear. Avoid trading.",
-    noTradeConf:   (c: number) => `Confidence ${c}% < 55% threshold`,
-    agentDebate:   "AI Agent Debate",
-    bullAgent:     "🟢 Bull Agent",
-    bearAgent:     "🔴 Bear Agent",
-    judge:         "⚖️ Judge",
-    reasoning:     "Explainable AI Reasoning",
-    riskWarning:   "For educational purposes only. Past patterns don't guarantee future results. Always use proper risk management.",
-    copySignal:    "Copy Signal",
-    reAnalyze:     "Re-analyze",
-    cachedNote:    (t: string, tf: string) => `${tf} analysis · ${t} · Cache 3 min`,
-    emptyTitle:    "Select an asset and trading style",
-    emptySubtitle: "AI adapts indicators to your chosen timeframe",
-    confidence:    "Confidence",
-    rr:            "R:R",
-    style:         "Style",
-    risk:          "Risk",
-    entry:         "Entry",
-    stopLoss:      "Stop Loss",
-    takeProfit:    "Take Profit",
-    duration:      "Duration",
-    agents:        { technical: "Technical", momentum: "Momentum", sentiment: "Sentiment", fundamentals: "Fundamentals" },
-    votes:         { bullish: "Bullish", bearish: "Bearish", neutral: "Neutral" },
-    risks:         { low: "Low", medium: "Medium", high: "High" },
-    copiedTitle:   "Signal copied!",
-    copiedDesc:    "Paste it anywhere.",
-    errorTitle:    "Analysis failed",
-    tf:            "Timeframe",
-  },
-  id: {
-    title:         "AI Trading Copilot",
-    selectPair:    "Pilih Aset",
-    selectStyle:   "Gaya Trading",
-    styleLabel: {
-      scalp: "Scalp",
-      day:   "Day Trade",
-      swing: "Swing",
-    },
-    analyzeBtn:    (p: string, s: string) => `Analisis ${p} (${s})`,
-    analyzingBtn:  (p: string) => `Menganalisis ${p}…`,
-    noTrade:       "JANGAN TRADING",
-    noTradeMsg:    "🚫 Kondisi pasar tidak jelas. Hindari trading.",
-    noTradeConf:   (c: number) => `Keyakinan ${c}% < batas 55%`,
-    agentDebate:   "Debat Agen AI",
-    bullAgent:     "🟢 Agen Bull",
-    bearAgent:     "🔴 Agen Bear",
-    judge:         "⚖️ Hakim",
-    reasoning:     "Penjelasan Analisis AI",
-    riskWarning:   "Hanya untuk edukasi. Pola masa lalu tidak menjamin hasil masa depan. Selalu gunakan manajemen risiko yang tepat.",
-    copySignal:    "Salin Sinyal",
-    reAnalyze:     "Analisis Ulang",
-    cachedNote:    (t: string, tf: string) => `Analisis ${tf} · ${t} · Cache 3 menit`,
-    emptyTitle:    "Pilih aset dan gaya trading",
-    emptySubtitle: "AI menyesuaikan indikator sesuai timeframe yang dipilih",
-    confidence:    "Keyakinan",
-    rr:            "R:R",
-    style:         "Gaya",
-    risk:          "Risiko",
-    entry:         "Entry",
-    stopLoss:      "Stop Loss",
-    takeProfit:    "Take Profit",
-    duration:      "Durasi",
-    agents:        { technical: "Teknikal", momentum: "Momentum", sentiment: "Sentimen", fundamentals: "Fundamental" },
-    votes:         { bullish: "Bullish", bearish: "Bearish", neutral: "Netral" },
-    risks:         { low: "Rendah", medium: "Sedang", high: "Tinggi" },
-    copiedTitle:   "Sinyal disalin!",
-    copiedDesc:    "Paste di mana saja.",
-    errorTitle:    "Analisis gagal",
-    tf:            "Timeframe",
-  },
+function useTx(lang: string) {
+  const id = lang === "id";
+  return {
+    title:        id ? "AI Copilot" : "AI Copilot",
+    subtitle:     id ? "Analisis teknikal multi-agen" : "Multi-agent technical analysis",
+    pair:         id ? "Pair" : "Pair",
+    style:        id ? "Gaya Trading" : "Trading Style",
+    styleLabel:   { scalp: "Scalp", day: "Day Trade", swing: "Swing" } as Record<string, string>,
+    analyzeBtn:   (p: string, s: string) => id ? `Analisis ${p} (${s})` : `Analyze ${p} (${s})`,
+    analyzingBtn: (p: string) => id ? `Menganalisis ${p}…` : `Analyzing ${p}…`,
+    agents:       {
+      technical:    id ? "Teknikal" : "Technical",
+      momentum:     id ? "Momentum" : "Momentum",
+      sentiment:    id ? "Sentimen" : "Sentiment",
+      fundamentals: id ? "Fundamental" : "Fundamentals",
+    } as Record<string, string>,
+    votes: {
+      bullish: id ? "Bullish" : "Bullish",
+      bearish: id ? "Bearish" : "Bearish",
+      neutral: id ? "Netral" : "Neutral",
+    } as Record<string, string>,
+    noTrade:      id ? "JANGAN MASUK" : "NO TRADE",
+    noTradeMsg:   id ? "Kondisi pasar tidak jelas. Tunggu setup lebih bersih." : "Market conditions unclear. Wait for a cleaner setup.",
+    noTradeConf:  (c: number) => id ? `Confidence ${c.toFixed(0)}% < 55% minimum` : `Confidence ${c.toFixed(0)}% < 55% minimum`,
+    entry:        id ? "Entry" : "Entry",
+    stopLoss:     id ? "Stop Loss" : "Stop Loss",
+    takeProfit:   id ? "Take Profit" : "Take Profit",
+    confidence:   id ? "Confidence" : "Confidence",
+    rr:           id ? "R:R" : "R:R",
+    risk:         id ? "Risiko" : "Risk",
+    duration:     id ? "Durasi" : "Duration",
+    risks:        { low: id ? "Rendah" : "Low", medium: id ? "Sedang" : "Medium", high: id ? "Tinggi" : "High" } as Record<string, string>,
+    agentDebate:  id ? "Debat AI" : "AI Debate",
+    bullAgent:    id ? "Bull Agent" : "Bull Agent",
+    bearAgent:    id ? "Bear Agent" : "Bear Agent",
+    judge:        id ? "Judge" : "Judge",
+    reasoning:    id ? "Kesimpulan" : "Reasoning",
+    riskWarning:  id
+      ? "Sinyal ini bersifat informatif, bukan saran investasi. Selalu gunakan manajemen risiko."
+      : "This signal is informational only, not financial advice. Always use proper risk management.",
+    copySignal:   id ? "Salin Sinyal" : "Copy Signal",
+    reAnalyze:    id ? "Analisis Ulang" : "Re-Analyze",
+    cachedNote:   (time: string, tf: string) =>
+      id ? `Dianalisis ${time} · ${tf}` : `Analyzed at ${time} · ${tf}`,
+    emptyTitle:   id ? "Belum ada sinyal" : "No signal yet",
+    emptySubtitle: id ? "Pilih pair & gaya, lalu tekan Analisis" : "Choose a pair & style, then press Analyze",
+  };
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function safeValue<T>(value: T | null | undefined, fallback: T): T {
+  return value ?? fallback;
+}
+
+function voteBg(vote: string) {
+  if (vote === "bullish") return "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800";
+  if (vote === "bearish") return "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800";
+  return "bg-muted/40 border-border";
+}
+
+function voteColor(vote: string) {
+  if (vote === "bullish") return "text-emerald-600 dark:text-emerald-400";
+  if (vote === "bearish") return "text-red-500 dark:text-red-400";
+  return "text-muted-foreground";
+}
+
+const styleColor: Record<string, string> = {
+  scalp: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300",
+  day:   "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300",
+  swing: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300",
 };
 
-// ─── UI helpers ───────────────────────────────────────────────────────────────
-
-function voteColor(v: string) {
-  if (v === "bullish") return "text-emerald-600 dark:text-emerald-400";
-  if (v === "bearish") return "text-red-500 dark:text-red-400";
-  return "text-amber-500 dark:text-amber-400";
-}
-function voteBg(v: string) {
-  if (v === "bullish") return "bg-emerald-500/10 border-emerald-500/20";
-  if (v === "bearish") return "bg-red-500/10 border-red-500/20";
-  return "bg-amber-500/10 border-amber-500/20";
-}
-function VoteIcon({ vote }: { vote: string }) {
-  if (vote === "bullish") return <TrendingUp  className="w-3.5 h-3.5" />;
-  if (vote === "bearish") return <TrendingDown className="w-3.5 h-3.5" />;
+function AgentIcon({ agent }: { agent: string }) {
+  if (agent === "technical")    return <TrendingUp className="w-3.5 h-3.5" />;
+  if (agent === "momentum")     return <Zap className="w-3.5 h-3.5" />;
+  if (agent === "sentiment")    return <Brain className="w-3.5 h-3.5" />;
+  if (agent === "fundamentals") return <BarChart className="w-3.5 h-3.5" />;
   return <Minus className="w-3.5 h-3.5" />;
 }
-function AgentIcon({ agent }: { agent: string }) {
-  if (agent === "technical")    return <BarChart3  className="w-4 h-4" />;
-  if (agent === "momentum")     return <Activity   className="w-4 h-4" />;
-  if (agent === "sentiment")    return <Newspaper  className="w-4 h-4" />;
-  if (agent === "fundamentals") return <DollarSign className="w-4 h-4" />;
-  return <Brain className="w-4 h-4" />;
+
+function VoteIcon({ vote }: { vote: string }) {
+  if (vote === "bullish") return <TrendingUp className="w-3 h-3" />;
+  if (vote === "bearish") return <TrendingDown className="w-3 h-3" />;
+  return <Minus className="w-3 h-3" />;
 }
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
+function BarChart({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6"  y1="20" x2="6"  y2="14" />
+    </svg>
+  );
+}
 
 function CopilotSkeleton() {
   return (
-    <div className="space-y-3 animate-pulse">
+    <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2">
-        {[0,1,2,3].map(i => (
-          <div key={i} className="rounded-lg border p-3 space-y-2">
-            <Skeleton className="h-3 w-20" />
-            <Skeleton className="h-5 w-16" />
-          </div>
-        ))}
+        {[1,2,3,4].map(i => <Skeleton key={i} className="h-14 rounded-lg" />)}
       </div>
-      <div className="rounded-lg border p-4 space-y-2">
-        <Skeleton className="h-8 w-24 mx-auto" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-3/4" />
-      </div>
-      <div className="rounded-lg border p-3 space-y-2">
-        <Skeleton className="h-3 w-28" />
-        <Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-5/6" /><Skeleton className="h-3 w-4/5" />
-      </div>
+      <Skeleton className="h-28 rounded-xl" />
+      <Skeleton className="h-10 rounded-lg" />
+      <Skeleton className="h-16 rounded-lg" />
     </div>
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export function AIForexCopilot() {
-  const { toast }                       = useToast();
-  const { language }                    = useLanguage();
-  const tx                              = i18n[language as "en" | "id"] ?? i18n.id;
+  const { language } = useLanguage();
+  const tx = useTx(language ?? "id");
 
-  const [selectedPair,  setPair]        = useState("XAU/USD");
-  const [selectedStyle, setStyle]       = useState<TradingStyle>("day");
-  const [signal,        setSignal]      = useState<AIForexSignal | null>(null);
-  const [debateOpen,    setDebateOpen]  = useState(false);
+  const [selectedPair,  setSelectedPair]  = useState<string>("XAU/USD");
+  const [selectedStyle, setSelectedStyle] = useState<TradingStyle>("day");
+  const [signal,        setSignal]        = useState<AIForexSignal | null>(null);
+  const [debateOpen,    setDebateOpen]    = useState(false);
 
   const analyze = useMutation({
-    mutationFn: ({ pair, style }: { pair: string; style: TradingStyle }) =>
-      apiRequest("POST", "/api/forex/ai-analyze", { pair, style }).then(r => r.json()),
-    onSuccess: (data: AIForexSignal) => { setSignal(data); setDebateOpen(false); },
-    onError:   (err: Error) => toast({ title: tx.errorTitle, description: err.message, variant: "destructive" }),
+    mutationFn: () =>
+      apiRequest("POST", "/api/forex/ai-analyze", {
+        pair:  safeValue(selectedPair,  "XAU/USD"),
+        style: safeValue(selectedStyle, "day"),
+      }).then(r => r.json() as Promise<AIForexSignal>),
+    onSuccess: (data) => setSignal(data),
   });
 
-  const runAnalyze = () => analyze.mutate({ pair: selectedPair, style: selectedStyle });
+  function runAnalyze() {
+    analyze.mutate();
+  }
 
-  const copySignal = () => {
+  function copySignal() {
     if (!signal) return;
-    const styleLabel = tx.styleLabel[signal.tradingStyle] ?? signal.tradingStyle ?? "";
-    const text = signal.direction === "NO_TRADE"
-      ? `🚫 AI Copilot — NO TRADE on ${signal.pair ?? ""} [${styleLabel} | ${signal.tfLabel ?? ""}]\n${tx.noTradeMsg}\n${new Date(signal.timestamp).toLocaleString()}`
-      : `📊 AI Copilot Signal\nPair: ${signal.pair ?? ""} | Style: ${styleLabel} (${signal.tfLabel ?? ""})\nDirection: ${signal.direction}\nEntry: ${signal.entry} | SL: ${signal.stopLoss} | TP: ${signal.takeProfit}\nConfidence: ${signal.confidence}% | RR: 1:${signal.riskReward} | Duration: ~${signal.durationEstimate ?? ""}\n${new Date(signal.timestamp).toLocaleString()}`;
-    navigator.clipboard.writeText(text).then(() =>
-      toast({ title: tx.copiedTitle, description: tx.copiedDesc })
-    );
-  };
+    const text = [
+      `${safeValue(signal.pair, "")} [${safeValue(signal.tradingStyle, "").toUpperCase()}]`,
+      `Direction: ${safeValue(signal.direction, "")}`,
+      `Entry: ${safeValue(signal.entry, "")}`,
+      `SL: ${safeValue(signal.stopLoss, "")}`,
+      `TP: ${safeValue(signal.takeProfit, "")}`,
+      `RR: 1:${safeValue(signal.riskReward, 0)}`,
+      `Confidence: ${safeValue(signal.confidence, 0)}%`,
+      `Risk: ${safeValue(signal.riskLevel, "")}`,
+      `TF: ${safeValue(signal.tfLabel, "")}`,
+      `Duration: ${safeValue(signal.durationEstimate, "")}`,
+    ].join("\n");
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
 
-  const dirConfig = signal ? ({
-    LONG:     { label: "LONG",       bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-500/30", icon: <TrendingUp   className="w-5 h-5" /> },
-    SHORT:    { label: "SHORT",      bg: "bg-red-500/15",     text: "text-red-600 dark:text-red-400",         border: "border-red-500/30",     icon: <TrendingDown className="w-5 h-5" /> },
-    NO_TRADE: { label: tx.noTrade,   bg: "bg-amber-500/15",   text: "text-amber-600 dark:text-amber-400",     border: "border-amber-500/30",   icon: <AlertTriangle className="w-5 h-5" /> },
-  } as const)[signal.direction] : null;
-
-  const styleColor = {
-    scalp: "bg-amber-500 text-white",
-    day:   "bg-sky-500 text-white",
-    swing: "bg-violet-500 text-white",
-  };
+  const dir = signal?.direction;
+  const dirConfig = dir === "LONG"
+    ? { bg: "bg-emerald-50 dark:bg-emerald-950/20", border: "border-emerald-300 dark:border-emerald-700",
+        text: "text-emerald-600 dark:text-emerald-400", icon: <TrendingUp className="w-6 h-6" />, label: "LONG — BUY" }
+    : dir === "SHORT"
+    ? { bg: "bg-red-50 dark:bg-red-950/20", border: "border-red-300 dark:border-red-700",
+        text: "text-red-500 dark:text-red-400",       icon: <TrendingDown className="w-6 h-6" />, label: "SHORT — SELL" }
+    : dir === "NO_TRADE"
+    ? { bg: "bg-muted/50",                            border: "border-border",
+        text: "text-muted-foreground",                icon: <Minus className="w-6 h-6" />,        label: "NO TRADE" }
+    : null;
 
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-base">
           <Brain className="w-4 h-4 text-violet-500" />
           {tx.title}
-          <Badge variant="outline" className="ml-auto text-[10px] px-1.5 py-0 font-normal text-muted-foreground">BETA</Badge>
         </CardTitle>
+        <p className="text-[11px] text-muted-foreground">{tx.subtitle}</p>
       </CardHeader>
 
       <CardContent className="space-y-3">
 
-        {/* ── Step 1: Select pair (flat list) */}
+        {/* ── Pair selector */}
         <div>
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{tx.selectPair}</p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1.5">{tx.pair}</p>
           <div className="flex flex-wrap gap-1.5">
-            {ALL_PAIRS.map(p => (
+            {(PAIRS || []).map(p => (
               <button
                 key={p}
-                onClick={() => { setPair(p); setSignal(null); }}
+                onClick={() => setSelectedPair(p)}
                 className={cn(
-                  "px-2.5 py-1 rounded-md text-xs font-medium border transition-colors",
-                  selectedPair === p
+                  "px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors",
+                  safeValue(selectedPair, "XAU/USD") === p
                     ? "bg-[#19432c] text-white border-[#19432c]"
-                    : HIGHLIGHT_PAIRS.has(p)
-                      ? "border-[#19432c]/40 text-[#19432c] dark:text-emerald-400 hover:bg-[#19432c]/10"
-                      : "border-border text-muted-foreground hover:bg-muted",
+                    : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground",
                 )}
               >
-                {HIGHLIGHT_PAIRS.has(p) && <span className="mr-1">⭐</span>}
                 {p}
               </button>
             ))}
           </div>
         </div>
 
-        {/* ── Step 2: Select style */}
+        {/* ── Style selector */}
         <div>
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{tx.selectStyle}</p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1.5">{tx.style}</p>
           <div className="flex gap-2">
             {STYLES.map(s => (
               <button
-                key={s.key}
-                onClick={() => { setStyle(s.key); setSignal(null); }}
+                key={s.value}
+                onClick={() => setSelectedStyle(s.value)}
                 className={cn(
-                  "flex-1 rounded-lg border py-2 text-center transition-colors",
-                  selectedStyle === s.key
-                    ? "border-transparent " + styleColor[s.key]
-                    : "border-border hover:bg-muted",
+                  "flex-1 rounded-lg border py-1.5 text-center transition-colors",
+                  safeValue(selectedStyle, "day") === s.value
+                    ? "bg-[#19432c] text-white border-[#19432c]"
+                    : "border-border text-muted-foreground hover:border-foreground/30",
                 )}
               >
-                <p className={cn("text-xs font-semibold", selectedStyle !== s.key && "text-foreground")}>
-                  {tx.styleLabel[s.key]}
+                <p className="text-[11px] font-semibold leading-none">
+                  {s.label[language === "id" ? "id" : "en"]}
                 </p>
-                <p className={cn("text-[10px] mt-0.5 flex items-center justify-center gap-0.5",
-                  selectedStyle === s.key ? "text-white/80" : "text-muted-foreground"
-                )}>
-                  <Clock className="w-3 h-3" /> {s.tfLabel}
+                <p className="text-[9px] opacity-70 mt-0.5">
+                  {s.sub[language === "id" ? "id" : "en"]}
                 </p>
               </button>
             ))}
@@ -315,8 +281,8 @@ export function AIForexCopilot() {
           disabled={analyze.isPending}
         >
           {analyze.isPending
-            ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />{tx.analyzingBtn(selectedPair)}</>
-            : <><Zap className="w-3.5 h-3.5 mr-1.5" />{tx.analyzeBtn(selectedPair, tx.styleLabel[selectedStyle])}</>
+            ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />{tx.analyzingBtn(safeValue(selectedPair, "XAU/USD"))}</>
+            : <><Zap className="w-3.5 h-3.5 mr-1.5" />{tx.analyzeBtn(safeValue(selectedPair, "XAU/USD"), tx.styleLabel[safeValue(selectedStyle, "day")] ?? safeValue(selectedStyle, "day"))}</>
           }
         </Button>
 
@@ -329,17 +295,17 @@ export function AIForexCopilot() {
 
             {/* TF badge */}
             <div className="flex items-center gap-2">
-              <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full", styleColor[signal.tradingStyle] ?? "bg-muted text-foreground")}>
-                {tx.styleLabel[signal.tradingStyle] ?? signal.tradingStyle ?? ""}
+              <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full", styleColor[safeValue(signal.tradingStyle, "day")] ?? "bg-muted text-foreground")}>
+                {tx.styleLabel[safeValue(signal.tradingStyle, "day")] ?? signal.tradingStyle ?? ""}
               </span>
               <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <Clock className="w-3 h-3" /> {signal.tfLabel ?? ""}
+                <Clock className="w-3 h-3" /> {safeValue(signal.tfLabel, "")}
               </span>
             </div>
 
             {/* 1 — Multi-Agent Summary */}
             <div className="grid grid-cols-2 gap-2">
-              {(Object.entries(signal.agentsConsensus ?? {}) as [string, string][]).map(([agent, vote]) => (
+              {(Object.entries(safeValue(signal.agentsConsensus, {}) as Record<string, string>)).map(([agent, vote]) => (
                 <div key={agent} className={cn("rounded-lg border p-2.5 flex items-center gap-2", voteBg(vote))}>
                   <span className={cn("shrink-0", voteColor(vote))}><AgentIcon agent={agent} /></span>
                   <div className="min-w-0">
@@ -364,7 +330,7 @@ export function AIForexCopilot() {
                       {dirConfig.icon} {tx.noTrade}
                     </div>
                     <p className="text-xs text-muted-foreground">{tx.noTradeMsg}</p>
-                    <p className="text-[10px] text-muted-foreground">{tx.noTradeConf(signal.confidence)}</p>
+                    <p className="text-[10px] text-muted-foreground">{tx.noTradeConf(safeValue(signal.confidence, 0))}</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -375,9 +341,9 @@ export function AIForexCopilot() {
                     {/* Entry / SL / TP */}
                     <div className="grid grid-cols-3 gap-2 text-left">
                       {[
-                        { label: tx.entry,      value: signal.entry },
-                        { label: tx.stopLoss,   value: signal.stopLoss },
-                        { label: tx.takeProfit, value: signal.takeProfit },
+                        { label: tx.entry,      value: safeValue(signal.entry,      "–") },
+                        { label: tx.stopLoss,   value: safeValue(signal.stopLoss,   "–") },
+                        { label: tx.takeProfit, value: safeValue(signal.takeProfit, "–") },
                       ].map(item => (
                         <div key={item.label} className="rounded-md bg-background/60 px-2 py-1.5">
                           <p className="text-[10px] text-muted-foreground">{item.label}</p>
@@ -390,11 +356,11 @@ export function AIForexCopilot() {
                     <div className="grid grid-cols-4 gap-1.5">
                       <div className="rounded-md bg-background/60 px-2 py-1.5">
                         <p className="text-[10px] text-muted-foreground">{tx.confidence}</p>
-                        <p className={cn("text-xs font-bold", dirConfig.text)}>{signal.confidence}%</p>
+                        <p className={cn("text-xs font-bold", dirConfig.text)}>{safeValue(signal.confidence, 0)}%</p>
                       </div>
                       <div className="rounded-md bg-background/60 px-2 py-1.5">
                         <p className="text-[10px] text-muted-foreground">{tx.rr}</p>
-                        <p className="text-xs font-bold">1:{signal.riskReward}</p>
+                        <p className="text-xs font-bold">1:{safeValue(signal.riskReward, 0)}</p>
                       </div>
                       <div className="rounded-md bg-background/60 px-2 py-1.5">
                         <p className="text-[10px] text-muted-foreground">{tx.risk}</p>
@@ -402,26 +368,26 @@ export function AIForexCopilot() {
                           signal.riskLevel === "high"   ? "text-red-500" :
                           signal.riskLevel === "medium" ? "text-amber-500" : "text-emerald-500"
                         )}>
-                          {tx.risks[signal.riskLevel as keyof typeof tx.risks]}
+                          {tx.risks[safeValue(signal.riskLevel, "low") as keyof typeof tx.risks] ?? safeValue(signal.riskLevel, "low")}
                         </p>
                       </div>
                       <div className="rounded-md bg-background/60 px-2 py-1.5">
                         <p className="text-[10px] text-muted-foreground">{tx.duration}</p>
-                        <p className="text-xs font-semibold leading-tight">{signal.durationEstimate}</p>
+                        <p className="text-xs font-semibold leading-tight">{safeValue(signal.durationEstimate, "–")}</p>
                       </div>
                     </div>
 
                     {/* Confidence bar */}
                     <div className="space-y-1">
                       <div className="flex justify-between text-[10px] text-muted-foreground">
-                        <span>{tx.confidence}</span><span>{signal.confidence}%</span>
+                        <span>{tx.confidence}</span><span>{safeValue(signal.confidence, 0)}%</span>
                       </div>
                       <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
                         <div
                           className={cn("h-full rounded-full transition-all duration-700",
                             signal.direction === "LONG" ? "bg-emerald-500" : "bg-red-500"
                           )}
-                          style={{ width: `${signal.confidence}%` }}
+                          style={{ width: `${safeValue(signal.confidence, 0)}%` }}
                         />
                       </div>
                     </div>
@@ -444,9 +410,9 @@ export function AIForexCopilot() {
               {debateOpen && (
                 <div className="px-3 pb-3 space-y-2 border-t border-border pt-2">
                   {[
-                    { label: tx.bullAgent, text: signal.debate?.bull  ?? "",  color: "text-emerald-600 dark:text-emerald-400" },
-                    { label: tx.bearAgent, text: signal.debate?.bear  ?? "",  color: "text-red-500 dark:text-red-400" },
-                    { label: tx.judge,     text: signal.debate?.judge ?? "",  color: "text-violet-600 dark:text-violet-400" },
+                    { label: tx.bullAgent, text: signal.debate?.bull  ?? "", color: "text-emerald-600 dark:text-emerald-400" },
+                    { label: tx.bearAgent, text: signal.debate?.bear  ?? "", color: "text-red-500 dark:text-red-400" },
+                    { label: tx.judge,     text: signal.debate?.judge ?? "", color: "text-violet-600 dark:text-violet-400" },
                   ].map(item => (
                     <div key={item.label}>
                       <p className={cn("text-[10px] font-semibold mb-0.5", item.color)}>{item.label}</p>
@@ -462,7 +428,7 @@ export function AIForexCopilot() {
               <p className="text-[10px] font-semibold text-muted-foreground mb-1.5 flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" /> {tx.reasoning}
               </p>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">{signal.reasoning}</p>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">{safeValue(signal.reasoning, "")}</p>
             </div>
 
             {/* Risk warning */}
@@ -482,7 +448,10 @@ export function AIForexCopilot() {
             </div>
 
             <p className="text-center text-[10px] text-muted-foreground">
-              {tx.cachedNote(signal.timestamp ? new Date(signal.timestamp).toLocaleTimeString() : "–", signal.tfLabel ?? "")}
+              {tx.cachedNote(
+                signal.timestamp ? new Date(signal.timestamp).toLocaleTimeString() : "–",
+                safeValue(signal.tfLabel, ""),
+              )}
             </p>
           </div>
         )}

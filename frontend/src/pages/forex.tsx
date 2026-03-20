@@ -181,8 +181,8 @@ function TradeRow({
           <div className="flex items-center gap-1.5">
             <span className="font-semibold text-sm">{t.symbol}</span>
             <Badge variant="outline" className={cn("text-[9px] px-1 py-0 uppercase",
-              t.type === "buy" ? "border-emerald-500 text-emerald-600" : "border-red-400 text-red-500")}>
-              {t.type}
+              (t.type ?? "") === "buy" ? "border-emerald-500 text-emerald-600" : "border-red-400 text-red-500")}>
+              {t.type ?? ""}
             </Badge>
             <span className="text-[10px] text-muted-foreground">{t.lot} lot</span>
           </div>
@@ -212,7 +212,7 @@ function TradeRow({
             <AlertDialogHeader>
               <AlertDialogTitle>Hapus trade ini?</AlertDialogTitle>
               <AlertDialogDescription>
-                <span className="font-semibold">{t.symbol} {t.type.toUpperCase()}</span>
+                <span className="font-semibold">{t.symbol ?? ""} {(t.type ?? "").toUpperCase()}</span>
                 {" "}({t.lot} lot, {fmtProfit(profit, "USD")}) akan dihapus permanen dan tidak dapat dibatalkan.
               </AlertDialogDescription>
             </AlertDialogHeader>
