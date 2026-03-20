@@ -144,7 +144,7 @@ export function ForexUploadSheet({ open, onClose }: Props) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-black/50 backdrop-blur-md z-[60]"
             onClick={handleClose}
           />
         )}
@@ -157,7 +157,7 @@ export function ForexUploadSheet({ open, onClose }: Props) {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-2xl shadow-2xl border-t flex flex-col"
+            className="fixed bottom-0 left-0 right-0 z-[70] bg-background rounded-t-2xl shadow-2xl border-t flex flex-col"
             style={{ maxHeight: "calc(92dvh - env(safe-area-inset-bottom, 0px))" }}
           >
             {/* Handle bar */}
