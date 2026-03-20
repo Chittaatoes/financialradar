@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,8 @@ interface Props {
 export function ForexUploadSheet({ open, onClose }: Props) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [stage, setStage] = useState<Stage>("upload");
   const [trades, setTrades] = useState<ParsedTrade[]>([]);
@@ -136,7 +139,9 @@ export function ForexUploadSheet({ open, onClose }: Props) {
     t => t.symbol && t.lot > 0 && t.openPrice > 0 && t.closePrice > 0,
   );
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <>
       <AnimatePresence>
         {open && (
@@ -345,7 +350,8 @@ export function ForexUploadSheet({ open, onClose }: Props) {
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </>,
+    document.body,
   );
 }
 
