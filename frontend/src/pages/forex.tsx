@@ -261,7 +261,7 @@ export default function ForexPage() {
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-violet-500" />
-            Forex Tracker
+            Forex
           </h1>
           <p className="text-xs text-muted-foreground">Trading Journal + Discipline Coach</p>
         </div>

@@ -2308,6 +2308,7 @@ export default function Dashboard() {
           { key: "aiAdvisor",  label: "AI Advisor",  icon: Brain,            path: "/ai-advisor", color: "text-pink-600 dark:text-pink-400",       bg: "bg-pink-500/10 dark:bg-pink-500/15" },
           { key: "tools",      label: "Tools",       icon: Wrench,           path: "/tools",      color: "text-slate-600 dark:text-slate-400",     bg: "bg-slate-500/10 dark:bg-slate-500/15" },
           { key: "market",     label: "Market",      icon: CandlestickChart, path: "/market",     color: "text-cyan-600 dark:text-cyan-400",       bg: "bg-cyan-500/10 dark:bg-cyan-500/15" },
+          { key: "forex",      label: "Forex",       icon: ArrowLeftRight,   path: "/forex",      color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-700/10 dark:bg-emerald-700/15" },
         ];
         const ITEMS_PER_PAGE = 5;
         const menuPages = Math.ceil(menuItems.length / ITEMS_PER_PAGE);
