@@ -23,6 +23,7 @@ interface AIForexSignal {
   pair: string;
   tradingStyle: TradingStyle;
   tfLabel: string;
+  durationEstimate: string;
   direction: "LONG" | "SHORT" | "NO_TRADE";
   entry: number;
   stopLoss: number;
@@ -95,6 +96,7 @@ const i18n = {
     entry:         "Entry",
     stopLoss:      "Stop Loss",
     takeProfit:    "Take Profit",
+    duration:      "Duration",
     agents:        { technical: "Technical", momentum: "Momentum", sentiment: "Sentiment", fundamentals: "Fundamentals" },
     votes:         { bullish: "Bullish", bearish: "Bearish", neutral: "Neutral" },
     risks:         { low: "Low", medium: "Medium", high: "High" },
@@ -135,6 +137,7 @@ const i18n = {
     entry:         "Entry",
     stopLoss:      "Stop Loss",
     takeProfit:    "Take Profit",
+    duration:      "Durasi",
     agents:        { technical: "Teknikal", momentum: "Momentum", sentiment: "Sentimen", fundamentals: "Fundamental" },
     votes:         { bullish: "Bullish", bearish: "Bearish", neutral: "Netral" },
     risks:         { low: "Rendah", medium: "Sedang", high: "Tinggi" },
@@ -222,7 +225,7 @@ export function AIForexCopilot() {
     const styleLabel = tx.styleLabel[signal.tradingStyle];
     const text = signal.direction === "NO_TRADE"
       ? `🚫 AI Copilot — NO TRADE on ${signal.pair} [${styleLabel} | ${signal.tfLabel}]\n${tx.noTradeMsg}\n${new Date(signal.timestamp).toLocaleString()}`
-      : `📊 AI Copilot Signal\nPair: ${signal.pair} | Style: ${styleLabel} (${signal.tfLabel})\nDirection: ${signal.direction}\nEntry: ${signal.entry} | SL: ${signal.stopLoss} | TP: ${signal.takeProfit}\nConfidence: ${signal.confidence}% | RR: 1:${signal.riskReward}\n${new Date(signal.timestamp).toLocaleString()}`;
+      : `📊 AI Copilot Signal\nPair: ${signal.pair} | Style: ${styleLabel} (${signal.tfLabel})\nDirection: ${signal.direction}\nEntry: ${signal.entry} | SL: ${signal.stopLoss} | TP: ${signal.takeProfit}\nConfidence: ${signal.confidence}% | RR: 1:${signal.riskReward} | Duration: ~${signal.durationEstimate}\n${new Date(signal.timestamp).toLocaleString()}`;
     navigator.clipboard.writeText(text).then(() =>
       toast({ title: tx.copiedTitle, description: tx.copiedDesc })
     );
@@ -383,7 +386,7 @@ export function AIForexCopilot() {
                       ))}
                     </div>
 
-                    {/* Confidence / RR / Style / Risk */}
+                    {/* Confidence / RR / Risk / Duration */}
                     <div className="grid grid-cols-4 gap-1.5">
                       <div className="rounded-md bg-background/60 px-2 py-1.5">
                         <p className="text-[10px] text-muted-foreground">{tx.confidence}</p>
@@ -394,10 +397,6 @@ export function AIForexCopilot() {
                         <p className="text-xs font-bold">1:{signal.riskReward}</p>
                       </div>
                       <div className="rounded-md bg-background/60 px-2 py-1.5">
-                        <p className="text-[10px] text-muted-foreground">{tx.tf}</p>
-                        <p className="text-xs font-semibold">{signal.tfLabel}</p>
-                      </div>
-                      <div className="rounded-md bg-background/60 px-2 py-1.5">
                         <p className="text-[10px] text-muted-foreground">{tx.risk}</p>
                         <p className={cn("text-xs font-semibold",
                           signal.riskLevel === "high"   ? "text-red-500" :
@@ -405,6 +404,10 @@ export function AIForexCopilot() {
                         )}>
                           {tx.risks[signal.riskLevel as keyof typeof tx.risks]}
                         </p>
+                      </div>
+                      <div className="rounded-md bg-background/60 px-2 py-1.5">
+                        <p className="text-[10px] text-muted-foreground">{tx.duration}</p>
+                        <p className="text-xs font-semibold leading-tight">{signal.durationEstimate}</p>
                       </div>
                     </div>
 

@@ -1,7 +1,7 @@
 // ─── AI Forex Copilot — Real Technical Analysis Engine ───────────────────────
 // Forex  → Frankfurter API (free, no key)
-// XAU/USD, BTC/USD → CryptoCompare histoday API (free, no key)
-// Indicator periods adapt to user-chosen trading style (scalp / day / swing)
+// XAU/USD, BTC/USD → CryptoCompare histoday OHLCV API (free, no key)
+// SL/TP: ATR-based, style-adaptive, pip-capped. RR enforced ≥ 1.5.
 
 import { marketCache } from "./market-cache";
 
@@ -25,48 +25,59 @@ export const SUPPORTED_PAIRS: Record<string, {
 };
 
 // ─── Style config ─────────────────────────────────────────────────────────────
-// Each style maps to different indicator periods + SL/TP multipliers.
-// We use daily close data as the base; period length simulates the TF perspective.
+// atrFraction: fraction of daily ATR used as base SL distance (simulates TF)
+// maxPips:     hard cap on SL in pip units → prevents unrealistic wide stops
+// tpMult:      TP = SL * tpMult (minimum RR enforced at 1.5)
+// minRR:       minimum required Risk:Reward
 
 const STYLE_CONFIG: Record<TradingStyle, {
+  // SMA / ROC indicator periods
   smaFast:   number;
   smaSlow:   number;
   smaTrend:  number;
   rocShort:  number;
   rocLong:   number;
-  sentLen:   number;       // lookback for candle sentiment
-  rocThreshFx:     number; // ROC threshold for forex
-  rocThreshCrypto: number; // ROC threshold for crypto
-  rocLongThreshFx:     number;
-  rocLongThreshCrypto: number;
-  slMult:    number;       // SL = atr * slMult
-  tpMult:    number;       // TP = SL * tpMult (always 1:2 RR)
-  tfLabel:   string;       // Display label
-  volWindow: number;       // volatility look-back
+  sentLen:   number;
+  rocThreshFx:          number;
+  rocThreshCrypto:      number;
+  rocLongThreshFx:      number;
+  rocLongThreshCrypto:  number;
+  volWindow: number;
+  // SL/TP
+  atrFraction: number;
+  maxPips:     number;
+  tpMult:      number;
+  minRR:       number;
+  // Meta
+  tfLabel:          string;
+  durationEstimate: string;
 }> = {
   scalp: {
     smaFast: 3,  smaSlow: 7,  smaTrend: 14,
     rocShort: 2, rocLong: 5,  sentLen: 3,
     rocThreshFx: 0.06, rocThreshCrypto: 0.5,
     rocLongThreshFx: 0.3, rocLongThreshCrypto: 2.0,
-    slMult: 0.5,  tpMult: 2.0, tfLabel: "M1 – M15",
     volWindow: 7,
+    atrFraction: 0.10, maxPips: 50,  tpMult: 1.5, minRR: 1.5,
+    tfLabel: "M1 – M15", durationEstimate: "15 – 60 min",
   },
   day: {
     smaFast: 10, smaSlow: 20, smaTrend: 50,
     rocShort: 5, rocLong: 20, sentLen: 5,
     rocThreshFx: 0.25, rocThreshCrypto: 1.5,
     rocLongThreshFx: 1.2, rocLongThreshCrypto: 5.0,
-    slMult: 1.0,  tpMult: 2.0, tfLabel: "H1 – H4",
     volWindow: 14,
+    atrFraction: 0.50, maxPips: 150, tpMult: 2.0, minRR: 1.5,
+    tfLabel: "H1 – H4", durationEstimate: "2 – 8 hours",
   },
   swing: {
     smaFast: 20, smaSlow: 50, smaTrend: 100,
     rocShort: 10, rocLong: 30, sentLen: 10,
     rocThreshFx: 0.5, rocThreshCrypto: 2.5,
     rocLongThreshFx: 2.5, rocLongThreshCrypto: 8.0,
-    slMult: 2.2,  tpMult: 2.0, tfLabel: "D1 – W1",
     volWindow: 30,
+    atrFraction: 1.50, maxPips: 400, tpMult: 3.0, minRR: 1.5,
+    tfLabel: "D1 – W1", durationEstimate: "2 – 7 days",
   },
 };
 
@@ -74,6 +85,7 @@ export interface AIForexSignal {
   pair: string;
   tradingStyle: TradingStyle;
   tfLabel: string;
+  durationEstimate: string;
   direction: "LONG" | "SHORT" | "NO_TRADE";
   entry: number;
   stopLoss: number;
@@ -93,6 +105,9 @@ export interface AIForexSignal {
 }
 
 type Vote = "bullish" | "bearish" | "neutral";
+
+// ─── OHLCV data structure ─────────────────────────────────────────────────────
+interface OHLCVBar { open: number; high: number; low: number; close: number; }
 
 // ─── Math helpers ─────────────────────────────────────────────────────────────
 
@@ -114,12 +129,102 @@ function roc(arr: number[], period: number): number {
   return ((cur - prev) / prev) * 100;
 }
 
+/**
+ * True ATR using OHLCV bars (Wilder method).
+ * When only close prices are available, falls back to average |Δclose|.
+ */
+function calculateATR(bars: OHLCVBar[], period = 14): number {
+  const trueRanges: number[] = [];
+  for (let i = 1; i < bars.length; i++) {
+    const h  = bars[i].high;
+    const l  = bars[i].low;
+    const pc = bars[i - 1].close;
+    trueRanges.push(Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc)));
+  }
+  const slice = trueRanges.slice(-Math.min(period, trueRanges.length));
+  return slice.reduce((a, b) => a + b, 0) / slice.length;
+}
+
+/**
+ * Approximate ATR from close-only data: average absolute daily change.
+ */
+function approxATR(closes: number[], period = 14): number {
+  const changes: number[] = [];
+  for (let i = 1; i < closes.length; i++) {
+    changes.push(Math.abs(closes[i] - closes[i - 1]));
+  }
+  const slice = changes.slice(-Math.min(period, changes.length));
+  return slice.reduce((a, b) => a + b, 0) / slice.length;
+}
+
+// ─── SL/TP generator ─────────────────────────────────────────────────────────
+
+interface SLTPResult {
+  stopLoss: number;
+  takeProfit: number;
+  riskReward: number;
+  effectiveStyle: TradingStyle;
+  slPips: number;
+}
+
+function generateSLTP(
+  entry: number,
+  direction: "LONG" | "SHORT" | "NO_TRADE",
+  rawATR: number,
+  style: TradingStyle,
+  pair: string,
+  pip: number,
+  decimals: number,
+): SLTPResult {
+  const sc = STYLE_CONFIG[style];
+
+  // Gold gets a 20% ATR inflation (higher intraday noise)
+  const atr = pair === "XAU/USD" ? rawATR * 1.2 : rawATR;
+
+  // Base SL = fraction of ATR simulating chosen TF
+  let slDist = atr * sc.atrFraction;
+
+  // Hard pip cap (prevents unrealistic ranges)
+  const maxSLDist = sc.maxPips * pip;
+  slDist = Math.min(slDist, maxSLDist);
+
+  // Safety: ensure SL is at least 1 pip
+  slDist = Math.max(slDist, pip);
+
+  // Determine TP (enforce min RR)
+  let tpDist = slDist * sc.tpMult;
+  const actualRR = tpDist / slDist;
+  if (actualRR < sc.minRR) {
+    tpDist = slDist * sc.minRR;
+  }
+
+  // Auto-upgrade scalp → day if SL still exceeds scalp cap after clamping
+  let effectiveStyle = style;
+  if (style === "scalp" && slDist > STYLE_CONFIG.scalp.maxPips * pip) {
+    effectiveStyle = "day";
+    const dc = STYLE_CONFIG.day;
+    tpDist = slDist * dc.tpMult;
+  }
+
+  if (slDist <= 0 || tpDist <= 0) throw new Error("Invalid SL/TP — ATR is zero or negative");
+
+  const fmt = (n: number) => parseFloat(n.toFixed(decimals));
+  const sl  = direction === "SHORT" ? fmt(entry + slDist) : fmt(entry - slDist);
+  const tp  = direction === "SHORT" ? fmt(entry - tpDist) : fmt(entry + tpDist);
+  const rr  = parseFloat((tpDist / slDist).toFixed(2));
+  const slPips = Math.round(slDist / pip);
+
+  return { stopLoss: sl, takeProfit: tp, riskReward: rr, effectiveStyle, slPips };
+}
+
 // ─── Data fetchers ────────────────────────────────────────────────────────────
 
-async function fetchForexRates(base: string, target: string): Promise<number[]> {
+interface ForexFetchResult { closes: number[]; bars: OHLCVBar[]; }
+
+async function fetchForexRates(base: string, target: string): Promise<ForexFetchResult> {
   const end   = new Date();
   const start = new Date();
-  start.setDate(start.getDate() - 120); // 120 days for swing indicator coverage
+  start.setDate(start.getDate() - 120);
   const fmt = (d: Date) => d.toISOString().split("T")[0];
 
   const url  = `${FRANKFURTER_BASE}/${fmt(start)}..${fmt(end)}?from=${base}&to=${target}`;
@@ -127,26 +232,40 @@ async function fetchForexRates(base: string, target: string): Promise<number[]> 
   if (!resp.ok) throw new Error(`Frankfurter API ${resp.status}`);
 
   const json  = await resp.json() as { rates: Record<string, Record<string, number>> };
-  const rates = Object.values(json.rates)
+  const closes = Object.values(json.rates)
     .map(r => r[target])
     .filter((v): v is number => typeof v === "number" && !isNaN(v));
 
-  if (rates.length < 15) throw new Error("Insufficient forex rate history");
-  return rates;
+  if (closes.length < 15) throw new Error("Insufficient forex rate history");
+
+  // Frankfurter has no OHLCV — synthesize bars from close data only
+  // (high/low approximated as ±0.03% of close; used for ATR via approxATR)
+  const bars: OHLCVBar[] = closes.map((c, i) => ({
+    open:  i > 0 ? closes[i - 1] : c,
+    high:  c * 1.0003,
+    low:   c * 0.9997,
+    close: c,
+  }));
+
+  return { closes, bars };
 }
 
-async function fetchCryptoRates(symbol: string): Promise<number[]> {
+async function fetchCryptoRates(symbol: string): Promise<ForexFetchResult> {
   const url  = `${CC_BASE}?fsym=${symbol}&tsym=USD&limit=120`;
   const resp = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!resp.ok) throw new Error(`CryptoCompare API ${resp.status}`);
 
-  const json  = await resp.json() as { Data: { Data: Array<{ close: number }> } };
-  const rates = json.Data.Data
-    .map(d => d.close)
-    .filter((v): v is number => typeof v === "number" && v > 0);
+  const json = await resp.json() as {
+    Data: { Data: Array<{ open: number; high: number; low: number; close: number }> }
+  };
+  const raw = json.Data.Data.filter(d => d.close > 0);
 
-  if (rates.length < 15) throw new Error("Insufficient crypto rate history");
-  return rates;
+  if (raw.length < 15) throw new Error("Insufficient crypto rate history");
+
+  const bars:   OHLCVBar[] = raw.map(d => ({ open: d.open, high: d.high, low: d.low, close: d.close }));
+  const closes: number[]   = raw.map(d => d.close);
+
+  return { closes, bars };
 }
 
 // ─── Core analysis ────────────────────────────────────────────────────────────
@@ -157,35 +276,33 @@ export async function analyzeForexPair(pair: string, tradingStyle: TradingStyle 
   const hit       = marketCache[cacheKey];
   if (hit && Date.now() - hit.ts < CACHE_TTL) return hit.data as AIForexSignal;
 
-  const cfg   = SUPPORTED_PAIRS[pair];
+  const cfg = SUPPORTED_PAIRS[pair];
   if (!cfg) throw new Error(`Unsupported pair: ${pair}`);
 
-  const sc    = STYLE_CONFIG[tradingStyle];
-  const rates = cfg.isCrypto
+  const { closes, bars } = cfg.isCrypto
     ? await fetchCryptoRates(cfg.base)
     : await fetchForexRates(cfg.base, cfg.target);
 
-  const current  = rates[rates.length - 1];
-  const decimals = cfg.decimals;
+  const sc      = STYLE_CONFIG[tradingStyle];
+  const current = closes[closes.length - 1];
 
-  // ── Style-aware indicators
-  const smaFast   = sma(rates, sc.smaFast);
-  const smaSlow   = sma(rates, sc.smaSlow);
-  const smaTrend  = sma(rates, sc.smaTrend);
-  const rocShort  = roc(rates, sc.rocShort);
-  const rocLong   = roc(rates, sc.rocLong);
-  const vol       = stdDev(rates, sc.volWindow);
-  const normVol   = (vol / current) * 100;
+  // ── Indicators (style-aware periods)
+  const smaFast  = sma(closes, sc.smaFast);
+  const smaSlow  = sma(closes, sc.smaSlow);
+  const smaTrend = sma(closes, sc.smaTrend);
+  const rocShort = roc(closes, sc.rocShort);
+  const rocLong  = roc(closes, sc.rocLong);
+  const vol      = stdDev(closes, sc.volWindow);
+  const normVol  = (vol / current) * 100;
 
-  const recentSlice = rates.slice(-sc.sentLen);
-  const upCandles   = recentSlice.filter((r, i) => i > 0 && r > recentSlice[i - 1]).length;
+  const recentSlice  = closes.slice(-sc.sentLen);
+  const upCandles    = recentSlice.filter((r, i) => i > 0 && r > recentSlice[i - 1]).length;
   const totalCandles = sc.sentLen - 1;
 
-  // Thresholds scale with style
   const rocThresh     = cfg.isCrypto ? sc.rocThreshCrypto     : sc.rocThreshFx;
   const rocLongThresh = cfg.isCrypto ? sc.rocLongThreshCrypto : sc.rocLongThreshFx;
 
-  // ── Agent 1: Technical (SMA crossover — style-aware periods)
+  // ── Agent 1: Technical (SMA crossover)
   let technical: Vote;
   if      (smaFast > smaSlow && current > smaSlow && smaSlow > smaTrend) technical = "bullish";
   else if (smaFast < smaSlow && current < smaSlow && smaSlow < smaTrend) technical = "bearish";
@@ -193,23 +310,23 @@ export async function analyzeForexPair(pair: string, tradingStyle: TradingStyle 
   else if (smaFast < smaSlow && current < smaSlow)                       technical = "bearish";
   else                                                                     technical = "neutral";
 
-  // ── Agent 2: Momentum (ROC — style-aware periods)
+  // ── Agent 2: Momentum (ROC)
   let momentum: Vote;
   if      (rocShort > rocThresh  && rocLong > 0)  momentum = "bullish";
   else if (rocShort < -rocThresh && rocLong < 0)  momentum = "bearish";
   else                                              momentum = "neutral";
 
-  // ── Agent 3: Sentiment (candle pattern — style-aware lookback)
+  // ── Agent 3: Sentiment (candle pattern)
   const sentThreshBull = Math.ceil(totalCandles * 0.65);
   const sentThreshBear = Math.floor(totalCandles * 0.35);
   let sentiment: Vote;
-  if      (upCandles >= sentThreshBull)                      sentiment = "bullish";
-  else if (upCandles <= sentThreshBear)                      sentiment = "bearish";
-  else if (upCandles > totalCandles / 2 && rocShort > 0)    sentiment = "bullish";
-  else if (upCandles < totalCandles / 2 && rocShort < 0)    sentiment = "bearish";
-  else                                                        sentiment = "neutral";
+  if      (upCandles >= sentThreshBull)                       sentiment = "bullish";
+  else if (upCandles <= sentThreshBear)                       sentiment = "bearish";
+  else if (upCandles > totalCandles / 2 && rocShort > 0)     sentiment = "bullish";
+  else if (upCandles < totalCandles / 2 && rocShort < 0)     sentiment = "bearish";
+  else                                                         sentiment = "neutral";
 
-  // ── Agent 4: Fundamentals (long-term trend via rocLong period)
+  // ── Agent 4: Fundamentals (long-term trend)
   let fundamentals: Vote;
   if      (rocLong > rocLongThresh)  fundamentals = "bullish";
   else if (rocLong < -rocLongThresh) fundamentals = "bearish";
@@ -232,18 +349,16 @@ export async function analyzeForexPair(pair: string, tradingStyle: TradingStyle 
   confidence = Math.min(93, Math.max(20, confidence));
   if (confidence < 55) direction = "NO_TRADE";
 
-  // ── SL / TP (style-scaled ATR proxy)
-  const atrBase  = vol * 1.4;
-  const minSl    = cfg.isCrypto ? current * 0.008 : current * 0.001;
-  const slDist   = Math.max(atrBase, minSl) * sc.slMult;
-  const tpDist   = slDist * sc.tpMult;
+  // ── ATR-based SL/TP (real OHLCV for crypto, approximated for forex)
+  const rawATR = cfg.isCrypto
+    ? calculateATR(bars, Math.min(14, bars.length - 1))
+    : approxATR(closes, 14);
 
-  const entry      = current;
-  const stopLoss   = direction === "SHORT" ? entry + slDist : entry - slDist;
-  const takeProfit = direction === "SHORT" ? entry - tpDist : entry + tpDist;
-  const riskReward = parseFloat((tpDist / slDist).toFixed(2));
+  const sltp = direction !== "NO_TRADE"
+    ? generateSLTP(current, direction, rawATR, tradingStyle, pair, cfg.pip, cfg.decimals)
+    : { stopLoss: 0, takeProfit: 0, riskReward: 0, effectiveStyle: tradingStyle, slPips: 0 };
 
-  // ── Risk level (volatility relative to style)
+  // ── Risk level
   const volHighThresh = cfg.isCrypto ? 4 : (tradingStyle === "scalp" ? 0.8 : tradingStyle === "day" ? 1.5 : 2.5);
   const volMedThresh  = cfg.isCrypto ? 2 : (tradingStyle === "scalp" ? 0.4 : tradingStyle === "day" ? 0.7 : 1.2);
   let riskLevel: "low" | "medium" | "high";
@@ -251,50 +366,52 @@ export async function analyzeForexPair(pair: string, tradingStyle: TradingStyle 
   else if (normVol > volMedThresh)  riskLevel = "medium";
   else                               riskLevel = "low";
 
-  // ── Text generation
-  const fmt       = (n: number) => n.toFixed(decimals);
+  // ── Text
+  const fmt       = (n: number) => n.toFixed(cfg.decimals);
   const smaPct    = ((smaFast - smaSlow) / smaSlow * 100).toFixed(3);
   const rocSLbl   = rocShort >= 0 ? `+${rocShort.toFixed(2)}%` : `${rocShort.toFixed(2)}%`;
   const rocLLbl   = rocLong  >= 0 ? `+${rocLong.toFixed(2)}%`  : `${rocLong.toFixed(2)}%`;
   const volLbl    = normVol.toFixed(2);
   const tfCtx     = `${sc.tfLabel} equivalent`;
+  const atrLbl    = rawATR.toFixed(cfg.decimals);
 
   const assetLabel = cfg.isCrypto
     ? (pair === "XAU/USD" ? "Gold (XAU/USD)" : "Bitcoin (BTC/USD)")
     : pair;
 
   const styleNote: Record<TradingStyle, string> = {
-    scalp: "Short-term scalp signals — fast momentum, tight SL/TP.",
-    day:   "Day trading signals — intraday momentum and trend.",
-    swing: "Swing trade signals — multi-day trend and momentum shift.",
+    scalp: "Short-term scalp — fast momentum, tight stops.",
+    day:   "Day trading — intraday momentum and trend.",
+    swing: "Swing trade — multi-day trend and momentum shift.",
   };
 
   const bullDebate = bullCount >= bearCount
-    ? `${assetLabel} [${tfCtx}] favors bulls. SMA${sc.smaFast} is ${smaPct}% ${parseFloat(smaPct) >= 0 ? "above" : "below"} SMA${sc.smaSlow}. ${sc.rocShort}-period ROC: ${rocSLbl}, ${sc.rocLong}-period trend: ${rocLLbl}. ${upCandles}/${totalCandles} recent candles closed higher. ${cfg.isCrypto ? "Risk-on macro environment supports the bullish thesis." : "SMA alignment confirms upward pressure."}`
-    : `Despite majority bearish signals, ${bullCount} agent(s) signal bullish. A SMA${sc.smaFast} reclaim at ${fmt(smaFast)} could trigger a move toward ${fmt(Math.abs(takeProfit))}.`;
+    ? `${assetLabel} [${tfCtx}] shows bullish bias. SMA${sc.smaFast} is ${smaPct}% ${parseFloat(smaPct) >= 0 ? "above" : "below"} SMA${sc.smaSlow}. ROC(${sc.rocShort}): ${rocSLbl}, ROC(${sc.rocLong}): ${rocLLbl}. ${upCandles}/${totalCandles} recent candles positive. ATR: ${atrLbl} → SL set at ${sltp.slPips} pips.`
+    : `${bullCount} agent(s) remain bullish despite majority bearish signals. A SMA${sc.smaFast} reclaim at ${fmt(smaFast)} could trigger recovery.`;
 
   const bearDebate = bearCount >= bullCount
-    ? `${bearCount} agents signal bearish for ${assetLabel} on ${tfCtx}. ${upCandles}/${totalCandles} recent candles up — weak recovery. ${sc.rocLong}-period ROC: ${rocLLbl}. Volatility: ${volLbl}%. SMA alignment: ${technical === "bearish" ? `bearish (SMA${sc.smaFast} < SMA${sc.smaSlow})` : "mixed"}.`
-    : `Bearish risks: volatility at ${volLbl}%. ${bearCount} agent(s) flag caution signals. ${cfg.isCrypto ? "Macro uncertainty could accelerate selling." : "Adverse macro events could reverse the trend quickly."}`;
+    ? `${bearCount} agents flag bearish conditions on ${assetLabel} [${tfCtx}]. ROC(${sc.rocLong}): ${rocLLbl}. Volatility: ${volLbl}%. SMA alignment: ${technical === "bearish" ? `bearish (SMA${sc.smaFast} < SMA${sc.smaSlow})` : "mixed"}.`
+    : `Bearish risks remain: vol at ${volLbl}%. ${bearCount} agent(s) warn. ${cfg.isCrypto ? "Macro uncertainty could accelerate selling." : "Adverse macro events could rapidly reverse trend."}`;
 
   const judgeDebate = direction === "NO_TRADE"
-    ? `Evidence: ${bullCount} bullish vs ${bearCount} bearish agents on ${tfCtx}. Confidence ${confidence.toFixed(0)}% < 55% threshold. Unclear structure — disciplined action is to wait for a cleaner setup.`
-    : `Verdict: ${direction} on ${assetLabel} [${tfCtx}]. ${Math.max(bullCount, bearCount)}/4 agents aligned. Confidence: ${confidence.toFixed(0)}%. Entry ${fmt(entry)} | SL ${fmt(stopLoss)} | TP ${fmt(takeProfit)} | RR 1:${riskReward}. ${riskLevel === "high" ? "Reduce position size — elevated volatility." : "Standard position sizing applies."}`;
+    ? `Evidence: ${bullCount} bullish vs ${bearCount} bearish on ${tfCtx}. Confidence ${confidence.toFixed(0)}% < 55% minimum. Market structure unclear — best action is to wait for a cleaner ${tradingStyle} setup.`
+    : `Verdict: ${direction} on ${assetLabel} [${tfCtx}]. ${Math.max(bullCount, bearCount)}/4 agents aligned. Confidence: ${confidence.toFixed(0)}%. Entry ${fmt(current)} | SL ${fmt(sltp.stopLoss)} (${sltp.slPips} pips) | TP ${fmt(sltp.takeProfit)} | RR 1:${sltp.riskReward}. Duration est: ${sc.durationEstimate}. ${riskLevel === "high" ? "⚠️ Reduce size — high volatility." : "Standard sizing applies."}`;
 
   const reasoning = direction === "NO_TRADE"
-    ? `[${tradingStyle.toUpperCase()} — ${sc.tfLabel}] ${assetLabel} analysis: ${bullCount} bullish, ${bearCount} bearish, ${4 - bullCount - bearCount} neutral signals. SMA${sc.smaFast}=${fmt(smaFast)}, SMA${sc.smaSlow}=${fmt(smaSlow)}. ROC(${sc.rocShort})=${rocSLbl}, ROC(${sc.rocLong})=${rocLLbl}. Sentiment: ${upCandles}/${totalCandles} candles up. Vol: ${volLbl}%. Confidence ${confidence.toFixed(0)}% < 55% → NO TRADE. Wait for clearer ${tradingStyle} setup.`
-    : `[${tradingStyle.toUpperCase()} — ${sc.tfLabel}] ${assetLabel}: ${direction} signal at ${confidence.toFixed(0)}% confidence. Technical (${technical}): SMA${sc.smaFast}=${fmt(smaFast)} ${parseFloat(smaPct) >= 0 ? "above" : "below"} SMA${sc.smaSlow}=${fmt(smaSlow)}, price ${current > smaSlow ? "above" : "below"} slow MA. Momentum (${momentum}): ${rocSLbl} / ${rocLLbl}. Sentiment (${sentiment}): ${upCandles}/${totalCandles} candles up. Fundamentals (${fundamentals}): ${rocLLbl} long-term. Plan: ${direction} @ ${fmt(entry)}, SL ${fmt(stopLoss)}, TP ${fmt(takeProfit)}, RR 1:${riskReward}. Risk: ${riskLevel}. ${styleNote[tradingStyle]} ${riskLevel === "high" ? "⚠️ High volatility — cut lot size." : riskLevel === "medium" ? "Moderate volatility — standard risk." : "Low volatility — clean entry conditions."}`;
+    ? `[${tradingStyle.toUpperCase()} — ${sc.tfLabel}] ${assetLabel}: ${bullCount} bullish, ${bearCount} bearish, ${4 - bullCount - bearCount} neutral. SMA${sc.smaFast}=${fmt(smaFast)}, SMA${sc.smaSlow}=${fmt(smaSlow)}. ROC(${sc.rocShort})=${rocSLbl}, ROC(${sc.rocLong})=${rocLLbl}. Sentiment: ${upCandles}/${totalCandles} up. Vol: ${volLbl}%. Confidence ${confidence.toFixed(0)}% < 55% → NO TRADE.`
+    : `[${tradingStyle.toUpperCase()} — ${sc.tfLabel}] ${assetLabel}: ${direction} at ${confidence.toFixed(0)}% confidence. ATR=${atrLbl} → SL ${sltp.slPips} pips (${fmt(sltp.stopLoss)}), TP ${fmt(sltp.takeProfit)}, RR 1:${sltp.riskReward}. Technicals (${technical}): SMA${sc.smaFast}=${fmt(smaFast)} vs SMA${sc.smaSlow}=${fmt(smaSlow)}, price ${current > smaSlow ? "above" : "below"} slow MA. Momentum (${momentum}): ${rocSLbl} / ${rocLLbl}. Sentiment (${sentiment}): ${upCandles}/${totalCandles} candles up. Fundamentals (${fundamentals}): ${rocLLbl} long-term. Duration est: ${sc.durationEstimate}. ${styleNote[tradingStyle]} Risk: ${riskLevel}. ${riskLevel === "high" ? "⚠️ High vol — cut lot size." : riskLevel === "medium" ? "Moderate — standard risk." : "Low vol — clean entry conditions."}`;
 
   const signal: AIForexSignal = {
     pair,
     tradingStyle,
-    tfLabel: sc.tfLabel,
+    tfLabel:          sc.tfLabel,
+    durationEstimate: sc.durationEstimate,
     direction,
-    entry:      parseFloat(fmt(entry)),
-    stopLoss:   parseFloat(fmt(stopLoss)),
-    takeProfit: parseFloat(fmt(takeProfit)),
+    entry:      parseFloat(current.toFixed(cfg.decimals)),
+    stopLoss:   sltp.stopLoss,
+    takeProfit: sltp.takeProfit,
     confidence: parseFloat(confidence.toFixed(1)),
-    riskReward,
+    riskReward: sltp.riskReward,
     riskLevel,
     agentsConsensus: { technical, momentum, sentiment, fundamentals },
     debate: { bull: bullDebate, bear: bearDebate, judge: judgeDebate },
