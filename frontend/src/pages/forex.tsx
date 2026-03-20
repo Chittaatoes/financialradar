@@ -14,6 +14,7 @@ import { useLanguage } from "@/lib/i18n";
 import { apiRequest } from "@/lib/queryClient";
 import { ForexUploadSheet } from "@/components/forex-upload-sheet";
 import { RiskCalculatorCard } from "@/components/risk-calculator-card";
+import { AIForexCopilot } from "@/components/ai-forex-copilot";
 import { cn } from "@/lib/utils";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -357,6 +358,9 @@ export default function ForexPage() {
 
       {/* Risk Calculator */}
       <RiskCalculatorCard />
+
+      {/* AI Trading Copilot */}
+      <AIForexCopilot />
 
       {/* Insights */}
       <Card>

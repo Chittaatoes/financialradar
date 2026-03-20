@@ -36,6 +36,7 @@ import { userProfiles, stockHoldings, transactions, forexTrades, tradingRules, t
 import { eq, sql, count, and, like, gte, lte } from "drizzle-orm";
 import { parseForexTrades } from "../services/forex-parser";
 import { cached, CACHE_TTL, registerWarmup } from "../services/market-cache";
+import { analyzeForexPair, SUPPORTED_PAIRS } from "../services/ai-copilot";
 
 // === REQUEST VALIDATION SCHEMAS ===
 // Zod schemas for validating POST/PATCH request bodies before database operations.
@@ -3023,6 +3024,26 @@ STYLE
     } catch (err) {
       console.error("forex/risk-settings PUT error:", err);
       res.status(500).json({ message: "Failed to save risk settings" });
+    }
+  });
+
+  // GET /api/forex/ai-pairs — List supported pairs
+  app.get("/api/forex/ai-pairs", isAuthenticated, (_req, res) => {
+    res.json({ pairs: Object.keys(SUPPORTED_PAIRS) });
+  });
+
+  // POST /api/forex/ai-analyze — AI Trading Copilot signal
+  app.post("/api/forex/ai-analyze", isAuthenticated, async (req, res) => {
+    try {
+      const { pair } = req.body as { pair?: string };
+      if (!pair || !SUPPORTED_PAIRS[pair]) {
+        return res.status(400).json({ message: `Unsupported pair. Choose from: ${Object.keys(SUPPORTED_PAIRS).join(", ")}` });
+      }
+      const signal = await analyzeForexPair(pair);
+      res.json(signal);
+    } catch (err) {
+      console.error("forex/ai-analyze error:", err);
+      res.status(500).json({ message: "Analysis failed. Please try again." });
     }
   });
 

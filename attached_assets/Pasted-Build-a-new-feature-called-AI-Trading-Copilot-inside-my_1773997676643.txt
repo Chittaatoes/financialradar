@@ -1,0 +1,278 @@
+Build a new feature called **"AI Trading Copilot"** inside my existing Forex page (React + TypeScript frontend, Node.js backend deployed on Render).
+
+This feature integrates with the TradingAgents framework (https://github.com/TauricResearch/TradingAgents) to generate AI-based trading decisions (LONG / SHORT / NO TRADE) for forex pairs.
+
+---
+
+## 🎯 MAIN GOAL
+
+Create an AI-powered assistant that:
+
+* Analyzes a selected forex pair
+* Uses multi-agent reasoning (technical, news, sentiment)
+* Produces a structured trading decision
+* Explains the reasoning (Explainable AI)
+* Integrates with existing trading journal & risk system
+
+---
+
+## 🧠 CORE FEATURES
+
+### 1. AI Analysis Panel (Frontend Component)
+
+Create a React component:
+
+`AIForexCopilot.tsx`
+
+UI must include:
+
+* Pair selector (EUR/USD, GBP/USD, etc)
+* Analyze button
+* Loading state (skeleton shimmer)
+
+After analysis:
+
+Display:
+
+1. Multi-Agent Summary:
+
+   * Technical: bullish / bearish / neutral
+   * News: bullish / bearish / neutral
+   * Sentiment: bullish / bearish / neutral
+   * Fundamentals: bullish / bearish / neutral
+
+2. AI Debate Section:
+
+   * Bull Agent reasoning
+   * Bear Agent reasoning
+   * Judge Agent conclusion
+
+3. Final Decision Card:
+
+   * Direction: LONG / SHORT / NO TRADE
+   * Style: scalp / day / swing / position
+   * Entry price
+   * Stop Loss
+   * Take Profit
+   * Confidence (0–100)
+   * Risk level (low / medium / high)
+   * Risk/Reward ratio
+
+4. Explainable Reasoning:
+
+   * Natural language explanation from AI
+
+5. Action Buttons:
+
+   * "Copy Signal"
+   * "Add to Journal"
+   * "Re-analyze"
+
+---
+
+### 2. NO TRADE Detection (IMPORTANT)
+
+If market condition is unclear:
+
+Return:
+
+* direction: "NO_TRADE"
+
+UI must show warning:
+
+"🚫 Market condition unclear. Avoid trading."
+
+---
+
+### 3. Trading Style Detection
+
+Automatically determine style based on:
+
+* volatility
+* timeframe signals
+* news impact
+
+Return:
+
+* scalp / day / swing / position
+
+---
+
+### 4. Signal Interface (TypeScript)
+
+```ts
+interface AIForexSignal {
+  pair: string;
+  direction: "LONG" | "SHORT" | "NO_TRADE";
+  style: "scalp" | "day" | "swing" | "position";
+  entry: number;
+  stopLoss: number;
+  takeProfit: number;
+  confidence: number;
+  riskReward: number;
+  riskLevel: "low" | "medium" | "high";
+  agentsConsensus: {
+    technical: "bullish" | "bearish" | "neutral";
+    news: "bullish" | "bearish" | "neutral";
+    sentiment: "bullish" | "bearish" | "neutral";
+    fundamentals: "bullish" | "bearish" | "neutral";
+  };
+  debate: {
+    bull: string;
+    bear: string;
+    judge: string;
+  };
+  reasoning: string;
+  timestamp: string;
+}
+```
+
+---
+
+## ⚙️ BACKEND IMPLEMENTATION
+
+### 1. Create new endpoint:
+
+POST `/api/forex/ai-analyze`
+
+### 2. Backend Architecture
+
+Node.js (Render) acts as proxy → Python TradingAgents service
+
+Flow:
+Frontend → Node API → Python AI → Node → Frontend
+
+---
+
+### 3. Python Service (TradingAgents)
+
+Create:
+
+`/python-ai/forex_ai.py`
+
+Use TradingAgentsGraph.
+
+Adapt stock logic → forex pair:
+
+Example:
+
+```python
+pair = "EURUSD"
+```
+
+Return structured response:
+
+```json
+{
+  "direction": "LONG",
+  "entry": 1.0870,
+  "stop_loss": 1.0840,
+  "take_profit": 1.0950,
+  "confidence": 78,
+  "risk_level": "medium",
+  "style": "swing",
+  "agents": {
+    "technical": "bullish",
+    "news": "neutral",
+    "sentiment": "bullish",
+    "fundamentals": "bullish"
+  },
+  "debate": {
+    "bull": "...",
+    "bear": "...",
+    "judge": "..."
+  },
+  "reasoning": "Detailed explanation..."
+}
+```
+
+---
+
+### 4. Node Route Example
+
+```ts
+app.post('/api/forex/ai-analyze', async (req, res) => {
+  const { pair } = req.body;
+
+  const response = await fetch('http://python-service/analyze', {
+    method: 'POST',
+    body: JSON.stringify({ pair })
+  });
+
+  const data = await response.json();
+
+  res.json(data);
+});
+```
+
+---
+
+## 🧩 FRONTEND INTEGRATION
+
+Add to existing forex page:
+
+```tsx
+<AIForexCopilot
+  pair={selectedPair}
+  onSignalGenerated={(signal) => {
+    setPendingTrade(signal);
+  }}
+/>
+```
+
+---
+
+## 🎨 UI REQUIREMENTS
+
+* Clean modern card design (similar to trading dashboard)
+* Use color codes:
+
+  * Green → bullish / LONG
+  * Red → bearish / SHORT
+  * Yellow → neutral / warning
+* Animated loading (skeleton shimmer)
+* Responsive (mobile friendly)
+
+---
+
+## 🔥 PERFORMANCE
+
+* Cache result for 1–3 minutes
+* Avoid repeated AI calls
+* Show last analysis instantly if available
+
+---
+
+## 🧠 EXTRA (IMPORTANT)
+
+* NEVER return random signals
+* If confidence < 55% → force "NO_TRADE"
+* Always include reasoning
+* Always include risk warning
+
+---
+
+## 🚀 MVP PRIORITY
+
+Phase 1:
+
+* Analyze button
+* LONG / SHORT / NO_TRADE
+* Entry / SL / TP
+* Confidence
+* Reasoning
+
+Phase 2:
+
+* Debate mode
+* Style detection
+* Risk warnings
+
+Phase 3:
+
+* Signal history
+* Win rate tracking
+
+---
+
+Build this feature clean, modular, and production-ready.
