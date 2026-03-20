@@ -4,8 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Camera, Upload, Loader2, AlertCircle, CheckCircle2, X,
-  Trash2, TrendingUp, TrendingDown, ChevronRight,
+  Upload, Loader2, AlertCircle, CheckCircle2, X,
+  Trash2, TrendingUp, TrendingDown, ChevronRight, ImageUp,
 } from "lucide-react";
 import { runOCR } from "@/lib/receipt-ocr";
 import { apiRequest } from "@/lib/queryClient";
@@ -38,7 +38,6 @@ interface Props {
 export function ForexUploadSheet({ open, onClose }: Props) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
 
   const [stage, setStage] = useState<Stage>("upload");
   const [trades, setTrades] = useState<ParsedTrade[]>([]);
@@ -183,30 +182,19 @@ export function ForexUploadSheet({ open, onClose }: Props) {
               {/* ── Upload stage ── */}
               {stage === "upload" && (
                 <div className="p-5 space-y-4">
-                  <div className="rounded-2xl border-2 border-dashed border-border bg-muted/30 p-8 flex flex-col items-center gap-3 text-center">
+                  {/* Tap-anywhere upload area */}
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    className="w-full rounded-2xl border-2 border-dashed border-border bg-muted/30 hover:bg-muted/50 hover:border-violet-400 transition-colors p-10 flex flex-col items-center gap-3 text-center"
+                  >
                     <div className="w-14 h-14 rounded-2xl bg-violet-500/15 flex items-center justify-center">
-                      <Upload className="w-7 h-7 text-violet-500" />
+                      <ImageUp className="w-7 h-7 text-violet-500" />
                     </div>
-                    <p className="text-sm font-medium">Upload screenshot MT4 / MT5</p>
-                    <p className="text-xs text-muted-foreground">Sistem akan membaca data trading secara otomatis</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => cameraRef.current?.click()}
-                      className="flex flex-col items-center gap-2 p-4 rounded-xl border bg-background hover:bg-muted/50 transition-colors"
-                    >
-                      <Camera className="w-6 h-6 text-violet-500" />
-                      <span className="text-xs font-medium">Ambil Screenshot</span>
-                    </button>
-                    <button
-                      onClick={() => fileRef.current?.click()}
-                      className="flex flex-col items-center gap-2 p-4 rounded-xl border bg-background hover:bg-muted/50 transition-colors"
-                    >
-                      <Upload className="w-6 h-6 text-sky-500" />
-                      <span className="text-xs font-medium">Pilih dari Galeri</span>
-                    </button>
-                  </div>
+                    <div>
+                      <p className="text-sm font-semibold">Pilih dari Galeri</p>
+                      <p className="text-xs text-muted-foreground mt-1">Pilih screenshot MT4 / MT5 dari galeri kamu</p>
+                    </div>
+                  </button>
 
                   <div className="relative flex items-center gap-3">
                     <div className="flex-1 border-t" />
@@ -221,8 +209,7 @@ export function ForexUploadSheet({ open, onClose }: Props) {
                     Input manual &rarr;
                   </button>
 
-                  {/* Hidden file inputs */}
-                  <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
+                  {/* Hidden file input (gallery) */}
                   <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
                 </div>
               )}
