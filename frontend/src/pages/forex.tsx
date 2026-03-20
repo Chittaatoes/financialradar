@@ -4,12 +4,17 @@ import {
   TrendingUp, TrendingDown, AlertTriangle, ShieldAlert,
   Target, BarChart3, Clock, Trophy, RefreshCw,
   ChevronDown, ChevronUp, Settings, Plus, Zap,
-  CheckCircle2, XCircle, ArrowUpRight, ArrowDownLeft,
+  CheckCircle2, XCircle, ArrowUpRight, ArrowDownLeft, Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useLanguage } from "@/lib/i18n";
 import { apiRequest } from "@/lib/queryClient";
 import { ForexUploadSheet } from "@/components/forex-upload-sheet";
@@ -153,12 +158,23 @@ function RulesEditor({ rules, onSave }: { rules: TradingRules; onSave: (r: Parti
   );
 }
 
-function TradeRow({ t, currency }: { t: ForexTrade; currency: "USD" | "IDR" }) {
+function TradeRow({
+  t, currency, onDelete, deleting,
+}: {
+  t: ForexTrade;
+  currency: "USD" | "IDR";
+  onDelete: (id: number) => void;
+  deleting: boolean;
+}) {
   const profit = Number(t.profit);
   const isWin  = profit >= 0;
-  const date   = t.createdAt ? new Date(t.createdAt).toLocaleDateString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "-";
+  const date   = t.createdAt
+    ? new Date(t.createdAt).toLocaleDateString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+    : "-";
+
   return (
-    <div className="flex items-center justify-between py-2 border-b border-border/50 last:border-0 gap-2">
+    <div className="group flex items-center justify-between py-2 border-b border-border/50 last:border-0 gap-2">
+      {/* Left — color bar + info */}
       <div className="flex items-center gap-2 min-w-0">
         <div className={cn("w-1.5 h-8 rounded-full shrink-0", isWin ? "bg-emerald-500" : "bg-red-400")} />
         <div className="min-w-0">
@@ -173,7 +189,45 @@ function TradeRow({ t, currency }: { t: ForexTrade; currency: "USD" | "IDR" }) {
           <p className="text-[10px] text-muted-foreground">{date}</p>
         </div>
       </div>
-      <ProfitBadge profit={profit} currency={currency} />
+
+      {/* Right — profit + delete */}
+      <div className="flex items-center gap-2 shrink-0">
+        <ProfitBadge profit={profit} currency={currency} />
+
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <button
+              disabled={deleting}
+              className={cn(
+                "p-1 rounded-md text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors",
+                "opacity-0 group-hover:opacity-100 focus:opacity-100",
+                deleting && "opacity-50 cursor-not-allowed",
+              )}
+              title="Hapus trade"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Hapus trade ini?</AlertDialogTitle>
+              <AlertDialogDescription>
+                <span className="font-semibold">{t.symbol} {t.type.toUpperCase()}</span>
+                {" "}({t.lot} lot, {fmtProfit(profit, "USD")}) akan dihapus permanen dan tidak dapat dibatalkan.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Batal</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => onDelete(t.id)}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                Ya, Hapus
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </div>
   );
 }
@@ -249,6 +303,16 @@ export default function ForexPage() {
   const saveRules = useMutation({
     mutationFn: (body: Partial<TradingRules>) => apiRequest("PUT", "/api/forex/rules", body).then(r => r.json()),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/forex/rules"] }); qc.invalidateQueries({ queryKey: ["/api/forex/psychology"] }); },
+  });
+
+  const deleteTrade = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/forex/trades/${id}`).then(r => r.json()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/forex/trades"] });
+      qc.invalidateQueries({ queryKey: ["/api/forex/stats"] });
+      qc.invalidateQueries({ queryKey: ["/api/forex/insights"] });
+      qc.invalidateQueries({ queryKey: ["/api/forex/psychology"] });
+    },
   });
 
   const displayedTrades = showAll ? trades : trades.slice(0, 10);
@@ -472,7 +536,15 @@ export default function ForexPage() {
             </div>
           ) : (
             <>
-              {displayedTrades.map(t => <TradeRow key={t.id} t={t} currency={currency} />)}
+              {displayedTrades.map(t => (
+                <TradeRow
+                  key={t.id}
+                  t={t}
+                  currency={currency}
+                  onDelete={(id) => deleteTrade.mutate(id)}
+                  deleting={deleteTrade.isPending && deleteTrade.variables === t.id}
+                />
+              ))}
               {trades.length > 10 && (
                 <Button variant="ghost" size="sm" className="w-full mt-2 text-xs" onClick={() => setShowAll(o => !o)}>
                   {showAll ? "Tampilkan lebih sedikit" : `Tampilkan semua (${trades.length} trade)`}

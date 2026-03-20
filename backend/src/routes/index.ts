@@ -2787,6 +2787,28 @@ STYLE
     }
   });
 
+  // DELETE /api/forex/trades/:id — Delete a single forex trade record
+  app.delete("/api/forex/trades/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId  = getUserId(req);
+      const tradeId = parseInt(req.params.id, 10);
+      if (isNaN(tradeId)) return res.status(400).json({ message: "Invalid trade ID" });
+
+      const existing = await db.query.forexTrades.findFirst({
+        where: and(eq(forexTrades.id, tradeId), eq(forexTrades.userId, userId)),
+      });
+      if (!existing) return res.status(404).json({ message: "Trade not found" });
+
+      await db.delete(forexTrades).where(
+        and(eq(forexTrades.id, tradeId), eq(forexTrades.userId, userId))
+      );
+      res.json({ success: true });
+    } catch (err) {
+      console.error("forex/trades DELETE error:", err);
+      res.status(500).json({ message: "Failed to delete trade" });
+    }
+  });
+
   // GET /api/forex/stats — Aggregate stats (today + all-time)
   app.get("/api/forex/stats", isAuthenticated, async (req, res) => {
     try {
