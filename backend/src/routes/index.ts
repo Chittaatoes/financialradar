@@ -36,7 +36,7 @@ import { userProfiles, stockHoldings, transactions, forexTrades, tradingRules, t
 import { eq, sql, count, and, like, gte, lte } from "drizzle-orm";
 import { parseForexTrades } from "../services/forex-parser";
 import { cached, CACHE_TTL, registerWarmup } from "../services/market-cache";
-import { analyzeForexPair, SUPPORTED_PAIRS } from "../services/ai-copilot";
+import { analyzeForexPair, SUPPORTED_PAIRS, type TradingStyle } from "../services/ai-copilot";
 
 // === REQUEST VALIDATION SCHEMAS ===
 // Zod schemas for validating POST/PATCH request bodies before database operations.
@@ -3035,11 +3035,14 @@ STYLE
   // POST /api/forex/ai-analyze — AI Trading Copilot signal
   app.post("/api/forex/ai-analyze", isAuthenticated, async (req, res) => {
     try {
-      const { pair } = req.body as { pair?: string };
+      const { pair, style } = req.body as { pair?: string; style?: string };
       if (!pair || !SUPPORTED_PAIRS[pair]) {
         return res.status(400).json({ message: `Unsupported pair. Choose from: ${Object.keys(SUPPORTED_PAIRS).join(", ")}` });
       }
-      const signal = await analyzeForexPair(pair);
+      const validStyles: TradingStyle[] = ["scalp", "day", "swing"];
+      const tradingStyle: TradingStyle  = validStyles.includes(style as TradingStyle)
+        ? (style as TradingStyle) : "day";
+      const signal = await analyzeForexPair(pair, tradingStyle);
       res.json(signal);
     } catch (err) {
       console.error("forex/ai-analyze error:", err);
