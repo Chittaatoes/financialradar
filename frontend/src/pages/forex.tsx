@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button"; 
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -321,9 +321,10 @@ export default function ForexPage() {
     },
   });
 
-  const displayedTrades = showAll ? trades : trades.slice(0, 10);
+  const safeTrades = trades ?? [];
+  const displayedTrades = showAll ? safeTrades : safeTrades.slice(0, 10);
 
-  const hasDanger  = psych?.alerts.some(a => a.severity === "danger");
+  const hasDanger = (psych?.alerts ?? []).some(a => a.severity === "danger");
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-4 pb-24 space-y-4">
@@ -347,9 +348,9 @@ export default function ForexPage() {
       </div>
 
       {/* Psychology Alerts */}
-      {!psychLoading && psych && psych.alerts.length > 0 && (
+      {!psychLoading && psych && (psych.alerts ?? []).length > 0 && (
         <div className="space-y-2">
-          {psych.alerts.map((a, i) => (
+          {(psych.alerts ?? []).map((a, i) => (
             <div key={i} className={cn("flex gap-2 p-3 rounded-lg border text-sm", SeverityBg(a.severity))}>
               <SeverityIcon s={a.severity} />
               <p className="leading-snug">{a.message}</p>
@@ -467,11 +468,11 @@ export default function ForexPage() {
               )}
 
               {/* By Symbol */}
-              {insights.bySymbol.length > 0 && (
+              {(insights.bySymbol ?? []).length > 0 && (
                 <div>
                   <p className="text-xs font-medium text-muted-foreground mb-2">Win Rate per Pair</p>
                   <div className="space-y-2">
-                    {insights.bySymbol.slice(0, 6).map(s => (
+                    {(insights.bySymbol ?? []).slice(0, 6).map(s => (
                       <div key={s.symbol} className="space-y-0.5">
                         <div className="flex justify-between text-xs">
                           <span className="font-medium">{s.symbol}</span>
@@ -487,7 +488,7 @@ export default function ForexPage() {
               )}
 
               {/* By Hour */}
-              {insights.byHour.length > 0 && (
+              {(insights.byHour ?? []).length > 0 && (
                 <div>
                   <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5" /> Profit per Jam
@@ -496,7 +497,7 @@ export default function ForexPage() {
                 </div>
               )}
 
-              {insights.bySymbol.length === 0 && insights.byHour.length === 0 && (
+              {(insights.bySymbol ?? []).length === 0 && (insights.byHour ?? []).length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">Upload trade pertama untuk melihat insights</p>
               )}
             </>
@@ -532,7 +533,7 @@ export default function ForexPage() {
         <CardContent className="px-4 pb-2">
           {tradesLoading ? (
             <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12" />)}</div>
-          ) : trades.length === 0 ? (
+          ) : safeTrades.length === 0 ? (
             <div className="text-center py-8 space-y-2">
               <TrendingUp className="w-10 h-10 mx-auto text-muted-foreground/30" />
               <p className="text-sm text-muted-foreground">Belum ada trade. Upload screenshot MT4/MT5 untuk mulai.</p>
@@ -551,9 +552,9 @@ export default function ForexPage() {
                   deleting={deleteTrade.isPending && deleteTrade.variables === t.id}
                 />
               ))}
-              {trades.length > 10 && (
+              {safeTrades.length > 10 && (
                 <Button variant="ghost" size="sm" className="w-full mt-2 text-xs" onClick={() => setShowAll(o => !o)}>
-                  {showAll ? "Tampilkan lebih sedikit" : `Tampilkan semua (${trades.length} trade)`}
+                  {showAll ? "Tampilkan lebih sedikit" : `Tampilkan semua (${safeTrades.length} trade)`}
                 </Button>
               )}
             </>
