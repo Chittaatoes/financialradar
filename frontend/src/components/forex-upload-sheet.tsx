@@ -12,6 +12,7 @@ import {
 import { runOCR } from "@/lib/receipt-ocr";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 interface ParsedTrade {
@@ -39,6 +40,8 @@ interface Props {
 
 export function ForexUploadSheet({ open, onClose }: Props) {
   const { toast } = useToast();
+  const { t } = useLanguage();
+  const fx = t.forex;
   const fileRef = useRef<HTMLInputElement>(null);
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -70,7 +73,7 @@ export function ForexUploadSheet({ open, onClose }: Props) {
     onSuccess: (data) => {
       if (data.debug) setDebugInfo(data.debug);
       if (!data.success || data.trades.length === 0) {
-        setParseError(data.message ?? "Tidak ada data trading yang terdeteksi. Coba input manual di bawah.");
+        setParseError(data.message ?? fx.sheetNoData);
         setStage("preview");
       } else {
         setTrades(data.trades);
@@ -79,7 +82,7 @@ export function ForexUploadSheet({ open, onClose }: Props) {
       }
     },
     onError: () => {
-      setParseError("Gagal menganalisis gambar. Coba input manual di bawah.");
+      setParseError(fx.sheetFailAnalyze);
       setStage("preview");
     },
   });
@@ -92,7 +95,7 @@ export function ForexUploadSheet({ open, onClose }: Props) {
       setStage("done");
     },
     onError: () => {
-      toast({ title: "Gagal menyimpan", description: "Coba lagi.", variant: "destructive" });
+      toast({ title: fx.sheetFailSave, description: fx.sheetTryAgain, variant: "destructive" });
       setStage("preview");
     },
   });
@@ -104,10 +107,10 @@ export function ForexUploadSheet({ open, onClose }: Props) {
       const text = await runOCR(file);
       parseMutation.mutate(text);
     } catch {
-      setParseError("Gagal membaca gambar. Coba input manual di bawah.");
+      setParseError(fx.sheetFailRead);
       setStage("preview");
     }
-  }, [parseMutation]);
+  }, [parseMutation, fx]);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -138,6 +141,14 @@ export function ForexUploadSheet({ open, onClose }: Props) {
   const isValidTrades = trades.length > 0 && trades.every(
     t => t.symbol && t.lot > 0 && t.openPrice > 0 && t.closePrice > 0,
   );
+
+  function stageSubtitle() {
+    if (stage === "upload")   return fx.sheetUpload;
+    if (stage === "scanning") return fx.sheetScanning;
+    if (stage === "preview")  return trades.length > 0 ? (fx.sheetPreview as any)(trades.length) : fx.sheetManual;
+    if (stage === "saving")   return fx.sheetSaving;
+    return fx.sheetDone;
+  }
 
   if (!mounted) return null;
 
@@ -171,14 +182,8 @@ export function ForexUploadSheet({ open, onClose }: Props) {
             {/* Header */}
             <div className="px-5 pt-3 pb-3 flex items-start justify-between shrink-0 border-b">
               <div>
-                <h3 className="text-base font-bold">Tambahkan Trading Hari Ini</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {stage === "upload"   && "Upload screenshot hasil trading kamu"}
-                  {stage === "scanning" && "Menganalisis trading..."}
-                  {stage === "preview"  && (trades.length > 0 ? `${trades.length} trade — periksa & konfirmasi` : "Input data trading manual")}
-                  {stage === "saving"   && "Menyimpan data..."}
-                  {stage === "done"     && "Data berhasil disimpan!"}
-                </p>
+                <h3 className="text-base font-bold">{fx.sheetTitle}</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">{stageSubtitle()}</p>
               </div>
               <button onClick={handleClose} className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted mt-0.5">
                 <X className="w-5 h-5" />
@@ -191,7 +196,6 @@ export function ForexUploadSheet({ open, onClose }: Props) {
               {/* ── Upload stage ── */}
               {stage === "upload" && (
                 <div className="p-5 space-y-3">
-                  {/* Gallery tap area — compact for mobile */}
                   <button
                     onClick={() => fileRef.current?.click()}
                     className="w-full rounded-2xl border-2 border-dashed border-border bg-muted/30 hover:bg-muted/50 hover:border-violet-400 active:scale-[0.99] transition-all p-6 flex flex-col items-center gap-3 text-center"
@@ -200,15 +204,14 @@ export function ForexUploadSheet({ open, onClose }: Props) {
                       <ImageUp className="w-6 h-6 text-violet-500" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold">Pilih dari Galeri</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Pilih screenshot MT4 / MT5</p>
+                      <p className="text-sm font-semibold">{fx.sheetChooseGallery}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{fx.sheetSelectMT}</p>
                     </div>
                   </button>
 
-                  {/* Manual input — styled as a proper button, always visible */}
                   <div className="relative flex items-center gap-3 py-1">
                     <div className="flex-1 border-t border-border/60" />
-                    <span className="text-[11px] text-muted-foreground font-medium">atau</span>
+                    <span className="text-[11px] text-muted-foreground font-medium">{fx.sheetOr}</span>
                     <div className="flex-1 border-t border-border/60" />
                   </div>
 
@@ -217,7 +220,7 @@ export function ForexUploadSheet({ open, onClose }: Props) {
                     className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-border bg-background hover:bg-muted/50 active:scale-[0.98] transition-all text-sm font-medium text-foreground"
                   >
                     <Upload className="w-4 h-4 text-muted-foreground" />
-                    Input manual
+                    {fx.sheetManualInput}
                     <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
                   </button>
 
@@ -232,8 +235,8 @@ export function ForexUploadSheet({ open, onClose }: Props) {
                     <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold">Menganalisis trading...</p>
-                    <p className="text-xs text-muted-foreground mt-1">OCR sedang membaca data dari screenshot kamu</p>
+                    <p className="text-sm font-semibold">{fx.sheetScanning}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{fx.sheetScanningDesc}</p>
                   </div>
                 </div>
               )}
@@ -253,17 +256,17 @@ export function ForexUploadSheet({ open, onClose }: Props) {
                             className="text-[10px] text-muted-foreground underline"
                             onClick={() => setShowDebug(v => !v)}
                           >
-                            {showDebug ? "Sembunyikan" : "Lihat"} teks OCR hasil baca
+                            {showDebug ? fx.sheetHide : fx.sheetView} {fx.sheetOCRText}
                           </button>
                           {showDebug && (
                             <div className="mt-2 space-y-1.5">
-                              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Teks asli:</p>
+                              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{fx.sheetRawText}</p>
                               <pre className="text-[10px] bg-muted rounded-lg p-2 overflow-x-auto whitespace-pre-wrap break-all max-h-24 overflow-y-auto">
-                                {debugInfo.rawText || "(kosong)"}
+                                {debugInfo.rawText || fx.sheetEmpty}
                               </pre>
-                              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Setelah normalisasi:</p>
+                              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{fx.sheetNormText}</p>
                               <pre className="text-[10px] bg-muted rounded-lg p-2 overflow-x-auto whitespace-pre-wrap break-all max-h-24 overflow-y-auto">
-                                {debugInfo.cleanText || "(kosong)"}
+                                {debugInfo.cleanText || fx.sheetEmpty}
                               </pre>
                             </div>
                           )}
@@ -274,11 +277,12 @@ export function ForexUploadSheet({ open, onClose }: Props) {
 
                   {trades.map((trade, i) => (
                     <TradeEditCard
-                      key={`${trade.symbol}-${trade.type}-${trade.openPrice}-${trade.closePrice}-${i}`}
+                      key={i}
                       trade={trade}
                       index={i}
                       onChange={updateTrade}
                       onDelete={deleteTrade}
+                      fx={fx}
                     />
                   ))}
 
@@ -286,7 +290,7 @@ export function ForexUploadSheet({ open, onClose }: Props) {
                     onClick={addManualTrade}
                     className="w-full py-3 rounded-xl border-2 border-dashed border-border text-xs text-muted-foreground hover:bg-muted/40 hover:border-foreground/20 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
                   >
-                    + Tambah trade lain
+                    {fx.sheetAddTrade}
                   </button>
                 </div>
               )}
@@ -298,27 +302,27 @@ export function ForexUploadSheet({ open, onClose }: Props) {
                     <CheckCircle2 className="w-8 h-8 text-emerald-500" />
                   </div>
                   <div>
-                    <p className="text-base font-bold">Data Tersimpan!</p>
+                    <p className="text-base font-bold">{fx.sheetSaved}</p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{saveResult.inserted} trade</span> berhasil disimpan
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{(fx.sheetSavedDesc as any)(saveResult.inserted)}</span>
                       {saveResult.duplicates > 0 && (
-                        <>, <span className="text-amber-500 font-semibold">{saveResult.duplicates}</span> dilewati (duplikat)</>
+                        <>, <span className="text-amber-500 font-semibold">{saveResult.duplicates}</span> {fx.sheetDuplicates}</>
                       )}
                     </p>
                   </div>
                   <div className="flex gap-3 w-full mt-2">
                     <Button variant="outline" className="flex-1" onClick={() => { reset(); }}>
-                      Upload Lagi
+                      {fx.sheetUploadAgain}
                     </Button>
                     <Button className="flex-1 bg-[#19432c] hover:bg-emerald-800 text-white" onClick={handleClose}>
-                      Selesai
+                      {fx.sheetDoneBtn}
                     </Button>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* ── Sticky footer (preview/saving) — above mobile nav ── */}
+            {/* ── Sticky footer (preview/saving) ── */}
             {(stage === "preview" || stage === "saving") && (
               <div
                 className="shrink-0 border-t px-4 pt-3 pb-3 bg-background space-y-2"
@@ -334,16 +338,16 @@ export function ForexUploadSheet({ open, onClose }: Props) {
                   }}
                 >
                   {stage === "saving" ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {fx.sheetSaving}</>
                   ) : (
-                    <>Simpan {trades.length} Trade <ChevronRight className="w-4 h-4 ml-1.5" /></>
+                    <>{(fx.sheetSave as any)(trades.length)} <ChevronRight className="w-4 h-4 ml-1.5" /></>
                   )}
                 </Button>
                 <button
                   onClick={() => { setStage("upload"); setTrades([]); setParseError(null); }}
                   className="w-full text-xs text-center text-muted-foreground py-1 hover:text-foreground transition-colors"
                 >
-                  ← Upload ulang
+                  {fx.sheetUploadAgainLink}
                 </button>
               </div>
             )}
@@ -355,14 +359,15 @@ export function ForexUploadSheet({ open, onClose }: Props) {
   );
 }
 
-// ─── Trade Edit Card — Fintech Style ─────────────────────────────────────────
+// ─── Trade Edit Card ─────────────────────────────────────────────────────────
 function TradeEditCard({
-  trade, index, onChange, onDelete,
+  trade, index, onChange, onDelete, fx,
 }: {
   trade: ParsedTrade;
   index: number;
   onChange: (i: number, field: keyof ParsedTrade, val: string) => void;
   onDelete: (i: number) => void;
+  fx: any;
 }) {
   const isBuy    = trade.type === "buy";
   const isProfit = trade.profit >= 0;
@@ -381,7 +386,6 @@ function TradeEditCard({
           ? "bg-gradient-to-r from-emerald-500/10 to-emerald-500/5"
           : "bg-gradient-to-r from-red-500/10 to-red-500/5",
       )}>
-        {/* Left: icon + symbol */}
         <div className="flex items-center gap-3">
           <div className={cn(
             "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
@@ -402,11 +406,10 @@ function TradeEditCard({
               )}
               placeholder="XAUUSD"
             />
-            <p className="text-[10px] text-muted-foreground -mt-0.5">Pasangan aset</p>
+            <p className="text-[10px] text-muted-foreground -mt-0.5">{fx.sheetAssetPair}</p>
           </div>
         </div>
 
-        {/* Right: BUY/SELL toggle + delete */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => onChange(index, "type", isBuy ? "sell" : "buy")}
@@ -431,28 +434,9 @@ function TradeEditCard({
 
       {/* ── Fields ── */}
       <div className="p-3 grid grid-cols-2 gap-2 bg-background">
-        {/* Lot */}
-        <FieldBox
-          label="Lot"
-          sublabel="Ukuran posisi"
-          value={String(trade.lot)}
-          onChange={v => onChange(index, "lot", v)}
-        />
-        {/* Open price */}
-        <FieldBox
-          label="Open"
-          sublabel="Harga buka"
-          value={String(trade.openPrice)}
-          onChange={v => onChange(index, "openPrice", v)}
-        />
-        {/* Close price */}
-        <FieldBox
-          label="Close"
-          sublabel="Harga tutup"
-          value={String(trade.closePrice)}
-          onChange={v => onChange(index, "closePrice", v)}
-        />
-        {/* Profit/Loss — spans full width + colored */}
+        <FieldBox label="Lot" sublabel={fx.sheetPosSize}   value={String(trade.lot)}        onChange={v => onChange(index, "lot", v)} />
+        <FieldBox label="Open"  sublabel={fx.sheetOpenPrice}  value={String(trade.openPrice)}  onChange={v => onChange(index, "openPrice", v)} />
+        <FieldBox label="Close" sublabel={fx.sheetClosePrice} value={String(trade.closePrice)} onChange={v => onChange(index, "closePrice", v)} />
         <div className={cn(
           "rounded-xl border p-3",
           isProfit
@@ -479,13 +463,8 @@ function TradeEditCard({
 }
 
 // ─── Reusable field box ───────────────────────────────────────────────────────
-function FieldBox({
-  label, sublabel, value, onChange,
-}: {
-  label: string;
-  sublabel: string;
-  value: string;
-  onChange: (v: string) => void;
+function FieldBox({ label, sublabel, value, onChange }: {
+  label: string; sublabel: string; value: string; onChange: (v: string) => void;
 }) {
   return (
     <div className="rounded-xl bg-muted/50 border border-border/60 p-3">
