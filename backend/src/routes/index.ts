@@ -36,7 +36,7 @@ import { userProfiles, stockHoldings, transactions, forexTrades, tradingRules, t
 import { eq, sql, count, and, like, gte, lte } from "drizzle-orm";
 import { parseForexTrades } from "../services/forex-parser";
 import { cached, CACHE_TTL, registerWarmup } from "../services/market-cache";
-import { analyzeForexPair, SUPPORTED_PAIRS, type TradingStyle } from "../services/ai-copilot";
+import { analyzeForexPair, warmAllPairs, SUPPORTED_PAIRS, type TradingStyle } from "../services/ai-copilot";
 
 // === REQUEST VALIDATION SCHEMAS ===
 // Zod schemas for validating POST/PATCH request bodies before database operations.
@@ -3104,6 +3104,8 @@ STYLE
       _macroFetch("fred_UNRATE",   `${FRED_BASE}UNRATE`),
       // ── Macro Radar — Forex Factory calendar (5-min cache) ────────────────
       _macroFetch("ff_events", "https://nfs.faireconomy.media/ff_calendar_thisweek.json"),
+      // ── AI Copilot — all 9 pairs × 3 styles (5-min cache, heaviest endpoint) ──
+      warmAllPairs(),
     ]);
   });
 

@@ -270,8 +270,18 @@ async function fetchCryptoRates(symbol: string): Promise<ForexFetchResult> {
 
 // ─── Core analysis ────────────────────────────────────────────────────────────
 
+const AI_COPILOT_TTL = 5 * 60 * 1000; // 5 min — matches health-ping interval so cache never goes cold
+
+/** Pre-warm all 9 pairs × 3 styles in parallel. Called by health warmup. */
+export async function warmAllPairs(): Promise<void> {
+  const pairs  = Object.keys(SUPPORTED_PAIRS);
+  const styles: TradingStyle[] = ["scalp", "day", "swing"];
+  const tasks  = pairs.flatMap(p => styles.map(s => analyzeForexPair(p, s).catch(() => null)));
+  await Promise.allSettled(tasks);
+}
+
 export async function analyzeForexPair(pair: string, tradingStyle: TradingStyle = "day"): Promise<AIForexSignal> {
-  const CACHE_TTL = 3 * 60 * 1000;
+  const CACHE_TTL = AI_COPILOT_TTL;
   const cacheKey  = `ai_copilot_${pair.replace("/", "_")}_${tradingStyle}`;
   const hit       = marketCache[cacheKey];
   if (hit && Date.now() - hit.ts < CACHE_TTL) return hit.data as AIForexSignal;
