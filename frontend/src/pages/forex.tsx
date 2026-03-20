@@ -298,6 +298,12 @@ export default function ForexPage() {
 
   const { data: insights, isLoading: insightsLoading } = useQuery<ForexInsights>({
     queryKey: ["/api/forex/insights"],
+    select: (d) => ({
+      bestPair:  d?.bestPair  ?? null,
+      worstPair: d?.worstPair ?? null,
+      bySymbol:  Array.isArray(d?.bySymbol) ? d.bySymbol : [],
+      byHour:    Array.isArray(d?.byHour)   ? d.byHour   : [],
+    }),
   });
 
   const saveRules = useMutation({

@@ -222,10 +222,10 @@ export function AIForexCopilot() {
 
   const copySignal = () => {
     if (!signal) return;
-    const styleLabel = tx.styleLabel[signal.tradingStyle];
+    const styleLabel = tx.styleLabel[signal.tradingStyle] ?? signal.tradingStyle ?? "";
     const text = signal.direction === "NO_TRADE"
-      ? `🚫 AI Copilot — NO TRADE on ${signal.pair} [${styleLabel} | ${signal.tfLabel}]\n${tx.noTradeMsg}\n${new Date(signal.timestamp).toLocaleString()}`
-      : `📊 AI Copilot Signal\nPair: ${signal.pair} | Style: ${styleLabel} (${signal.tfLabel})\nDirection: ${signal.direction}\nEntry: ${signal.entry} | SL: ${signal.stopLoss} | TP: ${signal.takeProfit}\nConfidence: ${signal.confidence}% | RR: 1:${signal.riskReward} | Duration: ~${signal.durationEstimate}\n${new Date(signal.timestamp).toLocaleString()}`;
+      ? `🚫 AI Copilot — NO TRADE on ${signal.pair ?? ""} [${styleLabel} | ${signal.tfLabel ?? ""}]\n${tx.noTradeMsg}\n${new Date(signal.timestamp).toLocaleString()}`
+      : `📊 AI Copilot Signal\nPair: ${signal.pair ?? ""} | Style: ${styleLabel} (${signal.tfLabel ?? ""})\nDirection: ${signal.direction}\nEntry: ${signal.entry} | SL: ${signal.stopLoss} | TP: ${signal.takeProfit}\nConfidence: ${signal.confidence}% | RR: 1:${signal.riskReward} | Duration: ~${signal.durationEstimate ?? ""}\n${new Date(signal.timestamp).toLocaleString()}`;
     navigator.clipboard.writeText(text).then(() =>
       toast({ title: tx.copiedTitle, description: tx.copiedDesc })
     );
@@ -329,17 +329,17 @@ export function AIForexCopilot() {
 
             {/* TF badge */}
             <div className="flex items-center gap-2">
-              <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full", styleColor[signal.tradingStyle])}>
-                {tx.styleLabel[signal.tradingStyle]}
+              <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full", styleColor[signal.tradingStyle] ?? "bg-muted text-foreground")}>
+                {tx.styleLabel[signal.tradingStyle] ?? signal.tradingStyle ?? ""}
               </span>
               <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <Clock className="w-3 h-3" /> {signal.tfLabel}
+                <Clock className="w-3 h-3" /> {signal.tfLabel ?? ""}
               </span>
             </div>
 
             {/* 1 — Multi-Agent Summary */}
             <div className="grid grid-cols-2 gap-2">
-              {(Object.entries(signal.agentsConsensus) as [string, string][]).map(([agent, vote]) => (
+              {(Object.entries(signal.agentsConsensus ?? {}) as [string, string][]).map(([agent, vote]) => (
                 <div key={agent} className={cn("rounded-lg border p-2.5 flex items-center gap-2", voteBg(vote))}>
                   <span className={cn("shrink-0", voteColor(vote))}><AgentIcon agent={agent} /></span>
                   <div className="min-w-0">
@@ -444,9 +444,9 @@ export function AIForexCopilot() {
               {debateOpen && (
                 <div className="px-3 pb-3 space-y-2 border-t border-border pt-2">
                   {[
-                    { label: tx.bullAgent, text: signal.debate.bull,  color: "text-emerald-600 dark:text-emerald-400" },
-                    { label: tx.bearAgent, text: signal.debate.bear,  color: "text-red-500 dark:text-red-400" },
-                    { label: tx.judge,     text: signal.debate.judge, color: "text-violet-600 dark:text-violet-400" },
+                    { label: tx.bullAgent, text: signal.debate?.bull  ?? "",  color: "text-emerald-600 dark:text-emerald-400" },
+                    { label: tx.bearAgent, text: signal.debate?.bear  ?? "",  color: "text-red-500 dark:text-red-400" },
+                    { label: tx.judge,     text: signal.debate?.judge ?? "",  color: "text-violet-600 dark:text-violet-400" },
                   ].map(item => (
                     <div key={item.label}>
                       <p className={cn("text-[10px] font-semibold mb-0.5", item.color)}>{item.label}</p>
@@ -482,7 +482,7 @@ export function AIForexCopilot() {
             </div>
 
             <p className="text-center text-[10px] text-muted-foreground">
-              {tx.cachedNote(new Date(signal.timestamp).toLocaleTimeString(), signal.tfLabel)}
+              {tx.cachedNote(signal.timestamp ? new Date(signal.timestamp).toLocaleTimeString() : "–", signal.tfLabel ?? "")}
             </p>
           </div>
         )}
