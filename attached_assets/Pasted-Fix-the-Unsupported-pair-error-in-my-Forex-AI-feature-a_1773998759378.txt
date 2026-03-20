@@ -1,0 +1,160 @@
+Fix the "Unsupported pair" error in my Forex AI feature and make the system support multi-asset pairs including XAU/USD.
+
+---
+
+## 🐛 CURRENT ISSUE
+
+When selecting XAU/USD, the API returns:
+
+"Unsupported pair. Choose from: EUR/USD, GBP/USD, USD/JPY, AUD/USD, USD/CHF, NZD/USD, USD/CAD"
+
+This is incorrect because the TradingAgents framework supports any ticker (including XAUUSD).
+
+---
+
+## 🎯 GOAL
+
+* Remove hardcoded pair restrictions
+* Support all forex pairs + gold (XAU/USD)
+* Normalize pair format for TradingAgents
+* Make system scalable for future assets (crypto, stocks)
+
+---
+
+## 🔧 BACKEND FIX (Node.js)
+
+### 1. REMOVE HARDCODED VALIDATION
+
+Find and remove this logic:
+
+```ts
+const allowedPairs = [...];
+if (!allowedPairs.includes(pair)) {
+  throw new Error("Unsupported pair");
+}
+```
+
+Replace with dynamic handling (NO hard limit).
+
+---
+
+### 2. ADD PAIR NORMALIZATION FUNCTION
+
+```ts
+function normalizePair(pair: string): string {
+  return pair.replace("/", "").toUpperCase();
+}
+```
+
+---
+
+### 3. ADD ASSET TYPE DETECTION
+
+```ts
+function detectAssetType(pair: string): "forex" | "gold" | "crypto" {
+  if (pair.includes("XAU")) return "gold";
+  if (pair.includes("BTC") || pair.includes("ETH")) return "crypto";
+  return "forex";
+}
+```
+
+---
+
+### 4. UPDATE API HANDLER
+
+```ts
+app.post('/api/forex/ai-analyze', async (req, res) => {
+  const { pair } = req.body;
+
+  const normalized = normalizePair(pair);
+  const assetType = detectAssetType(pair);
+
+  const response = await fetch('http://python-service/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ticker: normalized,
+      assetType
+    })
+  });
+
+  const data = await response.json();
+  res.json(data);
+});
+```
+
+---
+
+## 🐍 PYTHON (TradingAgents FIX)
+
+Update your Python service to accept dynamic ticker:
+
+```python
+ticker = request.json.get("ticker")  # e.g. XAUUSD
+```
+
+Ensure NO restriction on ticker name.
+
+---
+
+### OPTIONAL: HANDLE GOLD CONTEXT
+
+```python
+if ticker == "XAUUSD":
+    context = "Gold vs USD (macro-driven, sensitive to interest rates and inflation)"
+```
+
+---
+
+## 🎯 FRONTEND FIX
+
+### 1. REMOVE BLOCKING ERROR UI
+
+Do NOT block XAU/USD selection.
+
+### 2. SEND RAW PAIR
+
+```ts
+fetch('/api/forex/ai-analyze', {
+  method: 'POST',
+  body: JSON.stringify({ pair: selectedPair })
+});
+```
+
+---
+
+## ⚠️ IMPORTANT RULES
+
+* NEVER hardcode allowed pairs again
+* ALWAYS normalize before sending to AI
+* ALWAYS support new assets without code change
+
+---
+
+## 🚀 EXPECTED RESULT
+
+Now the system should support:
+
+* EUR/USD ✅
+* GBP/USD ✅
+* NZD/USD ✅
+* XAU/USD ✅ (FIXED)
+* BTC/USD (future-ready) ✅
+
+---
+
+## 🔥 BONUS (OPTIONAL IMPROVEMENT)
+
+Return this in API:
+
+```json
+{
+  "pair": "XAU/USD",
+  "normalized": "XAUUSD",
+  "assetType": "gold"
+}
+```
+
+---
+
+Make the fix clean, modular, and production-ready.
